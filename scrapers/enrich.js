@@ -33,7 +33,7 @@ import { fileURLToPath } from 'node:url';
 
 import { enrichKey } from '../lib/enrich-key.js';
 import { parseDoubanCard, resolveDouban } from './douban-suggest.js';
-import { imdbRatings, imdbUrl, resolveImdbIds } from './imdb.js';
+import { imdbRatings, imdbUrl, isReissueEvidence, matchesDoubanYear, resolveImdbIds } from './imdb.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -113,49 +113,64 @@ function needsWork(row, now) {
   return !(fresh && dFresh);
 }
 
-async function fetchImdb(names, year) {
-  // 括号里往往是院线自己的标记（(GFF) / (IMAX) / (The Royal Ballet 2026 – 2027)），
-  // 带上去 IMDb 根本搜不到，所以额外备一份去掉括号的写法。
-  const queries = [...new Set(names.flatMap((n) => (n ? [n, cleanTitle(n)] : [])).filter(Boolean))];
-  const cands = await resolveImdbIds(queries, year);
-  if (!cands.length) return null;
-
-  // ★ 重映按最初上映版本的评分算（产品要求）
-  //
-  // 重映片在 IMDb 常有多个条目：1997 原版（有分）与 2025 为重映新开的条目（无分），
-  // 按可信度选中的往往是新条目，直接展示就是「暫無評分」。
-  //
-  // 开销考虑：先只查首选，**拿到分就不再查后面的候选**。
-  // 否则 212 部×最多 5 个候选会把评分接口打爆（也慢得多）；
-  // 首选无分才逐个回退到更早的条目，取年份最早且有分的那个（= 原版）。
-  let best = null; // { c, r }
-  for (let idx = 0; idx < cands.length; idx++) {
-    const c = cands[idx];
-    const r = await imdbRatings(c.id);
-    await sleep(jitter(180, 420));
-    if (r && r.rating != null) {
-      if (idx === 0) { best = { c, r }; break; } // 首选就有分，不必再找原版
-      // 已发生回退：剩下的候选年份只会更近，取当前这个（最早且有分）
-      best = { c, r };
-      break;
-    }
-  }
-  const pick = best ? best.c : cands[0];
-
+/**
+ * 组装 IMDb 结果对象（首选 / 回退共用）
+ */
+function shapeImdb(pick, rating, cands, extra = {}) {
   return {
     imdbId: pick.id,
     imdbUrl: imdbUrl(pick.id),
     imdbTitle: pick.title || null,
     imdbYear: pick.year || null,
     // rating 为 null 是合法状态：条目存在但人数不足，尚未出分
-    rating: best ? best.r.rating : null,
-    votes: best ? best.r.votes : null,
+    rating: rating ? rating.rating : null,
+    votes: rating ? rating.votes : null,
     queriedWith: pick.query,
     relaxedYear: pick.relaxedYear || undefined,
     // 实际展示的不是首选条目（发生了重映回退），记下来源便于事后查错
     fallbackFrom: pick.id === cands[0].id ? undefined : cands[0].id,
     candidates: cands.map((c) => `${c.id}:${c.year ?? '?'}:${c.s}`).slice(0, 4),
+    ...extra,
   };
+}
+
+async function fetchImdb(names, year, opt = {}) {
+  // 括号里往往是院线自己的标记（(GFF) / (IMAX) / (The Royal Ballet 2026 – 2027)），
+  // 带上去 IMDb 根本搜不到，所以额外备一份去掉括号的写法。
+  const queries = [...new Set(names.flatMap((n) => (n ? [n, cleanTitle(n)] : [])).filter(Boolean))];
+  const cands = await resolveImdbIds(queries, year);
+  if (!cands.length) return null;
+
+  // 首选候选：先看它自己有没有分。
+  // 开销考虑：拿到分就不再查后面的候选，否则 212 部×最多 5 个候选会把评分接口打爆。
+  const first = cands[0];
+  const firstRating = await imdbRatings(first.id);
+  await sleep(jitter(180, 420));
+  if (firstRating && firstRating.rating != null) {
+    return shapeImdb(first, firstRating, cands);
+  }
+
+  // ★ 首选无分。只有拿到「真重映」的正面证据才回退到更早的原版。
+  //
+  // 没有证据就保留首选条目（页面显示「暫無評分」），
+  // 不冒把同名旧片分数挂到新片上的风险 —— 实测 11 个回退里 7 个是这么错的。
+  // 证据来自豆瓣年份，所以调用方必须**先跑豆瓣再跑 IMDb**（见 main 循环）。
+  const allow = isReissueEvidence(opt.doubanYear, year);
+  let best = null;
+  if (allow) {
+    for (let idx = 1; idx < cands.length; idx++) {
+      const c = cands[idx];
+      // 第二道闸门：这条候选的年份得跟豆瓣原作年对得上，
+      // 否则只是「另一部同名老片」（恨世者/天鵝湖 实测踩过）。
+      if (!matchesDoubanYear(c.year, opt.doubanYear)) continue;
+      const r = await imdbRatings(c.id);
+      await sleep(jitter(180, 420));
+      if (r && r.rating != null) { best = { c, r }; break; }
+    }
+  }
+  return best
+    ? shapeImdb(best.c, best.r, cands)
+    : shapeImdb(first, null, cands, { reissueEvidence: allow });
 }
 
 /**
@@ -276,32 +291,9 @@ async function main() {
     const ov = manual[p.key];
     if (ov) row.manual = ov;
 
-    try {
-      // IMDb 也要按自己的新鲜度判：needsWork 会因为「豆瓣还没跑过」而放行，
-      // 那时 IMDb 往往是刚抓的，不卡就会每轮重跑 212 次搜索。
-      // 时间戳在 row 顶层（updatedAt），imdb 子对象里没这个字段。
-      const iAt = row.updatedAt ? Date.parse(row.updatedAt) : 0;
-      const iFresh =
-        DUBAN_ONLY ||
-        (REFRESH_DAYS !== 0 &&
-          !!row.imdb &&
-          (row.imdb.notFound ? now - iAt <= 7 * 864e5 : now - iAt <= REFRESH_DAYS * 864e5));
-      if (ov?.imdbId && !DUBAN_ONLY) {
-        row.imdb = await fetchImdbById(ov.imdbId);
-        if (row.imdb.rating != null) hits++;
-      } else if (iFresh) {
-        reused++;
-      } else {
-        const hit = await fetchImdb(p.queries, p.year);
-        row.imdb = hit || { notFound: true };
-        if (hit?.rating != null) hits++;
-      }
-    } catch (e) {
-      log(`  ⚠️ IMDb ${p.nameZh || p.nameEn}: ${e.message}`);
-    }
-
     // ---------- 豆瓣 ----------
-    // 单独一个 try：豆瓣挂了不能把已拿到的 IMDb 结果一起抹掉。
+    // ★ 必须先跑豆瓣再跑 IMDb：IMDb 的「重映回退」要拿豆瓣年份当证据
+    //   （见 isReissueEvidence）。豆瓣挂了不影响 IMDb，两个 try 各自独立。
     // 已有 douban 且未过期时不重查（刷新周期比 IMDb 长）。
     if (!NO_DUBAN) {
       const dAt = row.douban?.at ? Date.parse(row.douban.at) : 0;
@@ -326,6 +318,33 @@ async function main() {
           log(`  ⚠️ 豆瓣 ${p.nameZh || p.nameEn}: ${e.message}`);
         }
       }
+    }
+
+    // ---------- IMDb ----------
+    try {
+      // IMDb 也要按自己的新鲜度判：needsWork 会因为「豆瓣还没跑过」而放行，
+      // 那时 IMDb 往往是刚抓的，不卡就会每轮重跑 212 次搜索。
+      // 时间戳在 row 顶层（updatedAt），imdb 子对象里没这个字段。
+      const iAt = row.updatedAt ? Date.parse(row.updatedAt) : 0;
+      const iFresh =
+        DUBAN_ONLY ||
+        (REFRESH_DAYS !== 0 &&
+          !!row.imdb &&
+          (row.imdb.notFound ? now - iAt <= 7 * 864e5 : now - iAt <= REFRESH_DAYS * 864e5));
+      if (ov?.imdbId && !DUBAN_ONLY) {
+        row.imdb = await fetchImdbById(ov.imdbId);
+        if (row.imdb.rating != null) hits++;
+      } else if (iFresh) {
+        reused++;
+      } else {
+        const hit = await fetchImdb(p.queries, p.year, {
+          doubanYear: row.douban?.doubanYear ?? null,
+        });
+        row.imdb = hit || { notFound: true };
+        if (hit?.rating != null) hits++;
+      }
+    } catch (e) {
+      log(`  ⚠️ IMDb ${p.nameZh || p.nameEn}: ${e.message}`);
     }
 
     row.updatedAt = new Date().toISOString();

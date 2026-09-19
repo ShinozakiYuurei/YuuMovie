@@ -63,21 +63,8 @@ export function buildIntro(group: MovieGroup): MovieIntro {
   const man = e?.manual || null;
   // ---------- 评分 ----------
   // 「匹到条目但尚未出分」也展示（新片常见），只有完全查不到才整块不出现。
-  // 顺序：豆瓣在前、IMDb 在后（中文站习惯，也与 hkmovie6 一致）。
+  // 顺序：IMDb 在前、豆瓣在后（用户 2026-09-19 指定）。
   const ratings: IntroRating[] = [];
-
-  const d = e?.douban && !e.douban.notFound ? e.douban : null;
-  // 豆瓣卡片**不返回评分人数**（card_subtitle 里只有分数），
-  // 所以 votes 恒为 null；没人数就不写人数，不拿 IMDb 的凑。
-  if (d && d.ratingState !== 'unreleased') {
-    ratings.push({
-      source: 'douban',
-      label: '豆瓣',
-      value: d.rating ?? null,
-      votes: null,
-      url: d.doubanUrl || null,
-    });
-  }
 
   const rating = man?.rating ?? i?.rating ?? null;
   if (i || man?.rating != null) {
@@ -87,6 +74,20 @@ export function buildIntro(group: MovieGroup): MovieIntro {
       value: rating,
       votes: man?.votes ?? i?.votes ?? null,
       url: i?.imdbUrl || (i?.imdbId ? `https://www.imdb.com/title/${i.imdbId}/` : null),
+    });
+  }
+
+  const d = e?.douban && !e.douban.notFound ? e.douban : null;
+  // 豆瓣卡片**不返回评分人数**（card_subtitle 里只有分数），
+  // 所以 votes 恒为 null；没人数就不写人数，不拿 IMDb 的凑。
+  // 页面侧也不渲染人数（IMDb 卡片同样只留分数，两张卡视觉对齐）。
+  if (d && d.ratingState !== 'unreleased') {
+    ratings.push({
+      source: 'douban',
+      label: '豆瓣',
+      value: d.rating ?? null,
+      votes: null,
+      url: d.doubanUrl || null,
     });
   }
 

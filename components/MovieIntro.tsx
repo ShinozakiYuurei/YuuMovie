@@ -12,12 +12,6 @@ import { formatLabel, type MovieGroup } from '@/lib/data';
  * 全服务端渲染，无客户端 JS —— 静态导出下这块是纯 HTML。
  */
 
-function formatVotes(n: number | null): string | null {
-  if (n == null || n <= 0) return null;
-  if (n >= 10000) return `${(n / 10000).toFixed(n >= 100000 ? 0 : 1)} 萬人評分`;
-  return `${n.toLocaleString('en-HK')} 人評分`;
-}
-
 /** 评分来源的视觉标识（豆瓣绿 / IMDb 琥珀，与各自官方一致） */
 const RATING_STYLE: Record<IntroRating['source'], { bg: string; fg: string; markBg: string; mark: string }> = {
   douban: { bg: 'bg-[rgb(46_150_61/0.14)]', fg: 'text-[#7bd48f]', markBg: 'bg-[#2e963d]', mark: '豆瓣' },
@@ -25,7 +19,6 @@ const RATING_STYLE: Record<IntroRating['source'], { bg: string; fg: string; mark
 };
 
 function RatingCard({ r }: { r: IntroRating }) {
-  const votes = formatVotes(r.votes);
   const st = RATING_STYLE[r.source];
   const body = (
     <div className={`flex items-center gap-2.5 rounded-xl border border-white/8 px-3 py-2 ${st.bg}`}>
@@ -40,9 +33,9 @@ function RatingCard({ r }: { r: IntroRating }) {
           <span className={`text-base font-semibold leading-none ${st.fg}`}>
             {r.value != null ? r.value.toFixed(1) : '—'}
           </span>
-          <span className="text-[10px] leading-none text-gray-500">
-            {r.value != null ? (votes ?? ' ') : '暫無評分'}
-          </span>
+          {r.value == null && (
+            <span className="text-[10px] leading-none text-gray-500">暫無評分</span>
+          )}
         </span>
       </span>
     </div>
@@ -77,15 +70,15 @@ export function MovieIntro({ group }: { group: MovieGroup }) {
     <header className="hkm-panel hkm-enter rounded-2xl p-4 sm:p-6">
       <div className="flex flex-col gap-5 sm:flex-row sm:gap-6">
         {/* 海报 */}
-        <div className="w-36 shrink-0 self-center sm:self-start sm:w-44">
+        <div className="w-44 shrink-0 self-center sm:self-start sm:w-56 lg:w-64">
           {a.poster ? (
             <Image
               src={a.poster}
               alt={a.title}
-              width={176}
-              height={264}
+              width={256}
+              height={384}
               priority
-              sizes="(max-width: 640px) 144px, 176px"
+              sizes="(max-width: 640px) 176px, (max-width: 1024px) 224px, 256px"
               className="w-full rounded-xl border border-white/10 object-cover shadow-[0_18px_50px_-20px_rgba(0,0,0,0.9)]"
             />
           ) : (
