@@ -1,0 +1,196 @@
+#!/usr/bin/env bash
+# 服务器端部署：由 deploy/sync.sh 通过 ssh 调用，也可手工调用。
+#
+#   sudo -u hkmovie bash /tmp/hkmovie-vps-deploy.sh            # 部署 origin/main
+#   sudo -u hkmovie bash /tmp/hkmovie-vps-deploy.sh <sha>      # 部署指定存档点（回滚）
+#
+# 必须由 hkmovie 身份执行：rebuild-static.sh 的 flock 锁文件、站点目录、
+# node_modules 都属于它，以 root 跑会 Permission denied。
+#
+# 必须带 ref 参数，不用裸 `git pull`：pull 跟随 origin/HEAD 的指向，实测踩过
+# 它指向一个本地从未 fetch 过的分支。
+set -euo pipefail
+
+APP_DIR="${APP_DIR:-/opt/hk-movie}"
+SITE_DIR="${SITE_DIR:-/home/web/html}"
+REPO="${REPO_URL:-git@github.com:ShinozakiYuurei/YuuMovie.git}"
+REF="${1:-main}"
+cd "$APP_DIR"
+
+log() { printf '▶ %s\n' "$*"; }
+die() { printf '✖ %s\n' "$*" >&2; exit 1; }
+
+target_paths() { git ls-tree -r --name-only "$1"; }
+
+# 脏 = 已跟踪文件的改动 + 与目标树重名的未跟踪文件。
+# 只看前者会漏掉首次收编（那里没有任何已跟踪文件，护栏全废），
+# 只列后者会被 data/ 之类噪声刷屏，所以未跟踪部分只算真会阻塞 checkout 的。
+dirty_paths() {
+  git status --porcelain --untracked-files=no | sed 's/^...//;s/.* -> //'
+  target_paths "$TARGET" | while read -r p; do
+    [ -e "$p" ] || continue
+    git ls-files --error-unmatch "$p" >/dev/null 2>&1 || echo "UNTRACKED  $p"
+  done
+}
+
+BK=""
+new_backup() { BK=".backup/pre-takeover-$(date +%Y%m%d-%H%M%S)"; mkdir -p "$BK"; }
+
+# 把「目标树里有、但本地未被跟踪」的文件移进备份区。
+# 不移走的话 git checkout 会直接 Aborting —— 真实首次收编正是这样失败的：
+# /opt/hk-movie 有 83 个文件却没有 .git，它们全是未跟踪的。
+stash_collisions() {
+  local moved=0
+  target_paths "$TARGET" | while read -r p; do
+    [ -e "$p" ] || continue
+    git ls-files --error-unmatch "$p" >/dev/null 2>&1 && continue
+    mkdir -p "$BK/$(dirname "$p")"
+    mv "$p" "$BK/$p"
+  done
+  moved=$(find "$BK" -type f 2>/dev/null | wc -l)
+  log "已把 $moved 个阻塞文件移入 $BK"
+}
+
+# 首次收编：HEAD 为空，目录下所有文件都是未跟踪的。
+# 整体 tar 一份（不只目标树），因为收编后任何不在仓库里的代码文件都成了孤儿，
+# 必须连本地专有文件一起能找回。
+take_over() {
+  local n_exist
+  n_exist=$(target_paths "$TARGET" | while read -r p; do [ -e "$p" ] && echo x; done | wc -l)
+  if [ "$n_exist" = "0" ]; then
+    log "目录为空，无需收编"
+    return 0
+  fi
+  new_backup
+  tar -cf "${BK}.tar" --exclude=./node_modules --exclude=./.git --exclude=./data \
+      --exclude=./out --exclude=./.next --exclude=./.backup --exclude=./dist . 2>/dev/null || true
+  log "首次收编：整目录已 tar 到 ${BK}.tar（$(tar -tf "${BK}.tar" 2>/dev/null | wc -l) 项），$n_exist 个同名文件让位给仓库"
+  stash_collisions
+}
+
+# 发布后的结构自检。跳过重建的分支也要跑：版本没变不代表站点完好，
+# 上一轮演练就是被"已是目标版本"提前退出掩盖了死链检查没执行。
+verify_site() {
+  [ -f "$SITE_DIR/index.html" ] || die "$SITE_DIR/index.html 不存在，站点没同步出来"
+  local n rc=0 min
+  n=$(find "$SITE_DIR" -name '*.html' | wc -l)
+  min="${MIN_HTML:-100}"
+  log "线上 HTML 页数 $n"
+  # 阈值可注入：真实站点 240+ 页，沙箱里的假构建只有几页。
+  [ "$n" -gt "$min" ] || die "页数只有 $n，低于阈值 $min，站点疑似残缺"
+  if [ -f probe/check-published-links.mjs ]; then
+    node probe/check-published-links.mjs "$SITE_DIR" || rc=$?
+    # 1 = 真有死链；2 = 检查根本没跑起来。两者都要判死，但原因不同，
+    # 不能用 && 串联（set -e 下先失败的那个会吞掉后面的分支）。
+    if [ "$rc" = "1" ]; then
+      die "存在死链，判定发布不健康"
+    elif [ "$rc" != "0" ]; then
+      die "死链检查未能执行（exit $rc），不能当作通过"
+    fi
+  else
+    log "⚠️ 缺 probe/check-published-links.mjs，本次未做死链检查"
+  fi
+}
+
+# ---------- 0 首次收编：把服务器目录变成仓库 ----------
+if [ ! -d .git ]; then
+  log "初始化仓库（首次收编）"
+  git init -q
+  # 不必把默认分支改成 main：实测即使 git init 出来的是 master，
+  # 后面的 `git checkout -B main <起点>` 也照样建得出 main。
+  git remote add origin "$REPO"
+  git config user.name  "vps-deploy"
+  git config user.email "vps-deploy@local"
+fi
+
+log "fetch origin"
+git fetch -q --prune origin
+
+# 解析 ref：分支名 → 远端分支；sha → 直接对象
+if git rev-parse --verify -q "refs/remotes/origin/$REF" >/dev/null; then
+  TARGET=$(git rev-parse "refs/remotes/origin/$REF")
+  BRANCH="$REF"
+elif git rev-parse --verify -q "$REF^{commit}" >/dev/null; then
+  TARGET=$(git rev-parse "$REF^{commit}")
+  BRANCH=""
+  log "目标是 commit（回滚模式，detached HEAD）"
+else
+  die "$REF 既不是 origin 上的分支也不是已知 commit。可用分支：$(git branch -r | tr -d ' ' | paste -sd, -)"
+fi
+
+CUR=$(git rev-parse -q --verify HEAD 2>/dev/null || echo "")
+
+# ---------- 1 工作区护栏 ----------
+if [ -z "$CUR" ]; then
+  take_over
+elif [ "$CUR" = "$TARGET" ] && [ -z "$(dirty_paths)" ]; then
+  log "服务器已是目标版本，不重建（仍复核站点）"
+  verify_site
+  exit 0
+else
+  DIRTY=$(dirty_paths)
+  if [ -n "$DIRTY" ]; then
+    echo "⚠️ 服务器代码与仓库不一致（$(echo "$DIRTY" | wc -l) 项）："
+    echo "$DIRTY" | head -20 | sed 's/^/    /'
+    if [ "${FORCE_TAKEOVER:-0}" != "1" ]; then
+      die "已停手。要么把服务器改动提交回仓库，要么 FORCE_TAKEOVER=1 明确以仓库为准（会先备份）"
+    fi
+    new_backup
+    while read -r p; do
+      p=${p#UNTRACKED  }
+      [ -n "$p" ] && [ -e "$p" ] || continue
+      mkdir -p "$BK/$(dirname "$p")"; cp -a "$p" "$BK/$p"
+    done <<< "$DIRTY"
+    log "服务器改动已备份到 $BK"
+    git checkout -q -- . 2>/dev/null || true
+    stash_collisions
+  fi
+fi
+
+# ---------- 2 切到目标版本 ----------
+log "切到 ${TARGET:0:8}"
+if [ -n "$BRANCH" ]; then
+  git checkout -q -B "$BRANCH" "$TARGET"
+else
+  git checkout -q --detach "$TARGET"
+fi
+
+# ---------- 3 依赖 ----------
+# --include=dev 不可省：typescript / tailwindcss / postcss / tsx 全在 devDependencies，
+# 而 rebuild-static.sh 会 export NODE_ENV=production，npm 据此默认 --omit=dev。
+# 实测不加旗标时 `npm ci` 输出 "remove tsx"。
+# 用锁文件 md5 戳判断是否重装，不用 git diff：首次部署 CUR 为空时 diff 会报错，
+# 被误判成"没变"而跳过安装。戳按 APP_DIR 命名，免得沙箱演练写下的戳
+# 让真实部署误判依赖未变。
+STAMP="${DEPS_STAMP:-/tmp/hkmovie-deps-$(basename "$APP_DIR").stamp}"
+LOCK_HASH=$(md5sum package-lock.json | cut -d' ' -f1)
+if [ -d node_modules ] && [ "$(cat "$STAMP" 2>/dev/null || echo none)" = "$LOCK_HASH" ]; then
+  log "依赖未变，跳过 npm ci"
+else
+  log "npm ci --include=dev"
+  npm ci --include=dev --no-audit --no-fund
+  echo "$LOCK_HASH" > "$STAMP"
+fi
+
+# ---------- 4 重建静态站 ----------
+# ★ 2026-09-19 修正注释：此前这里写「仓库里的 rebuild-static.sh 是本地版、
+#   含 ENRICH 评分步骤，服务器版没有」—— 那是两条独立历史并存时期的情况。
+#   现在仓库与服务器已统一（md5 一致），rebuild-static.sh 本身就**不含**
+#   ENRICH 步骤（只有 SCRAPE 与 POSTERS 两个开关）。
+#   因此下面仍传 ENRICH=0 只是无害的兼容写法：脚本不读该变量，传了也不生效。
+#   若将来把评分补充接回 rebuild-static.sh，ENRICH 默认值需重新确认——
+#   两个 systemd 定时器直接 ExecStart 该脚本，默认值会同时影响它们。
+# REBUILD 可注入只为能在沙箱演练；默认即真实重建，线上行为不变。
+log "重建静态站（SCRAPE=${SCRAPE:-0} ENRICH=${ENRICH:-0}）"
+SCRAPE="${SCRAPE:-0}" ENRICH="${ENRICH:-0}" eval "${REBUILD:-bash deploy/rebuild-static.sh}"
+
+# ---------- 5 自检 + 记录线上版本 ----------
+verify_site
+
+# 版本号写在工作区而不是站点目录：rebuild-static.sh 结尾会
+# find "$SITE_DIR" -mindepth 1 -delete，而定时器不跑本脚本，
+# 记在站点里的版本下一次抓取就被抹掉。
+printf '%s\t%s\t%s\n' "$TARGET" "$(git log -1 --format=%s | cut -c1-70)" "$(date -Iseconds)" \
+  > "$APP_DIR/.deploy-info"
+log "线上版本 = ${TARGET:0:8}（记于 $APP_DIR/.deploy-info）"
+log "完成"

@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+# 一条命令把本机代码发布到线上。
+#
+#   bash deploy/sync.sh                 # 存档本机改动 → 推送 → 服务器拉取重建 → 冒烟
+#   bash deploy/sync.sh -m "修好筛选"   # 指定提交说明
+#   bash deploy/sync.sh --no-deploy     # 只存档推送，不上线
+#   bash deploy/sync.sh --rollback      # 把线上退回它自己的上一个存档点（不存档不推送）
+#   bash deploy/sync.sh --to <sha>      # 线上切到指定存档点
+#
+# 为什么需要它：本项目页面是 SSG，代码不推到服务器并重建，线上就永远是旧的。
+# VPS 的 systemd 定时器只重复构建它自己已有的代码，从不拉新代码。
+set -euo pipefail
+
+VPS="${VPS_ALIAS:-伤心的云-HK}"
+APP_DIR="${APP_DIR:-/opt/hk-movie}"
+BRANCH="${DEPLOY_BRANCH:-main}"
+SITE="${SITE_URL:-https://hkmovie.yuurei.de}"
+TSX=node_modules/.bin/tsx
+TSC=node_modules/.bin/tsc
+cd "$(dirname "$0")/.."
+
+DEPLOY=1; MODE=deploy; MSG=""; TO=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --no-deploy) DEPLOY=0 ;;
+    --rollback)  MODE=rollback ;;
+    --to)        MODE=to; shift; TO="${1:-}" ;;
+    -m)          shift; MSG="${1:-}" ;;
+    -h|--help)   sed -n '2,12p' "$0"; exit 0 ;;
+    *) echo "未知参数：$1"; exit 1 ;;
+  esac
+  shift
+done
+# --to 不带值时不能默默变成一次正常部署，那正好是最危险的结果
+[ "$MODE" != "to" ] || [ -n "$TO" ] || { echo "✖ --to 需要跟一个 sha 或分支名"; exit 1; }
+
+vps() { timeout "${2:-900}" ssh -o BatchMode=yes -o ConnectTimeout=20 "$VPS" "$1"; }
+
+# 线上冒烟：只测三个必须 200 的路径。真正的结构验证（死链、版本记录）
+# 已在 vps-deploy.sh 里跑过，这里只确认发布后的站点确实可访问。
+smoke() {
+  echo "▶ 线上冒烟"
+  local a b c
+  a=$(curl -s -o /dev/null -m 25 -w '%{http_code}' "$SITE/")
+  b=$(curl -s -o /dev/null -m 25 -w '%{http_code}' "$SITE/showing/")
+  c=$(curl -s -o /dev/null -m 25 -w '%{http_code}' "$SITE/movie/the-odyssey-emperor-6228584009b6/")
+  echo "  首页=$a  /showing=$b  奧德賽=$c"
+  [ "$a$b$c" = "200200200" ] || { echo "✖ 冒烟未通过，检查服务器构建日志"; exit 1; }
+  echo "✅ 已发布"
+}
+
+# ---------- 回滚 / 切换版本：不碰本机存档，也不推送 ----------
+# 目标 sha 只能由【服务器】的 reflog 决定：本机的 HEAD@{1} 只是我上次 push 前
+# 的提交，跟线上实际跑过哪几版无关。
+if [ "$MODE" != "deploy" ]; then
+  if [ "$MODE" = "rollback" ]; then
+    TARGET=$(vps "cd $APP_DIR && git rev-parse --short 'HEAD@{1}' 2>/dev/null || echo")
+    [ -n "$TARGET" ] || { echo "✖ 服务器没有上一个存档点（首次部署或 reflog 已清），请用 --to <sha>"; exit 1; }
+  else
+    TARGET="$TO"
+  fi
+  CUR=$(vps "cd $APP_DIR && git rev-parse --short HEAD 2>/dev/null || echo none" || true)
+  echo "⚠️ 线上当前 ${CUR:-?} → 切到 $TARGET（不存档、不推送本机改动）"
+  vps "cat > /tmp/hkmovie-vps-deploy.sh" < deploy/vps-deploy.sh
+  vps "sudo -u hkmovie APP_DIR=$APP_DIR bash /tmp/hkmovie-vps-deploy.sh $TARGET"
+  smoke
+  exit 0
+fi
+
+# ---------- 1 本地自检 ----------
+# 只挡类型错误和错合并，不在本机跑完整 build：构建环境是服务器（Linux + 2C2G），
+# 本机 build 既慢又会覆盖 out/，真正的构建验证在第 4 步。
+echo "▶ [1/4] 本地自检"
+if [ "${SKIP_CHECK:-0}" = "1" ]; then
+  echo "  SKIP_CHECK=1，跳过自检（不推荐）"
+else
+  # 不用 npx：typescript / tsx 都是 devDependencies，npx 本地找不到时会联网
+  # 临时下载 —— 本机就是这么跑通的，所以问题只在服务器才暴露。
+  # 发布链路必须离线可重复，缺依赖就直说缺什么。
+  [ -x "$TSC" ] || { echo "✖ 缺 $TSC，先跑 npm ci --include=dev"; exit 1; }
+  [ -x "$TSX" ] || { echo "✖ 缺 $TSX，先跑 npm ci --include=dev"; exit 1; }
+  "$TSC" --noEmit
+  "$TSX" probe/check-danger.mts
+fi
+
+# ---------- 2 存档 ----------
+echo "▶ [2/4] 存档"
+if [ -n "$(git status --porcelain)" ]; then
+  git add -A
+  if [ -z "$MSG" ]; then
+    MSG="本机 $(date +%F\ %H:%M) 改动：$(git status --porcelain | sed 's/^...//' | tr '\n' ' ' | cut -c1-60)"
+  fi
+  git commit -q -m "$MSG"
+  echo "  已提交：$MSG"
+else
+  echo "  工作区干净，复用现有存档"
+fi
+git log --oneline -1 | sed 's/^/  HEAD /'
+
+# ---------- 3 推送 ----------
+echo "▶ [3/4] 推送 origin/$BRANCH"
+git push -u origin "$BRANCH"
+
+if [ "$DEPLOY" = "0" ]; then
+  echo "✅ 已存档并推送，未上线（--no-deploy）"
+  exit 0
+fi
+
+# ---------- 4 服务器部署（含构建、死链自检、记录线上版本） ----------
+echo "▶ [4/4] 服务器部署"
+# 必须先把部署脚本本身送到服务器再执行，而且不能送到 $APP_DIR/deploy/ 里：
+# 一是首次收编时服务器上还没有 vps-deploy.sh（它只存在于仓库）；
+# 二是脚本执行途中会被 git checkout 换掉内容，在 bash 逐行读取下担心自覆盖。
+# 放 /tmp 跑副本，两个问题一起消。
+vps "cat > /tmp/hkmovie-vps-deploy.sh" < deploy/vps-deploy.sh
+vps "sudo -u hkmovie APP_DIR=$APP_DIR bash /tmp/hkmovie-vps-deploy.sh $BRANCH"
+
+smoke

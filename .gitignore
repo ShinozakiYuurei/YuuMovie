@@ -31,3 +31,26 @@ public/posters/*
 
 # ── 本地性能测量临时目录 ────────────────────────────
 .perf/
+
+# ── 本机杂项：临时进度文件与本地测试数据 ─────────────
+# data.local-test/ 是本地跑的抓取样本（结构同 data/，但不是线上数据），
+# 不入库以免被误当成真实数据源；.claude-tmp-progress.md 是会话临时文件。
+# 两者若不排除，deploy/sync.sh 的 `git add -A` 会把它们一起提交上去。
+.claude-tmp-progress.md
+data.local-test/
+
+# ── probe/：默认全不入库，只点名收回归探针 ────────────
+# 入库标准：不联网、只依赖仓库内代码与 data/，因为**部署链路会真的执行它们**。
+#   - check-danger.mts 由 deploy/sync.sh 在本地自检阶段跑（挡错合并）
+#   - check-published-links.mjs 由 deploy/vps-deploy.sh 在服务器上跑（挡死链）
+# 其余是抓包、逆向签名、基准测试等一次性调试现场（含 52MB HTML 转储），
+# 留在本机不进仓库。
+#
+# 为什么不能写 `!probe/*.mjs` 这类通配白名单：tsconfig 把 probe/ 整个 exclude，
+# tsc 不检查它们，通配白名单等于不设防（曾因此误收 74 个脚本）。
+#
+# 注意：gitignore 的 # 只在行首是注释，规则行不能加行尾说明，
+# 否则整行变成一个永远匹配不上的模式（本文件曾因此白名单整体失效）。
+probe/*
+!probe/check-danger.mts
+!probe/check-published-links.mjs
