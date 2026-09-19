@@ -1,0 +1,12 @@
+import { createJar } from '../scrapers/douban-guard.js';
+const UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+const jar=createJar();
+let r=await fetch('https://movie.douban.com/subject/37193446/',{headers:{'user-agent':UA,'accept-language':'zh-CN,zh;q=0.9'},redirect:'manual'});
+jar.collect(r);
+r=await fetch(r.headers.get('location'),{headers:{'user-agent':UA,cookie:jar.header()}});
+const b=await r.text();
+console.log('status',r.status,'len',b.length);
+const head=b.slice(0,2000);
+console.log('访问太频繁?', /访问太频繁/.test(head), '| Too Many?', /Too Many Requests/i.test(head), '| rate?', /rate/i.test(head));
+const m=head.match(/.{0,30}rate.{0,30}/i);
+console.log('rate 上下文:', m&&m[0]);

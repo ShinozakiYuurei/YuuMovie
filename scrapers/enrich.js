@@ -1,0 +1,347 @@
+#!/usr/bin/env node
+/**
+ * 补充数据抓取：IMDb 评分
+ *
+ * 背景：五家院线的结构化数据里**没有**任何外部评分，
+ * 而 IMDb 是唯一「无鉴权、无风控、可从 VPS 直连」的稳定源。
+ *
+ * ★ 只做 IMDb —— 豆瓣评分与发行商已按需求取消（2026-09-19）：
+ *   豆瓣要过 sec.douban.com 的 PoW 盾且会被弹回挑战页，成本高且不稳；
+ *   发行商在院线数据、豆瓣、IMDb 三处都没有可靠来源。
+ *
+ * ★ 为什么单独存 data/enrich.json 而不写进 movies.json：
+ *   movies.json 每 2–6 小时被 scrape.js 整体重写，评分混进去会被冲掉；
+ *   而且外部源字段不该混进「院线原始数据」这一层 ——
+ *   分开存，谁重跑都不影响对方，出问题能单独回滚。
+ *
+ * 链路：片名 → v3.sg.media-imdb.com/suggestion → tt id → api.agregarr.org 评分
+ *
+ * 用法（在 VPS 上跑）：
+ *   node scrapers/enrich.js                 # 增量补全
+ *   LIMIT=20 node scrapers/enrich.js        # 只跑前 20 部
+ *   ONLY=坂本,超風 node scrapers/enrich.js  # 只跑片名含这些词的
+ *   REFRESH_DAYS=0 node scrapers/enrich.js  # 全部重抓（刷新评分）
+ *   DUBAN_ONLY=1 只跑豆瓣不动 IMDb         NO_DUBAN=1 关掉豆瓣
+ *   DRY=1 node scrapers/enrich.js           # 不发请求，只看计划
+ *
+ * 节流：每次请求间隔 0.3–0.7s。全量 212 部约 4–6 分钟。
+ * 中断安全：每部首写盘一次。
+ */
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { enrichKey } from '../lib/enrich-key.js';
+import { parseDoubanCard, resolveDouban } from './douban-suggest.js';
+import { imdbRatings, imdbUrl, resolveImdbIds } from './imdb.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.join(__dirname, '..');
+const OUT = path.join(ROOT, 'data');
+const CACHE_FILE = path.join(OUT, 'enrich.json');
+const MANUAL_FILE = path.join(OUT, 'enrich-manual.json');
+
+const LIMIT = Number(process.env.LIMIT || 0);
+const ONLY = (process.env.ONLY || '').split(',').map((s) => s.trim()).filter(Boolean);
+const DRY = process.env.DRY === '1';
+/** 评分会变动，默认 3 天刷新一次（比数据刷新慢，比重映一年一次快） */
+const REFRESH_DAYS = Number(process.env.REFRESH_DAYS ?? 3);
+/**
+ * 豆瓣刷新周期（天）
+ *
+ * 比 IMDb 长：豆瓣接口在 robots.txt 的 Disallow: /j/ 下（用户已批准使用），
+ * 拉长周期是少敲门。新片的分从「暂无」变成有分，靠这个周期而不是实时。
+ */
+const DUBAN_REFRESH_DAYS = Number(process.env.DUBAN_REFRESH_DAYS ?? 14);
+/** 关掉豆瓣（合规顾虑或接口挂时用） */
+const NO_DUBAN = process.env.NO_DUBAN === '1';
+/** 只跑豆瓣、不动 IMDb（首轮补数据用，省一半请求） */
+const DUBAN_ONLY = process.env.DUBAN_ONLY === '1';
+
+const log = (...a) => console.log(...a);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const jitter = (min, max) => min + Math.random() * (max - min);
+
+function readJson(file, fallback) {
+  try {
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch {
+    return fallback;
+  }
+}
+
+/** 原子写：避免定时器与人工同时跑时写出半个文件 */
+function writeJson(file, obj) {
+  const tmp = `${file}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(obj, null, 1));
+  fs.renameSync(tmp, file);
+}
+
+const yearOf = (d) => {
+  const m = /^(\d{4})/.exec(d || '');
+  return m ? Number(m[1]) : null;
+};
+
+/** 去掉片名里的院线附加标记，例如「M (GFF)」「恨世者(NT Live 2026-27)」 */
+const cleanTitle = (s) =>
+  (s || '')
+    .replace(/[（(〔[【{「『][^）)〕\]】}」』]*[）)〕\]】}」』]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+/**
+ * 是否需要（重）抓
+ *
+ * notFound 也要缓存：否则一部确实没上 IMDb 的冷门片每轮都会白查两次。
+ * 但给更短的重试周期（7 天），因为新片可能随后才登记。
+ *
+ * 豆瓣单独判：它是新接的源，旧缓存里**没有 douban 字段**，
+ * 不能因为 IMDb 新鲜就跳过豆瓣，否则老数据永远补不上评分。
+ */
+function needsWork(row, now) {
+  if (!row) return true;
+  // 先查全量刷新开关：notFound 的短路必须放在后面，
+  // 否则 REFRESH_DAYS=0（强制重抓）会被 7 天重试期顶掉，一都部不跑。
+  if (REFRESH_DAYS === 0) return true;
+  const at = row.updatedAt ? Date.parse(row.updatedAt) : 0;
+  const fresh = row.imdb && !row.imdb.notFound && now - at <= REFRESH_DAYS * 864e5;
+  if (NO_DUBAN) return !fresh;
+  if (!row.douban) return true; // 豆瓣还没跑过
+  const dAt = row.douban.at ? Date.parse(row.douban.at) : 0;
+  const dFresh = now - dAt <= DUBAN_REFRESH_DAYS * 864e5;
+  if (row.douban.notFound) return !(fresh && now - dAt <= 7 * 864e5); // 查过但没有，一周后重试
+  return !(fresh && dFresh);
+}
+
+async function fetchImdb(names, year) {
+  // 括号里往往是院线自己的标记（(GFF) / (IMAX) / (The Royal Ballet 2026 – 2027)），
+  // 带上去 IMDb 根本搜不到，所以额外备一份去掉括号的写法。
+  const queries = [...new Set(names.flatMap((n) => (n ? [n, cleanTitle(n)] : [])).filter(Boolean))];
+  const cands = await resolveImdbIds(queries, year);
+  if (!cands.length) return null;
+
+  // ★ 重映按最初上映版本的评分算（产品要求）
+  //
+  // 重映片在 IMDb 常有多个条目：1997 原版（有分）与 2025 为重映新开的条目（无分），
+  // 按可信度选中的往往是新条目，直接展示就是「暫無評分」。
+  //
+  // 开销考虑：先只查首选，**拿到分就不再查后面的候选**。
+  // 否则 212 部×最多 5 个候选会把评分接口打爆（也慢得多）；
+  // 首选无分才逐个回退到更早的条目，取年份最早且有分的那个（= 原版）。
+  let best = null; // { c, r }
+  for (let idx = 0; idx < cands.length; idx++) {
+    const c = cands[idx];
+    const r = await imdbRatings(c.id);
+    await sleep(jitter(180, 420));
+    if (r && r.rating != null) {
+      if (idx === 0) { best = { c, r }; break; } // 首选就有分，不必再找原版
+      // 已发生回退：剩下的候选年份只会更近，取当前这个（最早且有分）
+      best = { c, r };
+      break;
+    }
+  }
+  const pick = best ? best.c : cands[0];
+
+  return {
+    imdbId: pick.id,
+    imdbUrl: imdbUrl(pick.id),
+    imdbTitle: pick.title || null,
+    imdbYear: pick.year || null,
+    // rating 为 null 是合法状态：条目存在但人数不足，尚未出分
+    rating: best ? best.r.rating : null,
+    votes: best ? best.r.votes : null,
+    queriedWith: pick.query,
+    relaxedYear: pick.relaxedYear || undefined,
+    // 实际展示的不是首选条目（发生了重映回退），记下来源便于事后查错
+    fallbackFrom: pick.id === cands[0].id ? undefined : cands[0].id,
+    candidates: cands.map((c) => `${c.id}:${c.year ?? '?'}:${c.s}`).slice(0, 4),
+  };
+}
+
+/**
+ * 已知 tt id 时直接取分（人工指定用）
+ *
+ * 片名自动匹配偶尔会撞到同名旧片（尤其短片/电视电影），
+ * 这时候不必跟算法绕，data/enrich-manual.json 里写死 imdbId 即可。
+ */
+async function fetchImdbById(imdbId) {
+  const r = await imdbRatings(imdbId);
+  await sleep(jitter(250, 600));
+  return {
+    imdbId,
+    imdbUrl: imdbUrl(imdbId),
+    imdbTitle: null,
+    imdbYear: null,
+    rating: r ? r.rating : null,
+    votes: r ? r.votes : null,
+    queriedWith: 'manual',
+  };
+}
+
+async function main() {
+  const movies = readJson(path.join(OUT, 'movies.json'), []);
+  if (!movies.length) {
+    console.error('✖ data/movies.json 为空，先跑 node scrape.js');
+    process.exit(1);
+  }
+  const manual = readJson(MANUAL_FILE, {});
+  const cache = readJson(CACHE_FILE, { version: 2, updatedAt: null, entries: {} });
+  const entries = cache.entries || {};
+
+  // ---------- 按 enrichment key 去重 ----------
+  // 同一部电影在多家院线各有一条，但评分只需查一次。
+  const plan = new Map();
+  for (const m of movies) {
+    const nameZh = m.nameZh || '';
+    const nameEn = m.nameEn || '';
+    const key = enrichKey(nameZh || nameEn);
+    if (!key) continue;
+    const cur = plan.get(key);
+    const year = yearOf(m.openingDate);
+    if (!cur) {
+      plan.set(key, {
+        key,
+        nameZh,
+        nameEn,
+        year,
+        // IMDb 匹配用英文名命中率最高，中文名为辅
+        queries: [nameEn, nameZh].filter(Boolean),
+        ids: [m.id],
+      });
+    } else {
+      cur.ids.push(m.id);
+      if (!cur.year && year) cur.year = year;
+      if (!cur.nameZh && nameZh) cur.nameZh = nameZh;
+      if (!cur.nameEn && nameEn) cur.nameEn = nameEn;
+      for (const n of [nameEn, nameZh]) if (n && !cur.queries.includes(n)) cur.queries.push(n);
+    }
+  }
+
+  const now = Date.now();
+  let todo = [...plan.values()];
+  if (ONLY.length) {
+    todo = todo.filter((p) => ONLY.some((s) => p.key.includes(enrichKey(s)) || p.key.includes(s.toLowerCase())));
+  }
+  let work = todo.filter((p) => needsWork(entries[p.key], now));
+  // DUBAN_ONLY：IMDb 已经新，不想重跑那 212 次搜索，只补豆瓣
+  if (DUBAN_ONLY) {
+    work = todo.filter((p) => {
+      const row = entries[p.key];
+      if (!row?.douban) return true;
+      const dAt = row.douban.at ? Date.parse(row.douban.at) : 0;
+      return row.douban.notFound ? now - dAt > 7 * 864e5 : now - dAt > DUBAN_REFRESH_DAYS * 864e5;
+    });
+  }
+  const list = LIMIT > 0 ? work.slice(0, LIMIT) : work;
+
+  log(`▶ 补充数据：唯一影片 ${plan.size} | 待抓 ${work.length} | 本次 ${list.length} | 复用 ${todo.length - work.length}`);
+  if (DRY) {
+    for (const p of list.slice(0, 40)) log(`  · ${p.nameZh || p.nameEn} → key="${p.key}" year=${p.year ?? '-'}`);
+    log('▶ DRY=1，未发请求');
+    return;
+  }
+
+  let done = 0;
+  let hits = 0;
+  let reused = 0;
+  let dbHits = 0;
+  const t0 = Date.now();
+
+  function commit(row) {
+    entries[row.key] = row;
+    cache.entries = entries;
+    cache.updatedAt = new Date().toISOString();
+    const all = Object.values(entries);
+    cache.counts = {
+      entries: all.length,
+      withRating: all.filter((e) => e.imdb?.rating != null).length,
+      notFound: all.filter((e) => e.imdb?.notFound).length,
+      doubanRating: all.filter((e) => e.douban?.rating != null).length,
+      doubanMissing: all.filter((e) => !e.douban || e.douban.notFound).length,
+      manual: Object.keys(manual).length,
+    };
+    writeJson(CACHE_FILE, cache);
+  }
+
+  for (const p of list) {
+    const prev = entries[p.key] || {};
+    const row = {
+      ...prev,
+      key: p.key,
+      movieIds: p.ids,
+      nameZh: p.nameZh || null,
+      nameEn: p.nameEn || null,
+      year: p.year ?? null,
+    };
+    const ov = manual[p.key];
+    if (ov) row.manual = ov;
+
+    try {
+      // IMDb 也要按自己的新鲜度判：needsWork 会因为「豆瓣还没跑过」而放行，
+      // 那时 IMDb 往往是刚抓的，不卡就会每轮重跑 212 次搜索。
+      // 时间戳在 row 顶层（updatedAt），imdb 子对象里没这个字段。
+      const iAt = row.updatedAt ? Date.parse(row.updatedAt) : 0;
+      const iFresh =
+        DUBAN_ONLY ||
+        (REFRESH_DAYS !== 0 &&
+          !!row.imdb &&
+          (row.imdb.notFound ? now - iAt <= 7 * 864e5 : now - iAt <= REFRESH_DAYS * 864e5));
+      if (ov?.imdbId && !DUBAN_ONLY) {
+        row.imdb = await fetchImdbById(ov.imdbId);
+        if (row.imdb.rating != null) hits++;
+      } else if (iFresh) {
+        reused++;
+      } else {
+        const hit = await fetchImdb(p.queries, p.year);
+        row.imdb = hit || { notFound: true };
+        if (hit?.rating != null) hits++;
+      }
+    } catch (e) {
+      log(`  ⚠️ IMDb ${p.nameZh || p.nameEn}: ${e.message}`);
+    }
+
+    // ---------- 豆瓣 ----------
+    // 单独一个 try：豆瓣挂了不能把已拿到的 IMDb 结果一起抹掉。
+    // 已有 douban 且未过期时不重查（刷新周期比 IMDb 长）。
+    if (!NO_DUBAN) {
+      const dAt = row.douban?.at ? Date.parse(row.douban.at) : 0;
+      const dFresh = row.douban && !row.douban.notFound && now - dAt <= DUBAN_REFRESH_DAYS * 864e5;
+      const dRetry = row.douban?.notFound && now - dAt <= 7 * 864e5;
+      if (!dFresh && !dRetry) {
+        try {
+          const found = await resolveDouban({ zh: p.nameZh, en: p.nameEn, year: p.year });
+          if (found) {
+            const parsed = parseDoubanCard(found.card);
+            row.douban = {
+              ...parsed,
+              queriedWith: found.queriedWith,
+              alternatives: found.alternatives,
+              at: new Date().toISOString(),
+            };
+            if (parsed.rating != null) dbHits++;
+          } else {
+            row.douban = { notFound: true, at: new Date().toISOString() };
+          }
+        } catch (e) {
+          log(`  ⚠️ 豆瓣 ${p.nameZh || p.nameEn}: ${e.message}`);
+        }
+      }
+    }
+
+    row.updatedAt = new Date().toISOString();
+    commit(row);
+    done++;
+    if (done % 25 === 0) {
+      const per = (Date.now() - t0) / done / 1000;
+      log(`  … ${done}/${list.length}（${per.toFixed(1)}s/部，剩余约 ${(((list.length - done) * per) / 60).toFixed(1)} 分）`);
+    }
+  }
+
+  log(`\n✅ 完成 ${done} 部（IMDb 新拿分 ${hits}，复用 ${reused}；豆瓣新拿分 ${dbHits}），耗时 ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+  log('  ' + JSON.stringify(cache.counts));
+}
+
+main().catch((e) => {
+  console.error('✖ 抓取失败:', e.message);
+  process.exit(1);
+});

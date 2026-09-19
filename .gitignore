@@ -1,0 +1,21 @@
+# ── 依赖与构建产物 ──────────────────────────────────
+node_modules/
+.next/
+out/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# ── 抓取数据：由服务器每 2 小时生成，绝不进仓库 ──────
+data/
+
+# ── 服务器私有：密钥、缓存、备份 ────────────────────
+# .ssh/ 必须排除：hkmovie 的 HOME 就是本目录，
+# 只读部署私钥落在仓库内，一旦被 git add -A 扫到就泄进版本库。
+.ssh/
+.backup/
+.local/
+.config/
+.npm/
+.env*.local
+*.log
