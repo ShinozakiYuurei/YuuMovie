@@ -70,16 +70,18 @@ type FilterDim = keyof typeof FILTER_LABELS;
 /**
  * 分层标题：左侧一根强调色竖条 + 标题 + 右侧说明。
  *
- * 三层用同一套标题样式，视觉上形成「1 篩選 → 2 日期 → 3 場次」的层次，
+ * 三层用同一套标题样式，视觉上形成「篩選 → 日期 → 場次」的层次，
  * 避免此前所有内容挤在一个面板里、分不出先看哪里。
+ *
+ * ★ 2026-09-19 去掉序号（原为「1 篩選 / 2 日期 / 3 場次」）：
+ *   用户明确要求删除。序号属于解释性装饰 —— 三层本身已按顺序自上而下排列，
+ *   竖条 + 标题已足够表达层次；数字反而多一层视觉噪音。
  */
 function LayerHeader({
-  step,
   title,
   hint,
   children,
 }: {
-  step: string;
   title: string;
   hint?: string;
   children?: React.ReactNode;
@@ -91,7 +93,6 @@ function LayerHeader({
           aria-hidden
           className="inline-block h-4 w-[3px] rounded-full bg-gradient-to-b from-[#8b7cff] to-[#22d3ee]"
         />
-        <span className="text-xs font-medium tabular-nums text-gray-400">{step}</span>
         {title}
       </h3>
       {hint && <span className="text-xs text-gray-400">{hint}</span>}
@@ -381,7 +382,7 @@ export function ShowtimeExplorer({
     <div>
       {/* ============ 第一層：篩選 ============ */}
       <section className="hkm-panel rounded-2xl p-4">
-        <LayerHeader step="1" title="篩選" hint="同類可多選（或），跨類需同時符合（且）">
+        <LayerHeader title="篩選" hint="同類可多選（或），跨類需同時符合（且）">
           <span className="tabular-nums text-xs text-gray-300">
             {sorted.length} / {rows.length} 場
           </span>
@@ -443,7 +444,6 @@ export function ShowtimeExplorer({
           {/* ============ 第二層：日期 ============ */}
           <section className="mt-8">
             <LayerHeader
-              step="2"
               title="日期"
               hint={`共 ${days.length} 個放映日`}
             />
@@ -488,7 +488,6 @@ export function ShowtimeExplorer({
           {/* ============ 第三層：場次 ============ */}
           <section className="mt-7">
             <LayerHeader
-              step="3"
               title="場次"
               hint={`${formatDate(activeDate!)}　${dayCount} 場 · ${activeByCinema!.size} 間戲院`}
             />
