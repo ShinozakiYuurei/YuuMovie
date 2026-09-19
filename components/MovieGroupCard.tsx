@@ -19,7 +19,24 @@ import { formatDuration, relativeDay } from '@/lib/format';
  *
  * 标题：单行中文，过长截断（hover 显示全名）；不再另起一行显示外文名
  */
-export function MovieGroupCard({ group }: { group: MovieGroup }) {
+export function MovieGroupCard({
+  group,
+  priority = false,
+}: {
+  group: MovieGroup;
+  /**
+   * 首屏可见的卡片传 true：海报立即加载并提高抓取优先级。
+   *
+   * ★ 为什么需要（2026-09-19 实测）：线上首页 16 张海报**全部**是
+   *   loading="lazy"（0 张 eager），包括首屏第一行。lazy 要等浏览器
+   *   完成布局、判定接近视口后才发请求，对首屏图等于凭空多一轮串行等待，
+   *   直接推后 LCP。详见 components/PosterImage.tsx 的注释。
+   *
+   *   默认 false，由调用方按「是否首屏」显式开启 —— 避免全部卡片
+   *   都抢带宽，反而拖慢真正的 LCP 元素。
+   */
+  priority?: boolean;
+}) {
   const m = group.primary;
 
   return (
@@ -34,6 +51,7 @@ export function MovieGroupCard({ group }: { group: MovieGroup }) {
             alt={group.displayName}
             sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
             className="object-cover transition-transform duration-300 group-hover:scale-105"
+            priority={priority}
           />
         ) : (
           <div className="flex h-full items-center justify-center text-xs text-gray-600">

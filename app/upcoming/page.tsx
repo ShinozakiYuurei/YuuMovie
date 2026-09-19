@@ -52,7 +52,8 @@ export default function UpcomingPage() {
                 style={{ '--i': i } as React.CSSProperties}
                 className="h-full"
               >
-                <MovieGroupCard group={grp} />
+                {/* 首屏优先级：仅当月第一行（5 张），见 PosterImage.tsx 注释 */}
+                <MovieGroupCard group={grp} priority={i < 5} />
               </div>
             ))}
           </div>

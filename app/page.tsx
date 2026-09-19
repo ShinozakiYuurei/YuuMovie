@@ -57,7 +57,15 @@ function PosterGrid({ groups }: { groups: MovieGroup[] }) {
     <div className="hkm-stagger mt-4 grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4">
       {groups.map((g, i) => (
         <div key={g.key} style={{ '--i': i } as React.CSSProperties} className="h-full">
-          <MovieGroupCard group={g} />
+          {/*
+           * 首屏优先级：只给**第一行**海报（前 4 张）开 priority。
+           *
+           * 为什么是 4：网格是 lg:grid-cols-4，第一行 4 张即首屏可见区域。
+           * 为什么不全开：priority 会让图片立即请求并 fetchpriority=high，
+           *   16 张同时抢带宽反而拖慢真正的 LCP 元素（浏览器并发连接有限，
+           *   高优先级请求之间仍会互相排队）。只标首屏第一行收益最大。
+           */}
+          <MovieGroupCard group={g} priority={i < 4} />
         </div>
       ))}
     </div>

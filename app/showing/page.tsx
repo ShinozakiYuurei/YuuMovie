@@ -46,7 +46,12 @@ export default function ShowingAllPage() {
             style={{ '--i': Math.min(i, 30) } as React.CSSProperties}
             className="h-full"
           >
-            <MovieGroupCard group={g} />
+            {/*
+             * 首屏优先级：只给第一行（5 张）开 priority。
+             * 网格是 lg:grid-cols-5，第一行即首屏可见区域。
+             * 这里可能有上百张卡片，绝不能全开 —— 详见 PosterImage.tsx 注释。
+             */}
+            <MovieGroupCard group={g} priority={i < 5} />
           </div>
         ))}
       </div>
