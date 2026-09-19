@@ -1,70 +1,117 @@
 import Link from 'next/link';
-import { getShowingGroups, getMeta, formatLabel } from '@/lib/data';
+import { getShowingGroups, getUpcomingGroups, getMeta } from '@/lib/data';
+import type { MovieGroup } from '@/lib/data';
 import { MovieGroupCard } from '@/components/MovieGroupCard';
 
-// 动态渲染：数据从 data/*.json 实时读取，抓取后无需重建
+/**
+ * 首页
+ *
+ * 结构：两个区块，各「卡片条 + 8 张海报」
+ *   1. 現正上映：卡片条点击进 /showing（全部上映中）
+ *   2. 即將上映：卡片条点击进 /upcoming
+ *
+ * 为什么只展示 8 张（用户 2026-09-19 指定）：
+ *   原先首页铺 60 组，HTML 达 700KB+，在 2C2G 上首屏 TTFB 0.5s+。
+ *   首页的职责是「指路」，不是「列全」—— 完整清单交给 /showing 与 /upcoming，
+ *   它们是静态导出的独立页面，nginx 直接发文件，不拖累首页首屏。
+ *
+ * 排序：场次多者在前（getShowingGroups 已按 totalShows 降序）。
+ *   ★ 即将上映的片场次恒为 0（尚未开卖，见 data），所以那一区实际退化为
+ *     按上映日期排序 —— getUpcomingGroups 就是这么排的，符合直觉。
+ */
+
+/** 首页每个区块展示的海报数 */
+const PER_SECTION = 8;
+
+/** 卡片条：标题 + 副标题 + 「查看全部」按钮，整条可点 */
+function SectionBar({
+  href,
+  title,
+  subtitle,
+  cta,
+}: {
+  href: string;
+  title: React.ReactNode;
+  subtitle: string;
+  cta: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="hkm-glass group/bar flex flex-wrap items-center justify-between gap-4 rounded-2xl p-5"
+    >
+      <div>
+        <h2 className="text-xl font-bold tracking-tight text-white">{title}</h2>
+        <p className="mt-1 text-sm text-gray-400">{subtitle}</p>
+      </div>
+      <span className="hkm-btn-primary shrink-0 rounded-full px-4 py-2 text-xs font-semibold">
+        {cta} →
+      </span>
+    </Link>
+  );
+}
+
+/** 海报网格（首页固定 8 张） */
+function PosterGrid({ groups }: { groups: MovieGroup[] }) {
+  return (
+    <div className="hkm-stagger mt-4 grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4">
+      {groups.map((g, i) => (
+        <div key={g.key} style={{ '--i': i } as React.CSSProperties} className="h-full">
+          <MovieGroupCard group={g} />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function HomePage() {
-  const all = getShowingGroups();
-  // 低配 VPS（2C2G）优化：首页只渲染前 60 组。
-  // 数据涨到 275 部后，整页渲染会让 HTML 达到 700KB+、TTFB 0.5s+，
-  // 首屏变得很慢。60 组足以覆盖全部热映片（其余多为长尾/无场次）。
-  const groups = all.slice(0, 60);
+  const showing = getShowingGroups().slice(0, PER_SECTION);
+  const upcoming = getUpcomingGroups().slice(0, PER_SECTION);
   const meta = getMeta();
-  const hiddenCount = all.length - groups.length;
 
   return (
-    <>
-      <section className="mb-7">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              現正<span className="bg-gradient-to-r from-[#8b7cff] to-[#22d3ee] bg-clip-text text-transparent">上映</span>
-            </h1>
-            <p className="mt-2 text-sm text-gray-400">
-              點擊電影查看全部版本（IMAX / 4DX / 全景聲等）及場次，直接跳轉院線官方購票頁。
-            </p>
-          </div>
-          <div className="flex shrink-0 gap-2">
-            <span className="hkm-chip">{groups.length} 部電影</span>
-            <span className="hkm-chip">{meta.counts.shows} 場次</span>
-          </div>
-        </div>
+    <div className="space-y-10">
+      {/* ── 現正上映 ── */}
+      <section>
+        <SectionBar
+          href="/showing"
+          title={
+            <>
+              現正
+              <span className="bg-gradient-to-r from-[#8b7cff] to-[#22d3ee] bg-clip-text text-transparent">
+                上映
+              </span>
+            </>
+          }
+          subtitle={`共 ${meta.counts.movies} 部電影 · ${meta.counts.shows} 場次，按排片場次排列。`}
+          cta="查看全部"
+        />
+        <PosterGrid groups={showing} />
+        {showing.length === 0 && (
+          <p className="py-16 text-center text-gray-500">暫無上映資料</p>
+        )}
       </section>
 
-      {/* hkm-stagger：纯 CSS 逐个入场（--i 传入序号做延时，见 globals.css） */}
-      <div className="hkm-stagger grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-        {groups.map((g, i) => (
-          <div key={g.key} style={{ '--i': i } as React.CSSProperties} className="h-full">
-            <MovieGroupCard group={g} />
-          </div>
-        ))}
-      </div>
-
-      {groups.length === 0 && <p className="py-20 text-center text-gray-500">暫無上映資料</p>}
-
-      {hiddenCount > 0 && (
-        <p className="mt-6 text-center text-xs text-gray-500">
-          另有 {hiddenCount} 部上映中電影未在此頁列出（多为仅一两场的影展 / 特典長尾），
-          <Link href="/showing" className="text-accent hover:underline">
-            查看完整片单 →
-          </Link>
-        </p>
-      )}
-
-      <div className="hkm-glass mt-12 rounded-2xl p-5">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 className="font-semibold text-white">即將上映</h2>
-            <p className="mt-1 text-sm text-gray-400">
-              共 {meta.counts.upcoming} 部電影等待上映，查看上映日期與預告片。
-            </p>
-          </div>
-          <Link href="/upcoming" className="hkm-btn-primary rounded-full px-4 py-2 text-xs font-semibold">
-            查看全部 →
-          </Link>
-        </div>
-      </div>
-    </>
+      {/* ── 即將上映 ── */}
+      <section>
+        <SectionBar
+          href="/upcoming"
+          title={
+            <>
+              即將
+              <span className="bg-gradient-to-r from-[#8b7cff] to-[#22d3ee] bg-clip-text text-transparent">
+                上映
+              </span>
+            </>
+          }
+          subtitle={`共 ${meta.counts.upcoming} 部電影等待上映，查看上映日期與場次。`}
+          cta="查看全部"
+        />
+        <PosterGrid groups={upcoming} />
+        {upcoming.length === 0 && (
+          <p className="py-16 text-center text-gray-500">暫無即將上映資料</p>
+        )}
+      </section>
+    </div>
   );
 }
