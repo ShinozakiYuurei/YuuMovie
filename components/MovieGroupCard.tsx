@@ -3,6 +3,7 @@ import { PosterImage } from './PosterImage';
 import type { MovieGroup } from '@/lib/data';
 import { formatLabel } from '@/lib/data';
 import { formatDuration, relativeDay } from '@/lib/format';
+import { computeCardRating, ratingTitle } from '@/lib/rating';
 
 /**
  * 电影卡片（合并版本）
@@ -16,6 +17,7 @@ import { formatDuration, relativeDay } from '@/lib/format';
  *   上映中：时长 · 场次 · 起价
  *   待映：相对天数 + 上映日期
  *   格式版本（IMAX / 4DX …；无格式标记则显示「原版」）
+ *   右下角：綜合評分徽章（(IMDb + 豆瓣) ÷ 2，只有一方时直接用那一方）
  *
  * 标题：单行中文，过长截断（hover 显示全名）；不再另起一行显示外文名
  */
@@ -38,6 +40,8 @@ export function MovieGroupCard({
   priority?: boolean;
 }) {
   const m = group.primary;
+  // 综合评分：两边都有取平均，只有一边用那一边，都没有则整块不渲染
+  const rating = computeCardRating(group.enrich);
 
   return (
     <Link
@@ -93,9 +97,9 @@ export function MovieGroupCard({
             </p>
           )}
 
-          {/* 格式版本（替代此前的院线） */}
-          <p className="mt-1.5">
-            <span className="hkm-chip">
+          {/* 格式版本（替代此前的院线）+ 右下角综合评分 */}
+          <div className="mt-1.5 flex items-end justify-between gap-2">
+            <span className="hkm-chip min-w-0 truncate">
               {group.allFormats.length > 0
                 ? group.allFormats
                     .slice(0, 2)
@@ -104,7 +108,17 @@ export function MovieGroupCard({
                   (group.allFormats.length > 2 ? ` +${group.allFormats.length - 2}` : '')
                 : '原版'}
             </span>
-          </p>
+
+            {rating && (
+              <span
+                className={`hkm-score hkm-score-${rating.source} shrink-0`}
+                title={ratingTitle(rating)}
+              >
+                <span className="hkm-score-value">{rating.value.toFixed(1)}</span>
+                <span className="hkm-score-label">{rating.label}</span>
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </Link>
