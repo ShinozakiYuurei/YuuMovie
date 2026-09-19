@@ -28,3 +28,6 @@ public/posters/*
 .npm/
 .env*.local
 *.log
+
+# ── 本地性能测量临时目录 ────────────────────────────
+.perf/

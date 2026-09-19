@@ -17,8 +17,16 @@
  *      且同源静态文件会被 Cloudflare 边缘缓存 —— 这就是要的「CDN 节点缓存」。
  *
  * 产物：
- *   public/posters/<sha1前16位>.webp   实际图片（.gitignore 已排除该目录）
- *   data/poster-manifest.json          { 原始URL: 本地文件名 }，供 lib/data.ts 查表
+ *   public/posters/<sha1前16位>.webp     卡片/详情页主图（400w，.gitignore 已排除）
+ *   public/posters/<sha1前16位>-t.webp  列表缩略图（64w）
+ *   data/poster-manifest.json           { 原始URL: 本地文件名 }，供 lib/data.ts 查表
+ *
+ * ★ 2026-09-19 新增 -t 缩略图变体：
+ *   影院页（app/cinema/[id]/page.tsx）把海报渲染在 32×48px 的位置，
+ *   却引用 400w 主图 —— 实测单页 52 张 × 28KB = 1.43MB，而 64w 缩略图
+ *   只要 ~1KB。全站 42 个影院页共引用 6094 张，浪费约 72MB 流量。
+ *   缩略图文件名只是在主图名后加 `-t`，因此 lib/data.ts 能纯字符串推导，
+ *   不必再查一张表。
  *
  * 为什么放 public/posters 而不是 data/：
  *   站点是 `output: 'export'` 静态导出，next build 会把 public/ 拷进 out/，
@@ -50,6 +58,15 @@ const MOVIES = path.join(DATA_DIR, 'movies.json');
 /** 卡片最大展示宽度约 400 CSS px，2x 屏 → 400 足够；详情页 176px 亦覆盖 */
 const WIDTH = Number(process.env.POSTER_WIDTH || 400);
 const QUALITY = Number(process.env.POSTER_QUALITY || 78);
+/**
+ * 列表缩略图宽度。
+ *
+ * 影院页把海报显示在 32×48px（见 app/cinema/[id]/page.tsx 的 width/height），
+ * 2x 屏需 64px 物理像素 —— 取 64 已足够，且单张仅 ~1KB。
+ * 不取更小是因为 64 已是「肉眼无差」的拐点，再小会开始发糊。
+ */
+const THUMB_WIDTH = Number(process.env.POSTER_THUMB_WIDTH || 64);
+const THUMB_QUALITY = Number(process.env.POSTER_THUMB_QUALITY || 72);
 /** 并发：2C2G 机器上 sharp 是 CPU 密集，6 路已能打满且不挤占 nginx */
 const CONCURRENCY = Number(process.env.POSTER_CONCURRENCY || 6);
 const TIMEOUT_MS = Number(process.env.POSTER_TIMEOUT_MS || 30_000);
@@ -81,6 +98,17 @@ function sourceUrlFor(url) {
 
 function hashOf(url) {
   return crypto.createHash('sha1').update(url).digest('hex').slice(0, 16);
+}
+
+/**
+ * 缩略图文件名：主图名后插 `-t`。
+ *
+ * 之所以用「命名约定」而不是再存一张表：lib/data.ts 拿到主图名后
+ * 只需一次字符串拼接就能推出缩略图路径，无需额外查表、也不会出现
+ * 「表里有主图无缩略图」的不一致状态。
+ */
+function thumbNameFor(mainName) {
+  return mainName.replace(/\.webp$/, '-t.webp');
 }
 
 async function fetchBuffer(url) {
@@ -189,9 +217,8 @@ async function main() {
     return;
   }
   if (todo.length === 0) {
-    console.log('✅ 无新增，直接写 manifest');
+    console.log('   无新增主图，检查缩略图是否齐全...');
     fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2));
-    return;
   }
 
   let done = 0;
@@ -224,6 +251,7 @@ async function main() {
       const url = queue.shift();
       const name = `${hashOf(url)}.webp`;
       const out = path.join(CACHE_DIR, name);
+      const thumbOut = path.join(CACHE_DIR, thumbNameFor(name));
       try {
         const src = sourceUrlFor(url);
         const buf = await fetchBuffer(src);
@@ -233,6 +261,17 @@ async function main() {
           .webp({ quality: QUALITY })
           .toBuffer();
         fs.writeFileSync(out, webp);
+
+        // 缩略图从**已生成的主图**再缩一次，而不是重新解码原图：
+        //   1. 输入小得多，sharp 开销更低（2C2G 机器上值得）
+        //   2. 尺寸关系确定（64 ≤ 400），不会出现缩略图反而更大的怪状
+        //   3. 与主图同源同色，不会因两次独立缩放而色调偏移
+        const thumb = await sharp(webp)
+          .resize({ width: THUMB_WIDTH, withoutEnlargement: true })
+          .webp({ quality: THUMB_QUALITY })
+          .toBuffer();
+        fs.writeFileSync(thumbOut, thumb);
+
         manifest[url] = name;
         savedFrom += buf.length;
         savedTo += webp.length;
@@ -253,6 +292,29 @@ async function main() {
   process.stdout.write('\n');
 
   checkpoint();
+
+  // ---------- 补齐缺失的缩略图 ----------
+  // ★ 为什么单独一步：本次新增 -t 变体之前，盘上已有几百张主图。
+  //   若只在上面的循环里生成，老图永远拿不到缩略图，除非 --force 全量重下
+  //   （那要重新下载 258MB）。这一步直接从**本地主图**生成，零网络开销。
+  let thumbMade = 0;
+  for (const [url, name] of Object.entries(manifest)) {
+    const main = path.join(CACHE_DIR, name);
+    const thumb = path.join(CACHE_DIR, thumbNameFor(name));
+    try {
+      if (fs.existsSync(thumb) && fs.statSync(thumb).size > 0) continue;
+      if (!fs.existsSync(main) || fs.statSync(main).size === 0) continue;
+      const t = await sharp(main)
+        .resize({ width: THUMB_WIDTH, withoutEnlargement: true })
+        .webp({ quality: THUMB_QUALITY })
+        .toBuffer();
+      fs.writeFileSync(thumb, t);
+      thumbMade++;
+    } catch {
+      /* 单张失败不影响其他；缺缩略图时页面会回退到主图 */
+    }
+  }
+  if (thumbMade > 0) console.log(`   ↻ 补齐缩略图 ${thumbMade} 张（从本地主图生成，未产生网络请求）`);
 
   const mb = (n) => (n / 1048576).toFixed(1);
   console.log(`✅ 完成：成功 ${done}，失败 ${failed}`);

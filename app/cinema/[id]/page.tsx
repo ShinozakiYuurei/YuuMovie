@@ -7,6 +7,7 @@ import {
   getShowsByCinema,
   getMovieById,
   getGroupForMovieId,
+  posterThumbPath,
   SOURCE_LABEL,
 } from '@/lib/data';
 import { getCinemas } from '@/lib/data';
@@ -106,8 +107,16 @@ export default async function CinemaPage({ params }: { params: Promise<{ id: str
                   <div key={movieId} className="hkm-panel rounded-2xl p-3.5">
                     <div className="mb-2.5 flex items-center gap-2.5">
                       {(group?.primary?.poster || movie?.poster) && (
+                        /*
+                         * ★ 用 64w 缩略图，不用 400w 主图。
+                         *
+                         * 这里只渲染 32×48px，却曾引用 400w 主图：
+                         * 实测单页 52 张 × 28KB ≈ 1.43MB，缩略图只要 ~1KB。
+                         * posterThumbPath 在构建期已确认文件存在，
+                         * 缺失时原样返回主图路径，不会 404。
+                         */
                         <Image
-                          src={group?.primary?.poster || movie!.poster!}
+                          src={posterThumbPath(group?.primary?.poster || movie!.poster!)!}
                           alt=""
                           width={32}
                           height={48}

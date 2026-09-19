@@ -96,6 +96,67 @@ function posterManifest(): Record<string, string> {
   return _posterManifest;
 }
 
+/**
+ * 缩略图路径映射：原始 URL → /posters/xxx-t.webp
+ *
+ * ★ 为什么需要缩略图：
+ *   影院页（app/cinema/[id]/page.tsx）把海报渲染在 32×48px 的位置，
+ *   却引用了 400w 主图。实测单页 52 张 × 28KB ≈ 1.43MB，而 64w 缩略图
+ *   只要 ~1KB —— 单张浪费约 25 倍，全站 42 个影院页共引用 6094 张。
+ *
+ * ★ 为什么要在此校验文件存在（而不是直接拼字符串）：
+ *   缩略图由 scripts/fetch-posters.mjs 生成，命名规则是主图名插 `-t`。
+ *   若某张图的缩略图生成失败而主图成功，直接拼路径会得到 404 ——
+ *   页面会显示碎图。这里在**构建期**（load() 只跑一次，不进请求路径）
+ *   用 existsSync 确认，缺失则不提供条目，页面自然回退到主图。
+ *
+ * 目录解析：next 构建时 cwd 就是项目根，public/posters 即产物源。
+ *   可用 POSTER_DIR 覆盖（部署环境与本地不一致时）。
+ */
+let _posterThumbs: Record<string, string> | null = null;
+/** 已确认存在的缩略图路径集合，供 posterThumbPath 做 O(1) 判断 */
+let _posterThumbSet: Set<string> | null = null;
+
+function posterThumbMap(): Record<string, string> {
+  if (_posterThumbs) return _posterThumbs;
+  const out: Record<string, string> = {};
+  const set = new Set<string>();
+  try {
+    const dir = process.env.POSTER_DIR || path.join(process.cwd(), 'public', 'posters');
+    for (const [url, name] of Object.entries(posterManifest())) {
+      const thumb = name.replace(/\.webp$/, '-t.webp');
+      if (thumb === name) continue;
+      if (fs.existsSync(path.join(dir, thumb))) {
+        const p = `/posters/${thumb}`;
+        out[url] = p;
+        set.add(p);
+      }
+    }
+  } catch {
+    /* 目录不存在（如尚未跑过抓图）→ 全部回退主图，不影响页面 */
+  }
+  _posterThumbs = out;
+  _posterThumbSet = set;
+  return out;
+}
+
+/**
+ * 取海报的**缩略图**路径（列表小图用）。
+ *
+ * 入参是已本地化的海报路径（/posters/xxx.webp）。
+ * 找不到缩略图或入参是远端 URL 时，原样返回 —— 调用方无需分支。
+ *
+ * 用 Set 做 O(1) 判断而不是扫 map：影院页单页最多 52 张图，
+ * 线性扫会退化成 O(n²)（实测该页 202 个 img 标签）。
+ */
+export function posterThumbPath(poster: string | null | undefined): string | null {
+  if (!poster) return null;
+  if (!poster.startsWith('/posters/')) return poster;
+  posterThumbMap(); // 确保 _posterThumbSet 已初始化
+  const thumb = `/posters/${poster.slice('/posters/'.length).replace(/\.webp$/, '-t.webp')}`;
+  return _posterThumbSet?.has(thumb) ? thumb : poster;
+}
+
 function slimPoster(url: string | null, width: number): string | null {
   if (!url) return null;
 
