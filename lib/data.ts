@@ -716,18 +716,36 @@ export function getUpcomingGroups(): MovieGroup[] {
   );
 }
 
-/** 待映按日期分组 */
-export function getUpcomingGroupsByDate(): { date: string; groups: MovieGroup[] }[] {
-  const byDate = new Map<string, MovieGroup[]>();
+/**
+ * 待映按月分组
+ *
+ * ★ 为什么按「月」而不是按「日」（2026-09-19 改）
+ *   原按具体日期分组，但待映片的开画日非常分散（实测 25 部散在 13 个日期上），
+ *   结果几乎每个小节只有 1 部电影 —— 一天一个标题，页面被标题切得粉碎，
+ *   也看不出「这个月大概有什么」。
+ *   按月归类后只剩 6 个分组（其中 10 月 15 部），密度合理。
+ *
+ * 月内仍按日期升序（getUpcomingGroups 已排好，逐条推入即保持有序）。
+ * 月份本身按时间升序；「未定」排在最后 —— 没有日期的条目不该插在
+ * 已确定日期的片单中间。
+ */
+export function getUpcomingGroupsByMonth(): { month: string; groups: MovieGroup[] }[] {
+  const byMonth = new Map<string, MovieGroup[]>();
   for (const g of getUpcomingGroups()) {
-    const d = g.primary.openingDate || '未定';
-    const bucket = byDate.get(d);
+    const d = g.primary.openingDate || '';
+    // 2026-10-08 → 2026-10；日期缺失归到 '未定'
+    const mo = /^\d{4}-\d{2}/.test(d) ? d.slice(0, 7) : '未定';
+    const bucket = byMonth.get(mo);
     if (bucket) bucket.push(g);
-    else byDate.set(d, [g]);
+    else byMonth.set(mo, [g]);
   }
-  return [...byDate.entries()]
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([date, groups]) => ({ date, groups }));
+  return [...byMonth.entries()]
+    .sort((a, b) => {
+      if (a[0] === '未定') return 1;
+      if (b[0] === '未定') return -1;
+      return a[0].localeCompare(b[0]);
+    })
+    .map(([month, groups]) => ({ month, groups }));
 }
 
 /** 根据 slug 取回电影组（详情页用，支持任一版本的 slug） */

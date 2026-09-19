@@ -19,6 +19,19 @@ export function formatDateShort(iso: string): string {
   return `${m}/${day}`;
 }
 
+/**
+ * 格式化月份：2026-10-08 → 2026年10月
+ *
+ * 用于「即将上映」按月归类的小节标题。带上年份是必要的：
+ * 片单会跨年（当前数据里 2026-09 ~ 2027-03），只写「10月」会有两个。
+ */
+export function formatMonth(iso: string): string {
+  const d = (iso || '').slice(0, 10);
+  const [y, m] = d.split('-').map(Number);
+  if (!y || !m) return '上映日期未定';
+  return `${y}年${m}月`;
+}
+
 /** 星期几的简写：週四（用于日期条第二行，与 formatDate 的括号写法区分） */
 export function weekdayShort(iso: string): string {
   const d = iso.slice(0, 10);
