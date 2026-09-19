@@ -13,15 +13,15 @@ const SITE = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),
   title: {
-    default: '香港電影場次 · 上映及即將上映',
-    template: '%s · 香港電影場次',
+    default: 'YuuMovie · 上映及即將上映',
+    template: '%s · YuuMovie',
   },
   description:
     '香港上映及即將上映電影資訊，整合百老匯、MCL 等院線場次、票價及官方購票連結。',
   openGraph: {
     type: 'website',
     locale: 'zh_HK',
-    siteName: '香港電影場次',
+    siteName: 'YuuMovie',
   },
 };
 
@@ -38,7 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <header className="hkm-glass-bar sticky top-0 z-50">
           <div className="mx-auto flex max-w-6xl items-center gap-6 px-4 py-3">
             <Link href="/" className="text-lg font-bold tracking-tight">
-              香港電影<span className="text-accent">場次</span>
+              Yuu<span className="text-accent">Movie</span>
             </Link>
             <nav className="flex gap-1 text-sm">
               <Link
