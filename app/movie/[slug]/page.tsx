@@ -219,15 +219,15 @@ export default async function MoviePage({ params }: { params: Promise<{ slug: st
       </nav>
 
       <header className="flex flex-col gap-6 sm:flex-row">
-        <div className="w-40 shrink-0 sm:w-48">
+        <div className="w-48 shrink-0 sm:w-56 md:w-64 lg:w-72">
           {m.poster ? (
             <Image
               src={m.poster}
               alt={group.displayName}
-              width={192}
-              height={288}
+              width={288}
+              height={432}
               priority
-              sizes="(max-width: 640px) 160px, 192px"
+              sizes="(max-width: 640px) 192px, (max-width: 1024px) 224px, 288px"
               className="w-full rounded-2xl border border-white/10 object-cover shadow-[0_18px_50px_-20px_rgba(0,0,0,0.9)]"
             />
           ) : (
@@ -259,16 +259,27 @@ export default async function MoviePage({ params }: { params: Promise<{ slug: st
             </div>
           )}
 
+          {/* IMDb & 豆瓣评分 */}
+          {(m.ratingImdb || m.ratingDouban) && (
+            <div className="mt-4 flex items-center gap-3">
+              {m.ratingDouban && (
+                <div className="flex items-center gap-1 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-500 px-3 py-1.5 text-white shadow-md">
+                  <span className="text-xs font-bold">豆瓣</span>
+                  <span className="ml-1 text-lg font-bold">{m.ratingDouban.toFixed(1)}</span>
+                </div>
+              )}
+              {m.ratingImdb && (
+                <div className="flex items-center gap-1 rounded-lg bg-gradient-to-r from-amber-600 to-amber-500 px-3 py-1.5 text-white shadow-md">
+                  <span className="text-xs font-bold">IMDb</span>
+                  <span className="ml-1 text-lg font-bold">{m.ratingImdb.toFixed(1)}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 版本信息行已删除 */}
+
           <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-            {m.openingDate && (
-              <>
-                <dt className="text-gray-500">上映日期</dt>
-                <dd className="text-gray-200">
-                  {m.openingDate}
-                  <span className="ml-2 text-xs text-accent">{relativeDay(m.openingDate)}</span>
-                </dd>
-              </>
-            )}
             <dt className="text-gray-500">片長</dt>
             <dd className="text-gray-200">{formatDuration(m.duration)}</dd>
             {m.category && (
@@ -304,15 +315,7 @@ export default async function MoviePage({ params }: { params: Promise<{ slug: st
                 <dd className="text-gray-200">{m.cast}</dd>
               </>
             )}
-            <dt className="text-gray-500">版本</dt>
-            <dd className="text-gray-200">
-              {group.versions.length} 個
-              {group.sources.length > 1 && (
-                <span className="ml-2 text-xs text-gray-500">
-                  （{group.sources.map((s) => SOURCE_LABEL[s]).join(' + ')}）
-                </span>
-              )}
-            </dd>
+
           </dl>
 
           <div className="mt-5 flex flex-wrap gap-2">
@@ -393,8 +396,8 @@ export default async function MoviePage({ params }: { params: Promise<{ slug: st
 
       {m.description && (
         <section className="mt-10">
-          <h2 className="mb-3 text-xl font-bold">劇情簡介</h2>
-          <div className="prose-custom max-w-3xl text-sm text-gray-300">{m.description}</div>
+          <h2 className="mb-3 text-xl font-semibold text-gray-100">劇情簡介</h2>
+          <div className="max-w-3xl rounded-xl bg-white/5 p-4 text-base leading-relaxed text-gray-100">{m.description}</div>
         </section>
       )}
     </article>
