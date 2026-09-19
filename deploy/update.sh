@@ -12,6 +12,7 @@ APP_DIR="${APP_DIR:-/opt/hk-movie}"
 SERVICE_USER="${SERVICE_USER:-hkmovie}"
 MCL_PROXY="${MCL_PROXY:-}"
 BACKUP_DIR="/tmp/hk-movie-backup"
+VERSION_FILE="${APP_DIR}/.deploy-version"
 
 if [ "$(id -u)" -ne 0 ]; then
   echo "✖ 请用 root 运行（sudo bash deploy/update.sh）"
@@ -68,6 +69,12 @@ sleep 5
 
 if curl -sf --max-time 10 http://127.0.0.1:3000/ -o /dev/null; then
   echo "✅ $(date -Iseconds) 更新完成"
+  
+  # 记录当前版本
+  version=$(grep -o '"version": "[^"]*"' package.json | cut -d'"' -f4)
+  commit=$(git rev-parse --short HEAD)
+  echo "${version}-${commit}" > "$VERSION_FILE"
+  echo "📦 Version: $version (Commit: $commit)"
 else
   echo "✖ 应用未响应 → journalctl -u hk-movie -n 50 --no-pager"
   exit 1
