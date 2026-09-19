@@ -48,7 +48,6 @@ export async function generateMetadata({
     a.duration ? `片長 ${a.duration} 分鐘` : null,
     a.category ? `級別 ${a.category}` : null,
     rated ? `${rated.label} ${rated.value!.toFixed(1)} 分` : null,
-    group.versions.length > 1 ? `${group.versions.length} 個版本` : null,
   ].filter(Boolean);
 
   return {
@@ -119,7 +118,7 @@ export default async function MoviePage({ params }: { params: Promise<{ slug: st
           <div className="mb-4 flex flex-wrap items-baseline gap-3">
             <h2 className="text-2xl font-bold tracking-tight">場次及購票</h2>
             <span className="hkm-chip">
-              {group.versions.length} 個版本 · 共 {totalShows} 場
+              共 {totalShows} 場
             </span>
             {a.duration && <span className="hkm-chip">片長 {formatDuration(a.duration)}</span>}
           </div>

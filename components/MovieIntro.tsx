@@ -137,7 +137,7 @@ export function MovieIntro({ group }: { group: MovieGroup }) {
             </div>
           )}
 
-          {/* 版本標籤（不放「N 個版本 · 院線」統計行）*/}
+          {/* 版本標籤（IMAX / 4DX …）*/}
           {group.allFormats.length > 0 && (
             <div className="mt-4 flex flex-wrap items-center gap-1.5">
               {group.allFormats.map((f) => (
