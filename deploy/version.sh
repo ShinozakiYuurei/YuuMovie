@@ -83,13 +83,18 @@ create_tag() {
     if ! git diff --quiet >/dev/null 2>&1; then
         echo "📦 Committing changes before tagging..."
         git add -A
-        git commit -m "chore: version bump to $version"
+        git commit -m "chore: version bump to ${version}"
     fi
     
-    # Create annotated tag with message
+    # Create annotated tag with release message
     git tag -a "$tag" -m "Release v${version}"
+    
     echo "✅ Tag created successfully"
-    git log -1 "$tag"
+    echo ""
+    echo "📋 Recent changes:"
+    git log --oneline HEAD~5..HEAD
+    echo ""
+    echo "💡 Next step: View at https://github.com/ShinozakiYuurei/YuuMovie/releases"
     return 0
 }
 
