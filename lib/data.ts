@@ -15,6 +15,7 @@ import { enrichKey } from './enrich-key.js';
 import { zhGenres } from './genre-zh';
 import { zhLanguages, zhSubtitles } from './lang-zh';
 import { inferGeo, districtOrder, REGION_ORDER } from './region';
+import { CINEMA_DISPLAY_NAME } from './cinema-names';
 import type { Region } from './types';
 // 紧凑传输格式的编解码在同目录的 compact.ts（零依赖，客户端组件也要用）
 export { toCompact, fromCompact } from './compact';
@@ -287,6 +288,15 @@ function load() {
     const geo = inferGeo(c.nameZh, c.address);
     c.region = geo.region;
     c.district = geo.district;
+
+    // ★ 戲院顯示名修正：必须在 inferGeo **之后**（见 lib/cinema-names.ts 的说明）。
+    //   region.ts 的两张表仍以原始名索引，先把地理归属算完，再换成展示名，
+    //   这样改名不必连 region.ts 的表一起维护。未列出的戲院原样保留。
+    const display = CINEMA_DISPLAY_NAME[c.id];
+    if (display) c.nameZh = display;
+    // 原始名可能带首尾空白 / 换行（MCL「MCL THE ONE 戲院\n」实测如此），
+    // 直接渲染会在标题里多出一个空行，统一清掉。
+    c.nameZh = c.nameZh.trim();
   }
 
   // 海报瘦身：只在载入时做一次，随后进缓存（不重复解析 URL）
