@@ -119,11 +119,27 @@ docker exec nginx nginx -s reload
 log "nginx 已重载"
 
 # ---------- 4 验证 ----------
-log "验证（源站本机自测，绕开 DNS）"
-CODE=$(curl -s -o /dev/null -w '%{http_code}' -k --resolve "${IMG_DOMAIN}:443:127.0.0.1" \
-  "https://${IMG_DOMAIN}/posters/$(ls /home/web/html/posters/*.webp 2>/dev/null | head -1 | xargs -r basename)" || echo 000)
-echo "  HTTPS 取一张海报: HTTP ${CODE}"
-[ "$CODE" = "200" ] || echo "  ⚠️ 非 200，检查 /home/web/html/posters/ 是否有文件"
+log "验证（取一张真实海报）"
+# ★ 不能用 --resolve 指向 127.0.0.1：nginx 容器是 host 网络模式，
+#   从容器外部访问 127.0.0.1:443 会连不上（初次实现就是这么写出
+#   "HTTP 000000" 假失败的）。这里直接按真实域名访问 —— 灰云已生效，
+#   本机 DNS 解析到的就是源站自己。
+SAMPLE=$(ls /home/web/html/posters/*.webp 2>/dev/null | grep -v -- '-t\.webp$' | head -1 | xargs -r basename)
+if [ -z "$SAMPLE" ]; then
+  log "  ⚠️ /home/web/html/posters/ 下没有主图，跳过验证"
+else
+  CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "https://${IMG_DOMAIN}/posters/${SAMPLE}" || echo 000)
+  echo "  HTTPS 取海报 /posters/${SAMPLE}: HTTP ${CODE}"
+  if [ "$CODE" != "200" ]; then
+    echo "  ⚠️ 非 200。排查：1) 证书是否复制到 ${CERT_DIR}  2) 源站 443 是否放行  3) DNS 是否已生效"
+  fi
+  # 确认没走 CF（灰云应无 cf-ray）
+  if curl -sI --max-time 20 "https://${IMG_DOMAIN}/posters/${SAMPLE}" | grep -qi 'cf-ray'; then
+    echo "  ⚠️ 响应含 cf-ray —— 该域名仍在走 Cloudflare（应为灰云）"
+  else
+    echo "  ✅ 无 cf-ray，确认直连源站（不经 CF）"
+  fi
+fi
 
 log "完成。下一步：在服务器上设置 POSTER_ORIGIN 并重建"
 cat <<EOF
