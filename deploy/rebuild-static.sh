@@ -41,6 +41,9 @@ fi
 APP_DIR="${APP_DIR:-/opt/hk-movie}"
 SITE_DIR="${SITE_DIR:-/home/web/html}"
 SITE_URL="${SITE_URL:-https://hkmovie.yuurei.de}"
+# 图片子域（可选）：设为灰云子域可让海报直连香港，实测快 2.3–5.8 倍。
+# 留空则海报保持同源 /posters/*.webp（默认，行为不变）。
+POSTER_ORIGIN="${POSTER_ORIGIN:-}"
 SERVICE_USER="${SERVICE_USER:-hkmovie}"
 
 cd "${APP_DIR}"
@@ -98,6 +101,12 @@ fi
 echo "▶ 构建中（约 90 秒）..."
 rm -rf "${APP_DIR}/out"
 export NEXT_PUBLIC_SITE_URL="${SITE_URL}"
+# ★ 图片子域（可选）：设了就指向灰云子域（直连香港），不设则保持同源。
+#   为什么要单独一个变量：本站的 HTML/JS 走 Cloudflare 没问题（首页压缩后 7KB），
+#   但海报走 CF 会慢 2.3–5.8 倍 —— CF 免费版把大陆用户导到西雅图，而源站在香港。
+#   详见 lib/data.ts 里 POSTER_ORIGIN 的注释。
+#   未设置时为空 → lib/data.ts 回退到同源 /posters/*.webp，行为与之前完全一致。
+export NEXT_PUBLIC_POSTER_ORIGIN="${POSTER_ORIGIN:-}"
 npm run build
 echo "  HTML 页数: $(find out -name '*.html' | wc -l)"
 

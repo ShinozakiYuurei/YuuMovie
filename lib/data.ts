@@ -66,6 +66,44 @@ function asciiSlug(nameEn: string | null, nameZh: string | null, id: string): st
 const OSS_HOSTS = new Set(['cdn.icirena.ai', 'media.grabticks.com']);
 
 /**
+ * 本地海报的对外域名（图片专用子域，可选）
+ *
+ * ★ 为什么需要它（2026-09-19 实测）：
+ *
+ *   本站的 HTML/JS 走 Cloudflare（橙云）没问题 —— 首页压缩后仅 7KB。
+ *   但**海报不能走 CF**：CF 免费版没有大陆节点，把大陆用户导到西雅图。
+ *   实测 16 张海报全部加载完（6 并发，即真实浏览器行为）：
+ *     经 CF    1.05–1.46s（吞吐 23–75KB/s）
+ *     直连香港 0.18–0.47s（157–253KB/s）→ 快 2.3–5.8 倍
+ *
+ *   对比参照：hkmovie6 的海报秒开，因为它在 Amazon S3 ap-east-1（香港），
+ *   走香港节点，不经过 CF。
+ *
+ * 做法：另开一个**灰云**子域（CF 面板里云朵图标点成灰色 = 仅 DNS，
+ *   流量不经 CF），指向香港源站；海报改用它，HTML/JS 仍走主域（保留 CF 防护）。
+ *
+ * 配置方式：环境变量 NEXT_PUBLIC_POSTER_ORIGIN（如 https://img.yuurei.de）。
+ *   未设置时为空字符串 → 海报保持同源 /posters/*.webp（当前行为），
+ *   因此本次改动在设置变量前**完全无副作用**，可安全先合并再切换。
+ *
+ * 为什么用 NEXT_PUBLIC_ 前缀：这是构建期常量（静态导出会烤进 HTML），
+ *   与既有的 NEXT_PUBLIC_SITE_URL 一致，见 deploy/rebuild-static.sh。
+ */
+const POSTER_ORIGIN = (process.env.NEXT_PUBLIC_POSTER_ORIGIN || '').replace(/\/+$/, '');
+
+/** 拼出本地化海报的完整 URL（产物在 /posters/ 下） */
+function posterUrl(name: string): string {
+  return POSTER_ORIGIN ? `${POSTER_ORIGIN}/posters/${name}` : `/posters/${name}`;
+}
+
+/** 是否为本地化海报路径（含图片子域的情况） */
+function isLocalPoster(p: string): boolean {
+  return POSTER_ORIGIN
+    ? p.startsWith(`${POSTER_ORIGIN}/posters/`)
+    : p.startsWith('/posters/');
+}
+
+/**
  * 本地海报清单：原始 URL → public/posters/ 下的文件名
  *
  * ★ 为什么需要它（2026-09-19 实测，两个硬事实）：
@@ -127,7 +165,7 @@ function posterThumbMap(): Record<string, string> {
       const thumb = name.replace(/\.webp$/, '-t.webp');
       if (thumb === name) continue;
       if (fs.existsSync(path.join(dir, thumb))) {
-        const p = `/posters/${thumb}`;
+        const p = posterUrl(thumb);
         out[url] = p;
         set.add(p);
       }
@@ -151,9 +189,12 @@ function posterThumbMap(): Record<string, string> {
  */
 export function posterThumbPath(poster: string | null | undefined): string | null {
   if (!poster) return null;
-  if (!poster.startsWith('/posters/')) return poster;
+  // 本地化海报可能是同源 /posters/... 或图片子域 https://img.../posters/...
+  if (!isLocalPoster(poster)) return poster;
   posterThumbMap(); // 确保 _posterThumbSet 已初始化
-  const thumb = `/posters/${poster.slice('/posters/'.length).replace(/\.webp$/, '-t.webp')}`;
+  const name = poster.replace(/^.*\/posters\//, '');
+  const thumbName = name.replace(/\.webp$/, '-t.webp');
+  const thumb = posterUrl(thumbName);
   return _posterThumbSet?.has(thumb) ? thumb : poster;
 }
 
@@ -164,7 +205,7 @@ function slimPoster(url: string | null, width: number): string | null {
   //   未命中（新片还没跑抓图 / 抓取失败）则回退到下面的远端逻辑，
   //   保证页面不会白图。
   const local = posterManifest()[url];
-  if (local) return `/posters/${local}`;
+  if (local) return posterUrl(local);
 
   try {
     const u = new URL(url);
