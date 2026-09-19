@@ -61,10 +61,18 @@ export function PosterImage({
         fill
         sizes={sizes}
         className={className}
-        // priority=true 时 next/image 自动用 eager + fetchpriority=high
+        // priority=true 时 next/image 会自动用 loading=eager
         priority={priority}
-        // 非首屏图片保持异步解码，避免解码阻塞主线程
-        decoding={priority ? 'sync' : 'async'}
+        // ★ fetchPriority 必须显式传：next/image 只是透传这个 prop，
+        //   并不会因为 priority 就自动加上。缺了它浏览器仍会按默认优先级
+        //   抓取首屏海报，等于 priority 只做了一半。
+        fetchPriority={priority ? 'high' : undefined}
+        // 统一异步解码。
+        //   曾考虑首屏用 sync 让绘制更早，但首页有 8 张 priority 图，
+        //   同步解码会连续阻塞主线程，风险大于收益 —— 真正影响 LCP 的
+        //   是「何时开始下载」（由 priority + fetchPriority 控制），
+        //   而不是解码时机。
+        decoding="async"
         onLoad={() => setLoaded(true)}
       />
     </>
