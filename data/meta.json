@@ -1,0 +1,25 @@
+{
+ "lastUpdated": "2026-09-18T19:12:12.439Z",
+ "sources": [
+  "broadway",
+  "mcl",
+  "emperor",
+  "cinemacity",
+  "bestar"
+ ],
+ "counts": {
+  "movies": 380,
+  "showing": 355,
+  "upcoming": 25,
+  "cinemas": 42,
+  "shows": 7304
+ },
+ "errors": [],
+ "durationMs": 219618,
+ "integrity": {
+  "orphanShows": 0,
+  "showsWithoutBookingUrl": 0,
+  "moviesWithoutPoster": 9,
+  "cinemasWithoutAddress": 0
+ }
+}

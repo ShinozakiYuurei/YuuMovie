@@ -1,0 +1,104 @@
+import Link from 'next/link';
+import { PosterImage } from './PosterImage';
+import type { MovieGroup } from '@/lib/data';
+import { formatLabel } from '@/lib/data';
+import { formatDuration, relativeDay } from '@/lib/format';
+
+/**
+ * 电影卡片（合并版本）
+ *
+ * 海报区域：
+ *   左上角：香港电影分级（黑底白字）
+ *   不再展示版本数角标、底部版本 tag 与语言标签（用户偏好：更干净的卡片）
+ *
+ * 文字区域：
+ *   标题 / 英文片名
+ *   上映中：时长 · 场次 · 起价
+ *   待映：相对天数 + 上映日期
+ *   格式版本（IMAX / 4DX …；无格式标记则显示「原版」）
+ *
+ * 标题：单行中文，过长截断（hover 显示全名）；不再另起一行显示外文名
+ */
+export function MovieGroupCard({ group }: { group: MovieGroup }) {
+  const m = group.primary;
+
+  return (
+    <Link
+      href={`/movie/${group.slug}`}
+      className="hkm-glass group flex h-full flex-col overflow-hidden rounded-2xl"
+    >
+      <div className="relative aspect-[2/3] w-full overflow-hidden bg-black">
+        {m.poster ? (
+          <PosterImage
+            src={m.poster}
+            alt={group.displayName}
+            sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
+            className="object-cover transition-transform duration-300 group-hover:scale-105"
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center text-xs text-gray-600">
+            無海報
+          </div>
+        )}
+
+        {/* 左上：分级（黑底白字加粗，仅显示香港官方分级 I/IIA/IIB/III） */}
+        {group.displayCategory && (
+          <span
+            data-testid="card-rating"
+            className="absolute left-2 top-2 inline-flex items-center rounded bg-black/85 px-1.5 py-0.5 text-[11px] font-bold text-white tracking-wide"
+          >
+            {group.displayCategory}
+          </span>
+        )}
+
+      </div>
+
+      <div className="flex flex-1 flex-col gap-1.5 p-3">
+        {/* 单行中文标题：过长截断，hover 显示全名 */}
+        <h3
+          className="line-clamp-1 text-[13px] font-semibold leading-snug tracking-tight text-white"
+          title={group.displayName}
+        >
+          {group.displayName}
+        </h3>
+
+        <div className="mt-auto pt-2">
+          {group.status === 'upcoming' && m.openingDate ? (
+            <p className="text-[11px] font-medium text-accent">
+              {relativeDay(m.openingDate)}上映 · {m.openingDate}
+            </p>
+          ) : (
+            <p className="flex flex-wrap items-baseline gap-x-1.5 text-[11px] text-gray-400">
+              <span>{group.displayDuration ? formatDuration(group.displayDuration) : '—'}</span>
+              {group.totalShows > 0 && (
+                <>
+                  <span className="text-white/15">·</span>
+                  <span>{group.totalShows} 場</span>
+                </>
+              )}
+              {group.minPrice != null && (
+                <>
+                  <span className="text-white/15">·</span>
+                  <span className="font-medium text-white/90">${group.minPrice} 起</span>
+                </>
+              )}
+            </p>
+          )}
+
+          {/* 格式版本（替代此前的院线） */}
+          <p className="mt-1.5">
+            <span className="hkm-chip">
+              {group.allFormats.length > 0
+                ? group.allFormats
+                    .slice(0, 2)
+                    .map(formatLabel)
+                    .join(' · ') +
+                  (group.allFormats.length > 2 ? ` +${group.allFormats.length - 2}` : '')
+                : '原版'}
+            </span>
+          </p>
+        </div>
+      </div>
+    </Link>
+  );
+}

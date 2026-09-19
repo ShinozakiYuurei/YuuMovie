@@ -1,0 +1,101 @@
+# 香港电影聚合站 · nginx 站点配置（容器版）
+#
+# 适配环境：nginx 容器 + /home/web/conf.d/ 挂载
+# 放置位置：/home/web/conf.d/<你的域名>.conf
+#
+# 与现有站点（komari.yuurei.de 探针）靠 server_name 区分，互不干扰。
+# 证书：使用 Cloudflare Origin Certificate，放到 /home/web/certs/
+
+upstream hk_movie_backend {
+    server 127.0.0.1:3000;
+    keepalive 32;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name __SITE_DOMAIN__;
+
+    # HTTP → HTTPS（CF Flexible 模式下不要开这段，会死循环）
+    # 若 CF 用 Full/Full(strict)，保留下面这行
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    listen 443 quic;
+    listen [::]:443 quic;
+
+    server_name __SITE_DOMAIN__;
+
+    # Cloudflare Origin Certificate（15 年有效期，CF 后台可免费签发）
+    ssl_certificate     /etc/nginx/certs/__SITE_DOMAIN___cert.pem;
+    ssl_certificate_key /etc/nginx/certs/__SITE_DOMAIN___key.pem;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL_hkmovie:10m;
+    ssl_session_timeout 1d;
+
+    add_header Alt-Svc 'h3=":443"; ma=86400' always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # ---------- 安全：仅允许 Cloudflare 回源（可选，启用后直连 IP 会被拒）----------
+    # 若启用了 CF 且不想让人绕过 CF 直连，取消下面注释。
+    # ⚠️ 启用前确认 CF IP 段最新，否则会把自己锁在外面。
+    # include /etc/nginx/conf.d/cloudflare-ips.conf;
+    # if ($cf_allowed = 0) { return 403; }
+
+    client_max_body_size 20m;
+
+    # ---------- 静态资源长缓存 ----------
+    # Next 的 _next/static 文件名带 hash，可永久缓存
+    location /_next/static/ {
+        proxy_pass http://hk_movie_backend;
+        proxy_set_header Host $host;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        access_log off;
+    }
+
+    # ---------- ACME 验证（若需 certbot 签证书）----------
+    location ^~ /.well-known/acme-challenge/ {
+        default_type "text/plain";
+        root /var/www/letsencrypt;
+    }
+
+    # ---------- 反代 Next.js ----------
+    location / {
+        proxy_pass http://hk_movie_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        # 传原始 Host，Next 用于生成 canonical / sitemap
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+        proxy_connect_timeout 10s;
+
+        # ⚠️ 不要缓存 HTML：页面读实时数据，缓存会导致更新后用户看到旧内容
+        add_header Cache-Control "no-cache, must-revalidate" always;
+    }
+
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_types
+        text/plain
+        text/css
+        text/xml
+        application/json
+        application/javascript
+        application/xml
+        application/rss+xml
+        image/svg+xml;
+}

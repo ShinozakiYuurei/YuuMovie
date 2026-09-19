@@ -1,0 +1,433 @@
+@import 'tailwindcss';
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /*
+   * shadcn 默认注入的是**浅色**变量（background 近白），
+   * 而本站是深色主题（ink #0b0d12 / panel #141821 / edge #252b38 / accent #e11d48）。
+   * 这里整体改写为深色，保证新增组件与既有页面配色一致。
+   */
+  color-scheme: dark;
+  /* 底色比原先更深，让玻璃层/光晕有对比空间 */
+  --background: oklch(0.11 0.012 275);
+  --foreground: oklch(0.95 0.006 275);
+  --card: oklch(0.16 0.014 275);
+  --card-foreground: oklch(0.95 0.006 275);
+  --popover: oklch(0.16 0.014 275);
+  --popover-foreground: oklch(0.95 0.006 275);
+  /* 强调色：紫罗兰（取代原先的玫红，更现代、少一点“AI 味”） */
+  --primary: oklch(0.62 0.19 285);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.22 0.014 275);
+  --secondary-foreground: oklch(0.95 0.006 275);
+  --muted: oklch(0.22 0.014 275);
+  --muted-foreground: oklch(0.68 0.012 275);
+  --accent: oklch(0.62 0.19 285);
+  --accent-foreground: oklch(0.99 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.26 0.014 275);
+  --input: oklch(0.26 0.014 275);
+  --ring: oklch(0.62 0.19 285);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+html,
+body {
+  background: #07080d;
+  color: #eef0f6;
+}
+
+body {
+  font-family: system-ui, -apple-system, 'Segoe UI', 'PingFang HK', 'Microsoft JhengHei',
+    'Noto Sans HK', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================================
+   环境光背景（“极光”层）
+
+   用两团大面积径向渐变做景深，比纯黑底更有空间感。
+   固定定位 + 不参与滚动，且只用 transform 缓慢位移 ——
+   全部在合成层完成，不会引起 layout / paint。
+   ============================================================ */
+.hkm-aurora {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.hkm-aurora::before,
+.hkm-aurora::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.5;
+}
+
+.hkm-aurora::before {
+  width: 46rem;
+  height: 46rem;
+  top: -18rem;
+  left: -12rem;
+  background: radial-gradient(circle, rgb(124 108 255 / 0.42), transparent 68%);
+}
+
+.hkm-aurora::after {
+  width: 38rem;
+  height: 38rem;
+  top: 12rem;
+  right: -14rem;
+  background: radial-gradient(circle, rgb(34 211 238 / 0.26), transparent 70%);
+}
+
+/* 无动效偏好：关闭极光位移 */
+@media (prefers-reduced-motion: no-preference) {
+  .hkm-aurora::before {
+    animation: aurora-drift 26s ease-in-out infinite;
+  }
+  .hkm-aurora::after {
+    animation: aurora-drift 32s ease-in-out infinite reverse;
+  }
+}
+
+@keyframes aurora-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(3%, -3%, 0) scale(1.08);
+  }
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ============================================================
+   玻璃质感
+
+   ⚠️ 性能取舍（2C2G VPS + 可能低端手机）：
+   backdrop-filter 在**滚动中的大量元素**上会强制每帧重算背景模糊，
+   是掉帧主因。因此分层使用：
+
+   - .hkm-glass-bar ：顶部导航等**固定不动**的元素 → 真毛玻璃
+   - .hkm-glass     ：卡片等**大量滚动**元素 → 半透明+内高光+柔和阴影
+                      模拟玻璃观感，零模糊开销
+   ============================================================ */
+.hkm-glass-bar {
+  background: rgb(12 14 20 / 0.62);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border-bottom: 1px solid rgb(255 255 255 / 0.07);
+}
+
+.hkm-glass {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.055), rgb(255 255 255 / 0.018)),
+    rgb(17 19 24 / 0.72);
+  border: 1px solid rgb(255 255 255 / 0.08);
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.06),
+    0 10px 30px -12px rgb(0 0 0 / 0.7);
+  transition:
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.28s ease,
+    box-shadow 0.28s ease;
+}
+
+.hkm-glass:hover {
+  border-color: rgb(124 108 255 / 0.45);
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.1),
+    0 18px 44px -14px rgb(0 0 0 / 0.8),
+    0 0 0 1px rgb(124 108 255 / 0.12);
+}
+
+/* 卡片悬浮上浮（只在有指针设备时启用，避免触屏粘滞） */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .hkm-glass:hover {
+    transform: translateY(-3px);
+  }
+}
+
+/* 面板：比卡片更沉一层，用于详情页的场次容器 */
+.hkm-panel {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.04), rgb(255 255 255 / 0.012)),
+    rgb(15 17 22 / 0.66);
+  border: 1px solid rgb(255 255 255 / 0.07);
+  box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.05);
+}
+
+/* 药丸标签（院线 / 版本 / 分类等） */
+.hkm-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid rgb(255 255 255 / 0.09);
+  background: rgb(255 255 255 / 0.05);
+  padding: 0.125rem 0.5rem;
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  color: rgb(203 209 224);
+}
+
+/* 主要按钮：渐变 + 光晕 */
+.hkm-btn-primary {
+  background: linear-gradient(135deg, #8b7cff, #6d5cf0);
+  color: #fff;
+  box-shadow: 0 8px 24px -10px rgb(124 108 255 / 0.75);
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+.hkm-btn-primary:hover {
+  box-shadow: 0 12px 30px -10px rgb(124 108 255 / 0.9);
+}
+
+/* 次要按钮：玻璃边 */
+.hkm-btn-ghost {
+  border: 1px solid rgb(255 255 255 / 0.1);
+  background: rgb(255 255 255 / 0.03);
+  color: rgb(203 209 224);
+  transition: border-color 0.25s ease, background 0.25s ease, color 0.25s ease;
+}
+.hkm-btn-ghost:hover {
+  border-color: rgb(124 108 255 / 0.5);
+  background: rgb(124 108 255 / 0.1);
+  color: #fff;
+}
+
+/* 场次按日期折叠：用原生 <details>，无需客户端 JS */
+details > summary {
+  -webkit-tap-highlight-color: transparent;
+}
+details > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* ============================================================
+   动效层（Spectrum UI 风格，但刻意保持轻量）
+
+   设计取舍：
+   - 本站跑在 2C2G VPS 上，用户端也可能是低端手机。
+     Spectrum UI 有 88 个组件依赖 framer-motion（+40~60KB JS），
+     这里**不引入运行时动画库**，全部用 CSS 动画实现：
+     0 额外 JS、0 额外请求，动画交给合成器（opacity/transform），
+     不触发 layout/paint，因此不会拖慢滚动。
+   - 统一尊重 prefers-reduced-motion。
+   ============================================================ */
+
+/* 卡片入场：淡入 + 轻微上浮 */
+@keyframes hkm-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.hkm-enter {
+  animation: hkm-fade-up 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* 网格逐个入场（stagger）：靠 --i 变量逐级延时，
+   只给前 24 个卡片递增延时，之后统一封顶，避免长列表尾部等太久 */
+.hkm-stagger > * {
+  animation: hkm-fade-up 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(min(var(--i, 0), 24) * 28ms);
+}
+
+/* 海报加载完成前显示骨架微光，加载后淡出（配合 next/image） */
+@keyframes hkm-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.hkm-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgb(255 255 255 / 0.04) 25%,
+    rgb(255 255 255 / 0.09) 37%,
+    rgb(255 255 255 / 0.04) 63%
+  );
+  background-size: 200% 100%;
+  animation: hkm-shimmer 1.4s ease-in-out infinite;
+}
+
+/* 骨架淡出（图片 onLoad 后移除） */
+.hkm-skeleton--done {
+  opacity: 0;
+  transition: opacity 0.35s ease-out;
+  pointer-events: none;
+}
+
+/* 无障碍：用户要求减少动效时全部关闭 */
+@media (prefers-reduced-motion: reduce) {
+  .hkm-enter,
+  .hkm-stagger > * {
+    animation: none !important;
+  }
+  .hkm-skeleton {
+    animation: none !important;
+  }
+  .group:hover .group-hover\:scale-105 {
+    transform: none !important;
+  }
+}
+
+/* 简介 HTML 渲染样式 */
+.prose-custom p {
+  margin-bottom: 0.75rem;
+  line-height: 1.75;
+}
+.prose-custom br {
+  display: block;
+  content: '';
+  margin-top: 0.5rem;
+}
+.prose-custom i,
+.prose-custom em {
+  font-style: italic;
+  color: #c9cdd8;
+}
+.prose-custom strong {
+  color: #fff;
+  font-weight: 600;
+}
+
+@theme {
+  /* ============================================================
+     自定义设计令牌（Tailwind v4 CSS-first）
+
+     ⚠️ 重要：项目用的是 Tailwind v4，它**不读 tailwind.config.mjs**，
+     除非显式加 @config 指令。而此前全局搜不到 @config ——
+     也就是说 bg-panel / border-edge / bg-ink 这些类名一直是
+     **静默失效的死类**（产物 CSS 里 0 条规则），
+     卡片实际没有背景色与边框，这正是页面显得扁平、老气的原因之一。
+
+     这里改用 v4 原生写法把它们真正定义出来。
+     （accent 不在此重复定义，它由下方 shadcn 的 --accent 变量驱动，
+       避免两个 @theme 块争抢同一个 key。）
+     ============================================================ */
+  --color-ink: #07080d;
+  --color-panel: #111318;
+  --color-edge: #232733;
+  --color-accent2: #22d3ee;
+}
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}

@@ -1,0 +1,380 @@
+[
+ {
+  "id": "broadway-1",
+  "code": "PP",
+  "nameZh": "MOViE MOViE Pacific Place (金鐘)",
+  "address": "香港金鐘道88號太古廣場L1",
+  "mapUrl": "https://maps.app.goo.gl/pdka3ZhR16QdeXPw9",
+  "detailUrl": "https://www.cinema.com.hk/hk/cinema/1",
+  "source": "broadway"
+ },
+ {
+  "id": "broadway-2",
+  "code": "MM",
+  "nameZh": "MOViE MOViE Cityplaza (太古城)",
+  "address": "香港太古城道18號太古城中心5樓",
+  "mapUrl": "https://www.google.com.hk/maps/place/MOViE+MOViE+Cityplaza/@22.285597,114.2150058,17z/data=!3m2!4b1!5s0x340401736f98973b:0x1e54ca82ac42ef29!4m5!3m4!1s0x340401736c6914e5:0xaad9b80d58022a6f!8m2!3d22.285597!4d114.2171998?hl=zh-TW",
+  "detailUrl": "https://www.cinema.com.hk/hk/cinema/2",
+  "source": "broadway"
+ },
+ {
+  "id": "broadway-4",
+  "code": "PI",
+  "nameZh": "PALACE ifc",
+  "address": "香港中環金融街8號國際金融中心商場一樓",
+  "mapUrl": "https://www.google.com.hk/maps/place/PALACE+IFC%E7%99%BE%E8%80%81%E5%8C%AF%E6%88%B2%E9%99%A2/@22.2851404,114.1572794,18.88z/data=!3m1!5s0x3404006371c4ec15:0xb22ccd0f658a40b0!4m7!1m4!3m3!1s0x34040063041096a1:0xf6c429a6ef8975ca!2z5Lit55Kw6YeR6J6N6KGXOOiZn-Wci-mam-mHkeiejeS4reW_g-WVhuWgtOaaqOapn-WgtOW_q-e3mummmea4r-ermQ!3b1!3m1!1s0x0000000000000000:0x278facbc3b7d00ba?hl=zh-TW&shorturl=1",
+  "detailUrl": "https://www.cinema.com.hk/hk/cinema/4",
+  "source": "broadway"
+ },
+ {
+  "id": "broadway-3",
+  "code": "LP",
+  "nameZh": "GALA CINEMA (朗豪坊)",
+  "address": "旺角亞皆老街8號朗豪坊商場8樓",
+  "mapUrl": "https://www.google.com/maps/place/朗豪坊/@22.3182116,114.1686743,15z/data=!4m6!3m5!1s0x340400c778104b49:0xace2b89a889d5652!8m2!3d22.3182116!4d114.1686743!16zL20vMDh2YzFj?hl=zh-TW",
+  "detailUrl": "https://www.cinema.com.hk/hk/cinema/3",
+  "source": "broadway"
+ },
+ {
+  "id": "broadway-7",
+  "code": "PE",
+  "nameZh": "PREMIERE ELEMENTS",
+  "address": "九龍尖沙咀柯士甸道西1號圓方商場火區2樓2130號鋪",
+  "mapUrl": "https://www.google.com.hk/maps/@22.3036045,114.1613826,17z?hl=zh-TW",
+  "detailUrl": "https://www.cinema.com.hk/hk/cinema/7",
+  "source": "broadway"
+ },
+ {
+  "id": "broadway-5",
+  "code": "MO",
+  "nameZh": "B+ cinema MOKO (旺角東)",
+  "address": "香港九龍旺角太子道西193號MOKO新世紀廣場4樓",
+  "mapUrl": "https://www.google.com.hk/maps/place/MOKO+新世紀廣場/@22.3235449,114.1704488,17z/data=!4m9!1m2!2m1!1s4%2FF,+MOKO+193+Prince+Edward+Road+West,+Mongkok,+Kowloon,+Hong+Kong!3m5!1s0x340400c9224ff90b:0xda570eda36d1eac5!8m2!3d22.3231937!4d114.1723194!15sCkI0L0YsIE1PS08gMTkzIFByaW5jZSBFZHdhcmQgUm9hZCBXZXN0LCBNb25na29rLCBLb3dsb29uLCBIb25nIEtvbmeSAQ9zaG9wcGluZ19jZW50ZXI?hl=zh-TW",
+  "detailUrl": "https://www.cinema.com.hk/hk/cinema/5",
+  "source": "broadway"
+ },
+ {
+  "id": "broadway-6",
+  "code": "AP",
+  "nameZh": "B+ cinema apm (觀塘)",
+  "address": "九龍觀塘道418號創紀之城五期apm 6樓 L6-1舖",
+  "mapUrl": "https://www.google.com.hk/maps/place/B%2B+cinema+(apm)/@22.3122584,114.2202474,17z/data=!3m1!5s0x3404014f901b618d:0xb22ccd0fa548dae3!4m6!3m5!1s0x3404014f91664e0b:0x12a4b5db2b429cae!8m2!3d22.3122535!4d114.2251183!16s%2Fg%2F11bc8xm69j?hl=en&entry=tts&shorturl=1",
+  "detailUrl": "https://www.cinema.com.hk/hk/cinema/6",
+  "source": "broadway"
+ },
+ {
+  "id": "broadway-8",
+  "code": "BC",
+  "nameZh": "電影中心",
+  "address": "九龍油麻地眾坊街3號駿發花園",
+  "mapUrl": "https://www.google.com.hk/maps/place/Broadway+Cinematheque/@22.3107009,114.1667297,17z/data=!3m1!4b1!4m2!3m1!1s0x340400c06baf86c7:0xc85e21d919df856a?hl=en&shorturl=1",
+  "detailUrl": "https://www.cinema.com.hk/hk/cinema/8",
+  "source": "broadway"
+ },
+ {
+  "id": "broadway-9",
+  "code": "MK",
+  "nameZh": "旺角",
+  "address": "九龍西洋菜街6-12號",
+  "mapUrl": "https://www.google.com.hk/maps/place/Mongkok+Broadway+Theatre,+6-12+Sai+Yeung+Choi+St+S,+Mong+Kok/@22.3170779,114.1684628,17z/data=!3m1!4b1!4m2!3m1!1s0x340400c70024c4b7:0x5287f7ac31ed3ada?hl=en&shorturl=1",
+  "detailUrl": "https://www.cinema.com.hk/hk/cinema/9",
+  "source": "broadway"
+ },
+ {
+  "id": "broadway-10",
+  "code": "YH",
+  "nameZh": "MY CINEMA YOHO MALL",
+  "address": "新界元朗朗日路9號YOHO MALL I 1樓 1021舖",
+  "mapUrl": "https://www.google.com.hk/maps/place/YOHO+MALL+II/@22.4445422,114.0336104,17z/data=!4m9!1m2!2m1!1sYOHO+MALL!3m5!1s0x3403f0a63c24f84d:0x7f33c18922e18a5d!8m2!3d22.445713!4d114.0353169!16s%2Fg%2F11b7qv8nvm?entry=ttu&g_ep=EgoyMDI1MTEyMy4xIKXMDSoASAFQAw%3D%3D",
+  "detailUrl": "https://www.cinema.com.hk/hk/cinema/10",
+  "source": "broadway"
+ },
+ {
+  "id": "broadway-11",
+  "code": "KF",
+  "nameZh": "葵芳",
+  "address": "新界葵芳興芳路223號新都會廣場L1-L4",
+  "mapUrl": "https://www.google.com.hk/maps/place/Kwai+Fong+Broadway+Theatre/@22.3574671,114.1239739,17z/data=!3m2!4b1!5s0x3403f8bc2d65a63f:0x64dca853ce713750!4m2!3m1!1s0x3403f8bc2d2fb46f:0xa50df4a9a2a4fca7?hl=en&shorturl=1",
+  "detailUrl": "https://www.cinema.com.hk/hk/cinema/11",
+  "source": "broadway"
+ },
+ {
+  "id": "broadway-12",
+  "code": "TW",
+  "nameZh": "荃灣",
+  "address": "新界荃灣大壩街4-30號荃灣廣場L1-L3",
+  "mapUrl": "https://www.google.com.hk/maps/place/Broadway+Cinema+Tsuen+Wan/@22.3711884,114.1112548,17z/data=!3m1!4b1!4m6!3m5!1s0x3403f8ef0361db69:0xa0aa393a237019dd!8m2!3d22.3711884!4d114.1112548!16s%2Fg%2F1tgcpgpc?hl=en&entry=ttu&g_ep=EgoyMDI1MTEyMy4xIKXMDSoASAFQAw%3D%3D",
+  "detailUrl": "https://www.cinema.com.hk/hk/cinema/12",
+  "source": "broadway"
+ },
+ {
+  "id": "broadway-13",
+  "code": "KG",
+  "nameZh": "嘉湖",
+  "address": "新界元朗天水圍天恩路18號+WOO二期1樓",
+  "mapUrl": "https://www.google.com.hk/maps/place/%E7%BD%AE%E5%AF%8C%E5%98%89%E6%B9%96%E7%99%BE%E8%80%81%E5%8C%AF%E6%88%B2%E9%99%A2/@22.4519484,113.9826573,13z/data=!4m5!1m2!2m1!1sbroadway+cinema+kingswood+ginza!3m1!1s0x3403f087d261e087:0xc9bba7cce48c957?hl=en&shorturl=1",
+  "detailUrl": "https://www.cinema.com.hk/hk/cinema/13",
+  "source": "broadway"
+ },
+ {
+  "id": "mcl-017",
+  "code": "017",
+  "nameZh": "K11 ART HOUSE (尖東站)",
+  "address": "九龍尖沙咀梳士巴利道18號 Victoria Dockside K11 MUSEA L4 樓層 (港鐵尖東站J出口)",
+  "mapUrl": "https://www.google.com/maps/place/K11+MUSEA/@22.2942603,114.174395,19.79z",
+  "detailUrl": "https://www.mclcinema.com/NowShowingByHouse.aspx?ci=017",
+  "source": "mcl"
+ },
+ {
+  "id": "mcl-022",
+  "code": "022",
+  "nameZh": "MCL AIRSIDE 戲院 (啟德)",
+  "address": "九龍啟德協調道2號AIRSIDE 5樓 (港鐵啟德站C出口)",
+  "mapUrl": "https://www.google.com.hk/maps/place/%E6%B4%B2%E7%AB%8B%E4%BA%92%E5%8B%95%E5%AA%92%E9%AB%94%E6%9C%89%E9%99%90%E5%85%AC%E5%8F%B8/@22.3572594,114.1308341,19.5z/data=!4m5!3m4!1s0x0:0xd1ffc3042a3b2a01!8m2!3d22.357239!4d114.131426?hl=zh-TW",
+  "detailUrl": "https://www.mclcinema.com/NowShowingByHouse.aspx?ci=022",
+  "source": "mcl"
+ },
+ {
+  "id": "mcl-016",
+  "code": "016",
+  "nameZh": "MCL 數碼港戲院",
+  "address": "香港薄扶林數碼港道100號數碼港商場2樓103號舖",
+  "mapUrl": "https://www.google.com/maps/place/Cyberport/@22.2609187,114.1297366,18z",
+  "detailUrl": "https://www.mclcinema.com/NowShowingByHouse.aspx?ci=016",
+  "source": "mcl"
+ },
+ {
+  "id": "mcl-014",
+  "code": "014",
+  "nameZh": "MOVIE TOWN (新城市廣場)",
+  "address": "新界沙田新城市廣場第1期L1、L2及L3樓層 (港鐵沙田站A出口)",
+  "mapUrl": "",
+  "detailUrl": "https://www.mclcinema.com/NowShowingByHouse.aspx?ci=014",
+  "source": "mcl"
+ },
+ {
+  "id": "mcl-005",
+  "code": "005",
+  "nameZh": "MCL 德福戲院",
+  "address": "九龍九龍灣偉業街33號德福花園平台 (港鐵九龍灣站A出口)",
+  "mapUrl": "http://maps.google.com/maps?hl=zh-TW&q=mcl telford cinema&um=1&ie=UTF-8&sa=N&tab=wl",
+  "detailUrl": "https://www.mclcinema.com/NowShowingByHouse.aspx?ci=005",
+  "source": "mcl"
+ },
+ {
+  "id": "mcl-018",
+  "code": "018",
+  "nameZh": "MCL 東薈城戲院",
+  "address": "香港大嶼山東涌達東路18-20號東薈城名店倉6樓 (港鐵東涌站C出口)",
+  "mapUrl": "http://maps.google.com/maps?q=mcl%20jp%20cinema&um=1&hl=zh-TW&ie=UTF-8&sa=N&tab=wl",
+  "detailUrl": "https://www.mclcinema.com/NowShowingByHouse.aspx?ci=018",
+  "source": "mcl"
+ },
+ {
+  "id": "mcl-012",
+  "code": "012",
+  "nameZh": "FESTIVAL GRAND CINEMA (又一城)",
+  "address": "九龍九龍塘達之路80號又一城UG層 (港鐵九龍塘站C出口)",
+  "mapUrl": "https://www.google.com/maps/@22.337284,114.1744214,19.25z?hl=zh-TW",
+  "detailUrl": "https://www.mclcinema.com/NowShowingByHouse.aspx?ci=012",
+  "source": "mcl"
+ },
+ {
+  "id": "mcl-021",
+  "code": "021",
+  "nameZh": "MCL THE ONE 戲院\r\n",
+  "address": "九龍尖沙咀彌敦道100號The ONE 6樓 (港鐵尖沙咀站B1出口)",
+  "mapUrl": "https://www.google.com/maps/place/The+ONE/@22.2998755,114.1726943,15z",
+  "detailUrl": "https://www.mclcinema.com/NowShowingByHouse.aspx?ci=021",
+  "source": "mcl"
+ },
+ {
+  "id": "mcl-003",
+  "code": "003",
+  "nameZh": "皇室戲院",
+  "address": "香港銅鑼灣告士打道311 號皇室堡4樓 (港鐵銅鑼灣站E出口)",
+  "mapUrl": "https://www.google.com/maps/@22.2804764,114.1865675,19z?hl=zh-TW",
+  "detailUrl": "https://www.mclcinema.com/NowShowingByHouse.aspx?ci=003",
+  "source": "mcl"
+ },
+ {
+  "id": "mcl-009",
+  "code": "009",
+  "nameZh": "STAR CINEMA (將軍澳站)",
+  "address": "新界將軍澳唐賢街9號PopCorn 1樓 (港鐵將軍澳站C出口)",
+  "mapUrl": "http://maps.google.com/maps/myplaces?hl=zh-TW&ll=22.308251,114.258093&spn=0.011335,0.016458&ctz=-480&brcurrent=3,0x340403e98351c941:0xcdecffbe48d32670,0,0x340403e98351c941:0x63a9492dc77993ac&t=m&z=16",
+  "detailUrl": "https://www.mclcinema.com/NowShowingByHouse.aspx?ci=009",
+  "source": "mcl"
+ },
+ {
+  "id": "mcl-002",
+  "code": "002",
+  "nameZh": "MCL 新都城戲院(寶琳站)",
+  "address": "新界將軍澳欣景路8號新都城二期地下(港鐵寶琳站A2出口)",
+  "mapUrl": "http://maps.google.com/maps?hl=zh-TW&tab=wl&q=Mcl%20Cinema%20Metro",
+  "detailUrl": "https://www.mclcinema.com/NowShowingByHouse.aspx?ci=002",
+  "source": "mcl"
+ },
+ {
+  "id": "mcl-013",
+  "code": "013",
+  "nameZh": "MCL 粉嶺戲院 (逸峯廣場)",
+  "address": "新界粉嶺馬適路1號逸峯廣場G12號舖",
+  "mapUrl": "https://www.google.com.hk/maps/place/MCL+cinema+fanling/@22.5009119,114.1435079,17z",
+  "detailUrl": "https://www.mclcinema.com/NowShowingByHouse.aspx?ci=013",
+  "source": "mcl"
+ },
+ {
+  "id": "mcl-015",
+  "code": "015",
+  "nameZh": "MCL 長沙灣戲院",
+  "address": "九龍長沙灣道680號麗新商業中心G/F, G56及G58-59號舖 (港鐵荔枝角站B1出口或長沙灣站C2出口)",
+  "mapUrl": "https://www.google.com.hk/maps/@22.3389394,114.1517483,20.25z?hl=zh-TW",
+  "detailUrl": "https://www.mclcinema.com/NowShowingByHouse.aspx?ci=015",
+  "source": "mcl"
+ },
+ {
+  "id": "mcl-019",
+  "code": "019",
+  "nameZh": "MCL 淘大戲院",
+  "address": "九龍灣牛頭角道77號淘大商場三期地下 (港鐵九龍灣站B出口)",
+  "mapUrl": "",
+  "detailUrl": "https://www.mclcinema.com/NowShowingByHouse.aspx?ci=019",
+  "source": "mcl"
+ },
+ {
+  "id": "emperor-57002",
+  "code": "57002",
+  "nameZh": "銅鑼灣時代廣場",
+  "address": "香港銅鑼灣勿地臣街1號時代廣場13樓",
+  "mapUrl": "",
+  "detailUrl": "",
+  "source": "emperor"
+ },
+ {
+  "id": "emperor-57003",
+  "code": "57003",
+  "nameZh": "中環娛樂行",
+  "address": "香港中環皇后大道中30號娛樂行3樓",
+  "mapUrl": "",
+  "detailUrl": "",
+  "source": "emperor"
+ },
+ {
+  "id": "emperor-57004",
+  "code": "57004",
+  "nameZh": "黃竹坑 THE SOUTHSIDE",
+  "address": "香港黃竹坑香葉道11號THE SOUTHSIDE3樓",
+  "mapUrl": "",
+  "detailUrl": "",
+  "source": "emperor"
+ },
+ {
+  "id": "emperor-57005",
+  "code": "57005",
+  "nameZh": "尖沙咀iSQUARE",
+  "address": "九龍尖沙咀彌敦道63號國際廣場7樓",
+  "mapUrl": "",
+  "detailUrl": "",
+  "source": "emperor"
+ },
+ {
+  "id": "emperor-57001",
+  "code": "57001",
+  "nameZh": "英皇戲院總部",
+  "address": "香港灣仔軒尼詩道288號20樓",
+  "mapUrl": "",
+  "detailUrl": "",
+  "source": "emperor"
+ },
+ {
+  "id": "emperor-57006",
+  "code": "57006",
+  "nameZh": "大圍圍方",
+  "address": "新界大圍車公廟路18號圍方5樓",
+  "mapUrl": "",
+  "detailUrl": "",
+  "source": "emperor"
+ },
+ {
+  "id": "emperor-57007",
+  "code": "57007",
+  "nameZh": "荃灣荃新天地",
+  "address": "新界荃灣楊屋道18號荃新天地2期1樓",
+  "mapUrl": "",
+  "detailUrl": "",
+  "source": "emperor"
+ },
+ {
+  "id": "emperor-57008",
+  "code": "57008",
+  "nameZh": "將軍澳康城",
+  "address": "新界將軍澳康城路1號The LOHAS康城4樓",
+  "mapUrl": "",
+  "detailUrl": "",
+  "source": "emperor"
+ },
+ {
+  "id": "emperor-57010",
+  "code": "57010",
+  "nameZh": "屯門新都商場",
+  "address": "新界屯門屯利街2號新都商場3樓",
+  "mapUrl": "",
+  "detailUrl": "",
+  "source": "emperor"
+ },
+ {
+  "id": "emperor-57011",
+  "code": "57011",
+  "nameZh": "澳門葡京人",
+  "address": "澳門路氹溜冰路葡京人2樓",
+  "mapUrl": "",
+  "detailUrl": "",
+  "source": "emperor"
+ },
+ {
+  "id": "cinemacity-55001",
+  "code": "55001",
+  "nameZh": "柴灣,永利中心 Chai Wan, Winner Centre",
+  "address": "柴灣 柴灣道333號永利中心地下至4樓",
+  "mapUrl": "",
+  "detailUrl": "",
+  "source": "cinemacity"
+ },
+ {
+  "id": "cinemacity-55002",
+  "code": "55002",
+  "nameZh": "荃灣, 愉景新城 Tsuen Wan, Candy Park",
+  "address": "荃灣青山公路荃灣段398號愉景新城第一層1036號舖",
+  "mapUrl": "",
+  "detailUrl": "",
+  "source": "cinemacity"
+ },
+ {
+  "id": "bestar-58001",
+  "code": "58001",
+  "nameZh": "the sky",
+  "address": "西九龍海庭道18號奧海城2期1樓",
+  "mapUrl": "",
+  "detailUrl": "",
+  "source": "bestar"
+ },
+ {
+  "id": "bestar-58002",
+  "code": "58002",
+  "nameZh": "StagE",
+  "address": "新界屯門市廣場1期3樓3201鋪",
+  "mapUrl": "",
+  "detailUrl": "",
+  "source": "bestar"
+ },
+ {
+  "id": "bestar-58003",
+  "code": "58003",
+  "nameZh": "GH TaiPo",
+  "address": "新界大埔安邦路2號大埔超級城第一層 600號鋪",
+  "mapUrl": "",
+  "detailUrl": "",
+  "source": "bestar"
+ }
+]
