@@ -422,7 +422,14 @@ export function ShowtimeExplorer({
                     : 'border-white/12 bg-white/5 text-gray-300 hover:text-white'
                 }`}
               >
-                {on && <span className="tabular-nums text-[10px] text-accent">{i + 1}</span>}
+                {/*
+                 * ★ 2026-09-19 去掉优先级序号（原为 {i + 1}）：
+                 *   用户明确要求不显示。
+                 *
+                 *   多键排序的先后顺序仍由 sortRules 数组顺序决定（逻辑未变），
+                 *   只是不再把序号画到按钮上。方向箭头 ↑↓ 保留 —— 那表达的是
+                 *   「升序/降序」，与「第几个排序键」是两回事，删了会丢失信息。
+                 */}
                 {SORT_LABEL[k]}
                 {on && <span className="text-[10px]">{sortRules[i].dir === 'asc' ? '↑' : '↓'}</span>}
               </button>
