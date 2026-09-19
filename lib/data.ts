@@ -65,8 +65,46 @@ function asciiSlug(nameEn: string | null, nameZh: string | null, id: string): st
  */
 const OSS_HOSTS = new Set(['cdn.icirena.ai', 'media.grabticks.com']);
 
+/**
+ * 本地海报清单：原始 URL → public/posters/ 下的文件名
+ *
+ * ★ 为什么需要它（2026-09-19 实测，两个硬事实）：
+ *
+ *   1. www.mclcinema.com 对**用户侧网络完全不可达**：80/443 均超时，
+ *      浏览器要挂满 20s 才放弃。而香港服务器 0.2s 就能取到。
+ *      首页 60 张海报里有 28 张来自它 —— 即近半数图片不是「慢」，
+ *      而是**永远加载不出来**。这是用户报「又慢又卡」的主因。
+ *
+ *   2. media.grabticks.com 的 x-oss-process **完全无效**
+ *      （响应头是 Server: AmazonS3 / Via: cloudfront，不是阿里云 OSS）。
+ *      原先下方给它拼的缩放参数是空操作，213 张海报每张 390KB–1.5MB
+ *      原样下发，首页白背约 8.9MB。
+ *
+ * 解法：scripts/fetch-posters.mjs 在构建前把海报抓到服务器、
+ *       转成 400w WebP 存进 public/posters/，页面引用同源 /posters/*.webp。
+ *       实测 390KB → 45KB（省 88%），且同源静态文件会被 Cloudflare 边缘缓存。
+ *
+ * 惰性读取（不是模块级常量）：readJson 定义在本文件下方，
+ *   模块级求值会踩 TDZ。另外只需在 load() 里查一次表，本就无需提前。
+ */
+let _posterManifest: Record<string, string> | null = null;
+
+function posterManifest(): Record<string, string> {
+  if (_posterManifest) return _posterManifest;
+  // quiet：清单可缺失（首次部署尚未跑抓图），属预期情况，不刷错误日志
+  _posterManifest = readJson<Record<string, string>>('poster-manifest.json', {}, true);
+  return _posterManifest;
+}
+
 function slimPoster(url: string | null, width: number): string | null {
   if (!url) return null;
+
+  // ★ 优先用本地化海报：同源、已转 WebP、体积小一个数量级。
+  //   未命中（新片还没跑抓图 / 抓取失败）则回退到下面的远端逻辑，
+  //   保证页面不会白图。
+  const local = posterManifest()[url];
+  if (local) return `/posters/${local}`;
+
   try {
     const u = new URL(url);
     if (!OSS_HOSTS.has(u.hostname)) return url;
@@ -150,6 +188,7 @@ function load() {
   }
 
   // 海报瘦身：只在载入时做一次，随后进缓存（不重复解析 URL）
+  // 命中本地清单则改为同源 /posters/*.webp（见 slimPoster 注释）
   for (const m of movies) {
     if (m.poster) m.poster = slimPoster(m.poster, 400);
   }

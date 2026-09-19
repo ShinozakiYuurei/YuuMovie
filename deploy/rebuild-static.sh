@@ -19,8 +19,11 @@
 #
 # 用法：bash /opt/hk-movie/deploy/rebuild-static.sh
 #       SCRAPE=0 bash /opt/hk-movie/deploy/rebuild-static.sh   # 跳过抓取
+#       POSTERS=0 bash /opt/hk-movie/deploy/rebuild-static.sh  # 跳过海报本地化
 #
 #   2026-09-19 同时加了 flock 串行锁（见下）。
+#   2026-09-19 又加海报本地化（第 1.7 步）：页面引用 /posters/*.webp，
+#   图片必须先落 public/posters/ 再构建，否则同源海报会 404。
 set -euo pipefail
 
 # ★ 串行锁：light（每 2h）与 heavy（每 6h）两个定时器**共用本脚本**，
@@ -60,6 +63,33 @@ if [ "${SHOWS}" -lt 100 ]; then
   exit 1
 fi
 echo "  数据校验通过：${SHOWS} 场次"
+
+# ---------- 1.7 海报本地化 ----------
+# ★ 必须在构建前：页面引用的是 /posters/*.webp，图片要先落 public/posters/
+#   才能被 next build 拷进 out/，再同步到 nginx 目录。
+#
+# 为什么要本地化（2026-09-19 实测）：
+#   1. www.mclcinema.com 对**用户侧网络完全不可达**（80/443 均超时，
+#      挂满 20s），而本机 0.2s 就能取到。首页 60 张海报里 28 张来自它 ——
+#      近半数图片不是「慢」，而是永远加载不出来。同源后不再直连该域名。
+#   2. media.grabticks.com 的 x-oss-process 参数无效（它是 S3/CloudFront，
+#      不是阿里云 OSS），213 张原图 390KB–1.5MB 原样下发。
+#   本地化后 390KB → 45KB，且全部同源（会被 Cloudflare 边缘缓存）。
+#
+# 非致命：脚本自身增量 + 自愈（文件名即 URL 的 sha1），且 lib/data.ts
+#   对未命中的 URL 会回退到远端 —— 外部 CDN 抖动不该阻断整站重建。
+# POSTERS=0 可跳过。
+if [ "${POSTERS:-1}" = "1" ]; then
+  echo "▶ 海报本地化..."
+  T_POSTER=$(date +%s)
+  if node scripts/fetch-posters.mjs; then
+    echo "  海报耗时 $(( $(date +%s) - T_POSTER ))s"
+  else
+    echo "  ⚠️ 海报本地化失败，未命中部分将回退到原始 URL"
+  fi
+else
+  echo "▶ POSTERS=0，跳过海报本地化"
+fi
 
 # ---------- 2. 构建静态站点 ----------
 # 注意：不要 mv 掉 out/ 目录再建新的 —— nginx 容器的 bind mount

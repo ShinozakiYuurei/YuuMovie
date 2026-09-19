@@ -9,6 +9,15 @@ next-env.d.ts
 # ── 抓取数据：由服务器每 2 小时生成，绝不进仓库 ──────
 data/
 
+# ── 本地化海报：由 scripts/fetch-posters.mjs 生成 ────
+# 为什么排除：361 张 WebP 约 11MB，且能从 data/movies.json 的 URL 全量重建
+# （文件名就是原始 URL 的 sha1 前 16 位，可自愈反推）。
+# 服务器上由 rebuild-static.sh 每次重建时增量生成，不进仓库。
+# 保留目录本身：next build 只会把存在的 public/ 子目录拷进 out/，
+# 目录不存在时 out/posters/ 不会生成，同源海报会 404。
+public/posters/*
+!public/posters/.gitkeep
+
 # ── 服务器私有：密钥、缓存、备份 ────────────────────
 # .ssh/ 必须排除：hkmovie 的 HOME 就是本目录，
 # 只读部署私钥落在仓库内，一旦被 git add -A 扫到就泄进版本库。

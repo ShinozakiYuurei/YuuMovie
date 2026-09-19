@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "scrape": "node scrape.js"
+    "scrape": "node scrape.js",
+    "posters": "node scripts/fetch-posters.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
