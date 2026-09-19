@@ -1,19 +1,18 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import {
   getGroupBySlug,
   getMovieGroups,
-  getShowsByMovie,
-  getShowsByVersion,
-  getCinemaById,
-  formatLabel,
-  SOURCE_LABEL,
+  getShowRowsForGroup,
+  getFacets,
+  toCompact,
 } from '@/lib/data';
-import type { Show, Source } from '@/lib/types';
+import { buildIntro } from '@/lib/intro';
 import { MovieJsonLd } from '@/components/MovieJsonLd';
-import { formatDate, formatDuration, formatTime, relativeDay } from '@/lib/format';
+import { MovieIntro } from '@/components/MovieIntro';
+import { ShowtimeExplorer } from '@/components/ShowtimeExplorer';
+import { formatDuration } from '@/lib/format';
 
 // 静态导出：预先列出所有电影 slug。
 // 只导出「组」的代表 slug（每个版本自己的 slug 由组内跳转，不需要单独页面）。
@@ -25,6 +24,13 @@ export function generateStaticParams() {
 
 export const dynamicParams = false;
 
+/**
+ * SEO 元信息
+ *
+ * 用 buildIntro 而不是直接读 primary：页面标题与描述要显示的是
+ * 「聚合 + 中文优先」后的字段（级别/片长/评分），
+ * 与用户实际看到的内容保持一致，否则搜索摘要会和页面对不上。
+ */
 export async function generateMetadata({
   params,
 }: {
@@ -34,157 +40,27 @@ export async function generateMetadata({
   const group = getGroupBySlug(slug);
   if (!group) return { title: '找不到電影' };
 
-  const m = group.primary;
+  const a = buildIntro(group);
+  // ★ SEO 摘要只用 IMDb：Google 对 IMDb 评分有识别，豆瓣分对它无意义。
+  const rated = a.ratings.find((r) => r.source === 'imdb' && r.value != null);
   const bits = [
-    m.openingDate ? `${m.openingDate} 上映` : null,
-    m.duration ? `片長 ${m.duration} 分鐘` : null,
-    m.category ? `級別 ${m.category}` : null,
+    a.openingDate ? `${a.openingDate} 上映` : null,
+    a.duration ? `片長 ${a.duration} 分鐘` : null,
+    a.category ? `級別 ${a.category}` : null,
+    rated ? `${rated.label} ${rated.value!.toFixed(1)} 分` : null,
     group.versions.length > 1 ? `${group.versions.length} 個版本` : null,
   ].filter(Boolean);
 
   return {
-    title: `${group.displayName}｜場次及購票`,
-    description: `${group.displayName}${m.nameEn ? `（${m.nameEn}）` : ''}。${bits.join('，')}。查看全港戲院場次、票價及官方購票連結。`,
+    title: `${a.title}｜場次及購票`,
+    description: `${a.title}${a.subtitle ? `（${a.subtitle}）` : ''}。${bits.join('，')}。查看全港戲院場次、票價及官方購票連結。`,
     openGraph: {
-      title: group.displayName,
-      description: m.description?.slice(0, 150),
-      images: m.poster ? [m.poster] : undefined,
+      title: a.title,
+      description: a.summary?.slice(0, 150),
+      images: a.poster ? [a.poster] : undefined,
     },
     alternates: { canonical: `/movie/${group.slug}` },
   };
-}
-
-/** 一个版本区块 */
-function VersionSection({
-  sources,
-  shows,
-  versionLabel,
-  isBase,
-}: {
-  sources: Source[];
-  shows: Show[];
-  versionLabel: string;
-  isBase: boolean;
-}) {
-  // 按日期 → 影院 两级分组
-  //
-  // 为什么要按日期分组：热门片单页可超过 200 场（如《生化危機》235 場），
-  // 全部铺开会让详情页 HTML 达到 747KB，在 2C2G 机器上首屏很慢。
-  // 按日期折叠后，默认只渲染最近一天的场次，体积与渲染成本大幅下降；
-  // 用原生 <details> 折叠，不需要任何客户端 JS。
-  const byDate = new Map<string, Map<string, Show[]>>();
-  for (const s of shows) {
-    const d = s.date || '';
-    if (!byDate.has(d)) byDate.set(d, new Map());
-    const byCinema0 = byDate.get(d)!;
-    const cid = s.cinemaId || '';
-    if (!byCinema0.has(cid)) byCinema0.set(cid, []);
-    byCinema0.get(cid)!.push(s);
-  }
-
-  const dates = [...byDate.keys()].sort();
-  const prices = shows.map((s) => s.price).filter((p) => p != null) as number[];
-  const minPrice = prices.length ? Math.min(...prices) : null;
-
-  // 影院名缓存：避免同一影院在多日期下重复查表
-  const cinemaCache = new Map<string, ReturnType<typeof getCinemaById>>();
-  const cinemaOf = (id: string) => {
-    if (!cinemaCache.has(id)) cinemaCache.set(id, getCinemaById(id));
-    return cinemaCache.get(id);
-  };
-
-  return (
-    <section className="hkm-panel overflow-hidden rounded-2xl">
-      {/* 版本标题 */}
-      <header className="flex flex-wrap items-center gap-2 border-b border-white/7 px-4 py-3">
-        <span
-          className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
-            isBase
-              ? 'border border-white/12 bg-white/8 text-gray-200'
-              : 'bg-gradient-to-r from-[#8b7cff] to-[#6d5cf0] text-white shadow-[0_6px_18px_-8px_rgba(124,108,255,0.9)]'
-          }`}
-        >
-          {versionLabel}
-        </span>
-        <span className="text-xs text-gray-400">
-          {shows.length} 場 · {dates.length} 個放映日
-          {minPrice != null ? ` · $${minPrice} 起` : ''}
-        </span>
-        <span className="ml-auto text-[10px] text-gray-500">
-          {sources.map((s) => SOURCE_LABEL[s]).join(" + ")}
-        </span>
-      </header>
-
-      {/* 场次：按日期 → 影院。默认展开最近一天，其余折叠（原生 details，零 JS） */}
-      <div className="divide-y divide-white/6">
-        {dates.map((date, di) => {
-          const byCinema = byDate.get(date)!;
-          const dayShows = [...byCinema.values()].flat();
-          const open = di === 0;
-
-          return (
-            <details key={date} open={open} className="px-4 py-3">
-              <summary className="mb-2 flex cursor-pointer list-none items-baseline gap-2">
-                <h4 className="text-sm font-semibold text-white">{formatDate(date)}</h4>
-                <span className="text-[11px] text-gray-500">{dayShows.length} 場</span>
-                <span className="ml-auto text-[11px] text-gray-600">{open ? '收起 ▲' : '展開 ▼'}</span>
-              </summary>
-
-              {[...byCinema.entries()]
-                .map(([cinemaId, list]) => ({ cinemaId, cinema: cinemaOf(cinemaId), shows: list }))
-                .sort((a, b) =>
-                  (a.cinema?.nameZh || '').localeCompare(b.cinema?.nameZh || '')
-                )
-                .map(({ cinemaId, cinema, shows: list }) => (
-                  <div key={cinemaId} className="mb-3">
-                    <div className="mb-1.5 flex items-baseline gap-2">
-                      <h5 className="text-xs font-semibold text-gray-300">
-                        {cinema?.nameZh || `戲院 #${cinemaId}`}
-                      </h5>
-                      {cinema?.address && (
-                        <span className="hidden truncate text-[10px] text-gray-600 sm:inline">
-                          {cinema.address}
-                        </span>
-                      )}
-                      {cinema?.mapUrl && (
-                        <a
-                          href={cinema.mapUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="ml-auto shrink-0 text-[10px] text-gray-600 hover:text-white"
-                        >
-                          地圖 ↗
-                        </a>
-                      )}
-                    </div>
-
-                    <div className="flex flex-wrap gap-1.5">
-                      {list.map((s) => (
-                        <a
-                          key={s.id}
-                          href={s.bookingUrl}
-                          target="_blank"
-                          rel="noopener noreferrer nofollow"
-                          title={`${formatDate(s.date)} ${formatTime(s.startAt)} ${s.houseName} $${s.price ?? '?'}`}
-                          className="group flex flex-col rounded-xl border border-white/8 bg-white/4 px-2.5 py-1.5 text-center transition hover:border-accent/60 hover:bg-accent/12"
-                        >
-                          <span className="text-sm font-bold text-white">
-                            {formatTime(s.startAt)}
-                          </span>
-                          <span className="text-[10px] text-gray-400">
-                            {s.houseName || '—'} · ${s.price ?? '—'}
-                          </span>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-            </details>
-          );
-        })}
-      </div>
-    </section>
-  );
 }
 
 export default async function MoviePage({ params }: { params: Promise<{ slug: string }> }) {
@@ -192,192 +68,67 @@ export default async function MoviePage({ params }: { params: Promise<{ slug: st
   const group = getGroupBySlug(slug);
   if (!group) notFound();
 
-  const m = group.primary;
-  const allShows = group.versions.flatMap((v) => getShowsByVersion(v));
-  const totalShows = allShows.length;
+  const a = buildIntro(group);
 
-  // 版本 → 场次
-  const versionSections = group.versions
-    .map((v) => {
-      const shows = getShowsByVersion(v);
-      const label = v.formats.length ? v.formats.map(formatLabel).join(' + ') : '原版';
-      return { version: v, shows, label, isBase: v.formats.length === 0 };
-    })
-    .filter((x) => x.shows.length > 0);
-
+  // ★ 场次展平 + 筛选候选项
+  //
+  // 原先按「版本 → 日期 → 影院」三层嵌套服务端渲染，
+  // 热门片 HTML 达 746KB，且无法交互式筛选（静态导出无服务端可回请求）。
+  // 展平为 ShowRow[] 后交给客户端组件实时筛选/排序（见 ShowtimeExplorer）。
+  const rows = getShowRowsForGroup(group);
+  const facets = getFacets(rows);
+  const totalShows = rows.length;
+  // 紧凑字典化：单行 619 → 114 字节（详见 lib/data.ts 的 CompactRows 注释）
+  const compact = toCompact(rows);
 
   return (
     <article>
-      <MovieJsonLd movie={m} />
+      <MovieJsonLd
+        movie={group.primary}
+        extra={{
+          // 外部评分：只有拿到分数才写进结构化数据，
+          // aggregateRating 缺数时宁可省略（写 0 会误导搜索摘要）。
+          aggregateRating: (() => {
+            const r = a.ratings.find((x) => x.source === 'imdb' && x.value != null);
+            if (!r) return undefined;
+            return {
+              '@type': 'AggregateRating' as const,
+              ratingValue: r.value,
+              bestRating: 10,
+              worstRating: 0,
+              ratingCount: r.votes ?? undefined,
+            };
+          })(),
+          genre: a.genres.length ? a.genres : undefined,
+        }}
+      />
 
       <nav className="mb-4 text-xs text-gray-500">
         <Link href="/" className="hover:text-white">
           現正上映
         </Link>
         <span className="mx-1">/</span>
-        <span className="text-gray-400">{group.displayName}</span>
+        <span className="text-gray-400">{a.title}</span>
       </nav>
 
-      <header className="flex flex-col gap-6 sm:flex-row">
-        <div className="w-48 shrink-0 sm:w-56 md:w-64 lg:w-72">
-          {m.poster ? (
-            <Image
-              src={m.poster}
-              alt={group.displayName}
-              width={288}
-              height={432}
-              priority
-              sizes="(max-width: 640px) 192px, (max-width: 1024px) 224px, 288px"
-              className="w-full rounded-2xl border border-white/10 object-cover shadow-[0_18px_50px_-20px_rgba(0,0,0,0.9)]"
-            />
-          ) : (
-            <div className="flex aspect-[2/3] items-center justify-center rounded-2xl border border-white/10 bg-white/4 text-xs text-gray-500">
-              無海報
-            </div>
-          )}
-        </div>
+      <MovieIntro group={group} />
 
-        <div className="min-w-0 flex-1">
-          <h1 className="text-3xl font-bold leading-tight tracking-tight text-white">
-            {group.displayName}
-          </h1>
-          {m.nameEn && m.nameEn !== group.displayName && (
-            <p className="mt-1.5 text-sm text-gray-400">{m.nameEn}</p>
-          )}
-
-          {/* 版本标签总览 */}
-          {group.allFormats.length > 0 && (
-            <div className="mt-3.5 flex flex-wrap gap-1.5">
-              {group.allFormats.map((f) => (
-                <span
-                  key={f}
-                  className="rounded-full border border-accent/35 bg-accent/12 px-2.5 py-0.5 text-[11px] font-semibold text-accent"
-                >
-                  {formatLabel(f)}
-                </span>
-              ))}
-            </div>
-          )}
-
-          <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-            <dt className="text-gray-500">片長</dt>
-            <dd className="text-gray-200">{formatDuration(m.duration)}</dd>
-            {m.category && (
-              <>
-                <dt className="text-gray-500">級別</dt>
-                <dd className="text-gray-200">{m.category}</dd>
-              </>
-            )}
-            {m.dialect && (
-              <>
-                <dt className="text-gray-500">語言</dt>
-                <dd className="text-gray-200">
-                  {m.dialect}
-                  {m.subtitle ? `（${m.subtitle}字幕）` : ''}
-                </dd>
-              </>
-            )}
-            {m.genres?.length > 0 && (
-              <>
-                <dt className="text-gray-500">類型</dt>
-                <dd className="text-gray-200">{m.genres.join('、')}</dd>
-              </>
-            )}
-            {m.director && (
-              <>
-                <dt className="text-gray-500">導演</dt>
-                <dd className="text-gray-200">{m.director}</dd>
-              </>
-            )}
-            {m.cast && (
-              <>
-                <dt className="text-gray-500">演員</dt>
-                <dd className="text-gray-200">{m.cast}</dd>
-              </>
-            )}
-
-          </dl>
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            {totalShows > 0 && (
-              <a
-                href="#versions"
-                className="hkm-btn-primary rounded-full px-5 py-2.5 text-sm font-semibold"
-              >
-                查看 {totalShows} 個場次
-              </a>
-            )}
-            {m.trailer && (
-              <a
-                href={m.trailer}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hkm-btn-ghost rounded-full px-5 py-2.5 text-sm"
-              >
-                ▶ 預告片
-              </a>
-            )}
-            <a
-              href={m.detailUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hkm-btn-ghost rounded-full px-5 py-2.5 text-sm"
-            >
-              院線原始頁面
-            </a>
-          </div>
-        </div>
-      </header>
-
-      {/* 場次：按版本分類 */}
-      {versionSections.length > 0 && (
-        <section id="versions" className="mt-10 scroll-mt-20">
+      {/* 場次：多維篩選 + 多鍵排序 + 餘座顏色標記 */}
+      {totalShows > 0 && (
+        <section id="versions" className="mt-8 scroll-mt-20">
           <div className="mb-4 flex flex-wrap items-baseline gap-3">
-            <h2 className="text-2xl font-bold tracking-tight">版本及場次</h2>
+            <h2 className="text-2xl font-bold tracking-tight">場次及購票</h2>
             <span className="hkm-chip">
-              {versionSections.length} 個版本 · 共 {totalShows} 場
+              {group.versions.length} 個版本 · 共 {totalShows} 場
             </span>
+            {a.duration && <span className="hkm-chip">片長 {formatDuration(a.duration)}</span>}
           </div>
 
-          {/* 版本快速導航 */}
-          {versionSections.length > 1 && (
-            <div className="mb-4 flex flex-wrap gap-1.5">
-              {versionSections.map((v, i) => (
-                <a
-                  key={v.version.key}
-                  href={`#v${i}`}
-                  className="hkm-btn-ghost rounded-full px-3 py-1 text-[11px]"
-                >
-                  {v.label}
-                  <span className="ml-1 text-gray-500">{v.shows.length}</span>
-                </a>
-              ))}
-            </div>
-          )}
-
-          <div className="space-y-4">
-            {versionSections.map((v, i) => (
-              <div key={v.version.key} id={`v${i}`} className="scroll-mt-20">
-                <VersionSection
-                  sources={v.version.sources}
-                  shows={v.shows}
-                  versionLabel={v.label}
-                  isBase={v.isBase}
-                />
-              </div>
-            ))}
-          </div>
+          <ShowtimeExplorer compact={compact} facets={facets} />
 
           <p className="mt-3 text-[11px] text-gray-600">
             點擊場次將前往院線官方購票頁面（另開新視窗）。場次及票價以院線官方公佈為準。
           </p>
-        </section>
-      )}
-
-      {m.description && (
-        <section className="mt-10">
-          <h2 className="mb-3 text-xl font-semibold text-gray-100">劇情簡介</h2>
-          <div className="max-w-3xl rounded-xl bg-white/5 p-4 text-base leading-relaxed text-gray-100">{m.description}</div>
         </section>
       )}
     </article>

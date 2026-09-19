@@ -1,7 +1,6 @@
 import Image from 'next/image';
 import { buildIntro, type IntroRating } from '@/lib/intro';
-import { relativeDay } from '@/lib/format';
-import { SOURCE_LABEL, formatLabel, type MovieGroup } from '@/lib/data';
+import { formatLabel, type MovieGroup } from '@/lib/data';
 
 /**
  * 影片资料卡（详情页头部）
@@ -69,7 +68,6 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 export function MovieIntro({ group }: { group: MovieGroup }) {
   const a = buildIntro(group);
-  const rel = a.openingDate ? relativeDay(a.openingDate) : null;
   // 「粵語 / 英語（中字）」：只有一侧有值时不留孤立括号
   const lang = a.language
     ? `${a.language}${a.subtitleLang ? `（${a.subtitleLang}字幕）` : ''}`
@@ -109,7 +107,6 @@ export function MovieIntro({ group }: { group: MovieGroup }) {
             {a.openingDate && (
               <span>
                 上映日期: <span className="text-gray-200">{a.openingDate}</span>
-                {rel && <span className="ml-1.5 text-[11px] text-accent">{rel}</span>}
               </span>
             )}
             {a.duration != null && (
@@ -140,8 +137,8 @@ export function MovieIntro({ group }: { group: MovieGroup }) {
             </div>
           )}
 
-          {/* 版本 / 院线 */}
-          {(group.allFormats.length > 0 || group.sources.length > 0) && (
+          {/* 版本標籤（不放「N 個版本 · 院線」統計行）*/}
+          {group.allFormats.length > 0 && (
             <div className="mt-4 flex flex-wrap items-center gap-1.5">
               {group.allFormats.map((f) => (
                 <span
@@ -151,9 +148,6 @@ export function MovieIntro({ group }: { group: MovieGroup }) {
                   {formatLabel(f)}
                 </span>
               ))}
-              <span className="ml-1 text-[11px] text-gray-500">
-                {group.versions.length} 個版本 · {group.sources.map((s) => SOURCE_LABEL[s]).join(' / ')}
-              </span>
             </div>
           )}
 
