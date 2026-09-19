@@ -19,6 +19,10 @@ export interface Movie {
   detailUrl: string;
   status: 'showing' | 'upcoming';
   source: Source;
+  /** IMDb 评分 (0-10) */
+  ratingImdb?: number | null;
+  /** 豆瓣评分 (0-10) */
+  ratingDouban?: number | null;
   /** 该片还在哪些院线上映（跨院线合并时产生） */
   alsoAt?: Source[];
   /** 全部有该片场次的院线（含 primary） */

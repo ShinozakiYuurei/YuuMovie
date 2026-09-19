@@ -259,26 +259,6 @@ export default async function MoviePage({ params }: { params: Promise<{ slug: st
             </div>
           )}
 
-          {/* IMDb & 豆瓣评分 */}
-          {(m.ratingImdb || m.ratingDouban) && (
-            <div className="mt-4 flex items-center gap-3">
-              {m.ratingDouban && (
-                <div className="flex items-center gap-1 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-500 px-3 py-1.5 text-white shadow-md">
-                  <span className="text-xs font-bold">豆瓣</span>
-                  <span className="ml-1 text-lg font-bold">{m.ratingDouban.toFixed(1)}</span>
-                </div>
-              )}
-              {m.ratingImdb && (
-                <div className="flex items-center gap-1 rounded-lg bg-gradient-to-r from-amber-600 to-amber-500 px-3 py-1.5 text-white shadow-md">
-                  <span className="text-xs font-bold">IMDb</span>
-                  <span className="ml-1 text-lg font-bold">{m.ratingImdb.toFixed(1)}</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 版本信息行已删除 */}
-
           <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
             <dt className="text-gray-500">片長</dt>
             <dd className="text-gray-200">{formatDuration(m.duration)}</dd>
