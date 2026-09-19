@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 海报本地化：把第三方海报下载到本机，转成 400w WebP，改为同源 /img/ 提供。
+ * 海报本地化：把第三方海报下载到本机，转成 800w WebP，改为同源 /img/ 提供。
  *
  * ★ 为什么必须这么做（2026-09-19 实测）：
  *
@@ -17,13 +17,18 @@
  *      且同源静态文件会被 Cloudflare 边缘缓存 —— 这就是要的「CDN 节点缓存」。
  *
  * 产物：
- *   public/posters/<sha1前16位>.webp     卡片/详情页主图（400w，.gitignore 已排除）
- *   public/posters/<sha1前16位>-t.webp  列表缩略图（64w）
+ *   public/posters/<sha1前16位>-<宽度>.webp      卡片/详情页主图（800w，.gitignore 已排除）
+ *   public/posters/<sha1前16位>-<宽度>-t.webp   列表缩略图（64w）
+ *
+ *   ★ 文件名带宽度（2026-09-20 加）：/posters/ 在 nginx 侧是
+ *     `immutable, max-age=1y`。若文件名只由 URL 决定，调整 POSTER_WIDTH 后
+ *     产物变了而文件名没变，浏览器与 CF 边缘会继续用旧图整整一年。
+ *     宽度编进文件名后，换宽度即换文件名，缓存自动失效。
  *   data/poster-manifest.json           { 原始URL: 本地文件名 }，供 lib/data.ts 查表
  *
  * ★ 2026-09-19 新增 -t 缩略图变体：
  *   影院页（app/cinema/[id]/page.tsx）把海报渲染在 32×48px 的位置，
- *   却引用 400w 主图 —— 实测单页 52 张 × 28KB = 1.43MB，而 64w 缩略图
+ *   却引用主图 —— 实测单页 52 张 × 28KB = 1.43MB，而 64w 缩略图
  *   只要 ~1KB。全站 42 个影院页共引用 6094 张，浪费约 72MB 流量。
  *   缩略图文件名只是在主图名后加 `-t`，因此 lib/data.ts 能纯字符串推导，
  *   不必再查一张表。
@@ -55,9 +60,26 @@ const CACHE_DIR = process.env.POSTER_OUT_DIR || path.join(ROOT, 'public', 'poste
 const MANIFEST = path.join(DATA_DIR, 'poster-manifest.json');
 const MOVIES = path.join(DATA_DIR, 'movies.json');
 
-/** 卡片最大展示宽度约 400 CSS px，2x 屏 → 400 足够；详情页 176px 亦覆盖 */
-const WIDTH = Number(process.env.POSTER_WIDTH || 400);
-const QUALITY = Number(process.env.POSTER_QUALITY || 78);
+/**
+ * 主图宽度。
+ *
+ * ★ 2026-09-20 由 400 提到 800（用户反馈「海报好模糊」）。
+ *
+ *   卡片实际渲染 268×401 CSS px（首页 lg:grid-cols-4），HiDPI 屏需要
+ *   536×802 物理像素 —— 400w 在 2x 屏上是被**放大**显示的，必然发糊。
+ *   服务器实测（18 张真实源，2x 显示盒 536×802）：
+ *     400w/q78  30.7KB  PSNR 27.45 dB   ← 改动前
+ *     600w/q82  57.6KB  PSNR 34.10 dB
+ *     800w/q80  79.8KB  PSNR 36.98 dB   ← 现在
+ *   800w 同时覆盖 3x 手机的 540 物理像素与详情页 256 CSS px 的大图位。
+ *   全站 288 张合计约 27.6MB（各源原图合计约 258MB），同一量级。
+ *
+ * 源图更小时不放大（withoutEnlargement）：MCL 的 API 只有 290×390，
+ *   那批就保持 290 —— 同组若有更清晰的源，由 lib/data.ts 的
+ *   displayPoster 改用那张。
+ */
+const WIDTH = Number(process.env.POSTER_WIDTH || 800);
+const QUALITY = Number(process.env.POSTER_QUALITY || 80);
 /**
  * 列表缩略图宽度。
  *
@@ -88,8 +110,9 @@ function sourceUrlFor(url) {
   try {
     const u = new URL(url);
     if (!OSS_HOSTS.has(u.hostname)) return url;
-    // w_800 留一倍余量给未来的大图需求，转码时再收到 WIDTH
-    u.searchParams.set('x-oss-process', 'image/resize,w_800/format,webp');
+    // 取 WIDTH 的两倍：OSS 侧先缩一次能省 97% 下载量，
+    // 留一倍余量则保证本地 resize 是「缩小」而非放大，不额外损失锐度。
+    u.searchParams.set('x-oss-process', `image/resize,w_${WIDTH * 2}/format,webp`);
     return u.toString();
   } catch {
     return url;
@@ -98,6 +121,22 @@ function sourceUrlFor(url) {
 
 function hashOf(url) {
   return crypto.createHash('sha1').update(url).digest('hex').slice(0, 16);
+}
+
+/**
+ * 主图文件名：`<sha1(url) 前16位>-<宽度>.webp`
+ *
+ * ★ 为什么把宽度写进文件名：文件名原本只有 sha1(url)，那是「内容寻址」——
+ *   前提是同一个 URL 必然产出同样的字节。这个前提在调整 POSTER_WIDTH 时
+ *   不成立：URL 没变、产物变了，而 nginx 给 /posters/ 下发的是
+ *   `immutable, max-age=1y`，旧图会在浏览器和 CF 边缘留一整年，
+ *   等于改宽度对用户完全没生效。带上宽度后，宽度一变文件名必变。
+ *
+ * 缩略图沿用「主图名插 -t」的约定（见 thumbNameFor），
+ *   因此 lib/data.ts 仍可纯字符串推导，不需要额外的表。
+ */
+function mainNameFor(url) {
+  return `${hashOf(url)}-${WIDTH}.webp`;
 }
 
 /**
@@ -180,11 +219,15 @@ async function main() {
    *   避免「图已在盘上却因为清单缺条而重下 258MB」。
    *
    * 不读 manifest 也能跑：即使 JSON 完全丢失，本步就能从文件重建全量映射。
+   *
+   * ★ 宽度校验：认领时要求文件名带当前 WIDTH。否则换宽度后
+   *   （400→800）旧的 400w 文件会被误认领，下面 todo 的
+   *   「宽度不符就重做」判断反而失效。
    */
   let healed = 0;
   for (const u of urls) {
-    if (manifest[u]) continue;
-    const name = `${hashOf(u)}.webp`;
+    if (manifest[u] && manifest[u].endsWith(`-${WIDTH}.webp`)) continue;
+    const name = mainNameFor(u);
     const p = path.join(CACHE_DIR, name);
     try {
       if (fs.statSync(p).size > 0) {
@@ -206,6 +249,10 @@ async function main() {
     if (FORCE) return true;
     const f = manifest[u];
     if (!f) return true;
+    // ★ 宽度不符也必须重做：换了 POSTER_WIDTH 之后，manifest 里仍记着旧宽度的
+    //   文件名，而那个文件还在盘上 —— 只看「文件是否存在」会误判成已缓存，
+    //   新宽度永远不生成（本次 400→800 就踩这个）。
+    if (!f.endsWith(`-${WIDTH}.webp`)) return true;
     const p = path.join(CACHE_DIR, f);
     return !fs.existsSync(p) || fs.statSync(p).size === 0;
   });
@@ -249,9 +296,11 @@ async function main() {
   async function worker() {
     while (queue.length) {
       const url = queue.shift();
-      const name = `${hashOf(url)}.webp`;
+      const name = mainNameFor(url);
       const out = path.join(CACHE_DIR, name);
       const thumbOut = path.join(CACHE_DIR, thumbNameFor(name));
+      // 记下旧记录：重下失败时用它兜底（见 catch）
+      const prev = manifest[url];
       try {
         const src = sourceUrlFor(url);
         const buf = await fetchBuffer(src);
@@ -264,7 +313,7 @@ async function main() {
 
         // 缩略图从**已生成的主图**再缩一次，而不是重新解码原图：
         //   1. 输入小得多，sharp 开销更低（2C2G 机器上值得）
-        //   2. 尺寸关系确定（64 ≤ 400），不会出现缩略图反而更大的怪状
+        //   2. 尺寸关系确定（64 ≤ WIDTH），不会出现缩略图反而更大的怪状
         //   3. 与主图同源同色，不会因两次独立缩放而色调偏移
         const thumb = await sharp(webp)
           .resize({ width: THUMB_WIDTH, withoutEnlargement: true })
@@ -280,7 +329,15 @@ async function main() {
       } catch (e) {
         failed++;
         failures.push(`${url}  →  ${e.message}`);
-        delete manifest[url];
+        // ★ 保留旧记录，而不是删掉。
+        //   删掉会让 slimPoster 回退到**原始远端 URL** —— 而 MCL 那批
+        //   对用户网络完全不可达（见 lib/data.ts 注释），结果是直接碎图。
+        //   留着旧记录就能继续发上一版的本地文件（文件没被上面的清理删掉：
+        //   清理只认 manifest 里登记过的 sha1），最多是分辨率旧一点。
+        //   本次 400→800 正是这个情形：失败的那几张宁可继续用 400w，
+        //   也不应该变成裂图。
+        if (prev) manifest[url] = prev;
+        else delete manifest[url];
       }
       const n = done + failed;
       if (n % 25 === 0 || n === todo.length) {
@@ -317,6 +374,62 @@ async function main() {
   if (thumbMade > 0) console.log(`   ↻ 补齐缩略图 ${thumbMade} 张（从本地主图生成，未产生网络请求）`);
 
   const mb = (n) => (n / 1048576).toFixed(1);
+
+  // ---------- 清理：删掉不再被引用的旧宽度文件 ----------
+  //
+  // ★ 为什么必须做（2026-09-20 加）：public/posters/ 是 .gitignore 的构建产物，
+  //   nginx 直接服务 out/posters/。宽度从 400 改成 800 后，旧文件名不再被
+  //   manifest 引用，但文件仍在盘上，并会被 next build 原样拷进 out/ ——
+  //   等于每次改宽度都往站点里堆一整份废弃图（本次约 10MB）。
+  //   这一步让目录严格等于 manifest，重建后不会越来越肿。
+  //
+  // ★ 删除条件写得**很窄**（而不是「不在 manifest 里就删」）：
+  //   只删「sha1 与某个已登记 URL 相同、但宽度不是当前 WIDTH」的文件
+  //   （含旧命名 `<sha1>.webp`：它没有宽度段，一样属于旧宽度产物）。
+  //   理由：若本次全部下载失败，manifest 会被清空（见 catch 里的
+  //   delete manifest[url]），此时「不在 manifest 里就删」会把整目录
+  //   的海报删光 —— 而 rebuild-static.sh 海报步骤失败是**不中断**的，
+  //   于是线上就变成「引用远端 URL」：MCL 那批对用户网络不可达，直接碎图。
+  //   按 hash 前缀匹配后，manifest 为空就等于什么都不删，最坏只是留旧文件。
+  //
+  // 只在**全量**跑时清理：--limit 是冒烟用的，按它删会把未处理的图误删。
+  if (LIMIT === 0) {
+    const knownHashes = new Set();
+    /** 当前 manifest 仍在引用的文件名（含兜底保留的旧宽度记录） */
+    const referenced = new Set();
+    for (const name of Object.values(manifest)) {
+      const m = /^([0-9a-f]{16})-\d+\.webp$/.exec(name);
+      if (m) knownHashes.add(m[1]);
+      referenced.add(name);
+      referenced.add(thumbNameFor(name));
+    }
+    let pruned = 0;
+    let freed = 0;
+    for (const f of fs.readdirSync(CACHE_DIR)) {
+      // 两种命名都要覆盖：
+      //   带宽度  <sha1>-<宽度>.webp / -t.webp   （2026-09-20 起）
+      //   无宽度  <sha1>.webp / -t.webp          （旧产物，否则会永远留在盘上）
+      const m = /^([0-9a-f]{16})(?:-(\d+))?(-t)?\.webp$/.exec(f);
+      if (!m) continue;
+      const [, hash, width] = m;
+      // 仍被 manifest 引用的不动：重下失败时兜底保留的旧宽度记录就在这里，
+      //   删掉它会让页面变成「引用不存在的本地文件」（碎图）。
+      if (referenced.has(f)) continue;
+      // 已是当前宽度 → 保留；sha1 不属任何已登记 URL → 不动（可能是别人的文件）
+      if ((width && Number(width) === WIDTH) || !knownHashes.has(hash)) continue;
+      try {
+        const st = fs.statSync(path.join(CACHE_DIR, f));
+        if (!st.isFile()) continue;
+        fs.unlinkSync(path.join(CACHE_DIR, f));
+        freed += st.size;
+        pruned++;
+      } catch {
+        /* 单张删不掉不影响发布，下次再清 */
+      }
+    }
+    if (pruned > 0) console.log(`   ↻ 清理旧宽度图 ${pruned} 张（释放 ${mb(freed)}MB）`);
+  }
+
   console.log(`✅ 完成：成功 ${done}，失败 ${failed}`);
   console.log(`   图片目录: ${CACHE_DIR}（构建时拷进 out/posters/ → 同源 /posters/）`);
   if (savedFrom > 0) {
@@ -324,7 +437,7 @@ async function main() {
   }
   console.log(`   manifest: ${MANIFEST}`);
   if (failures.length) {
-    console.log(`\n⚠️ 失败清单（这些会回退到原始 URL）：`);
+    console.log(`\n⚠️ 失败清单（有旧版记录则继续用旧文件，否则回退到原始 URL）：`);
     for (const f of failures.slice(0, 20)) console.log('   ', f);
     if (failures.length > 20) console.log(`    …另有 ${failures.length - 20} 条`);
   }

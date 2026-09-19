@@ -40,6 +40,11 @@ export function MovieGroupCard({
   priority?: boolean;
 }) {
   const m = group.primary;
+  // ★ 海报用 group.displayPoster 而不是 primary.poster：
+  //   primary 按「原版优先 + 场次最多」选，与海报清晰度无关，
+  //   而 MCL 只提供 290×390、其他院线给 800×1125（见 pickDisplayPoster）。
+  //   兜底回 primary.poster：极端情况下（没跑过抓图）两者相同，不会白图。
+  const poster = group.displayPoster || m.poster;
   // 综合评分：两边都有取平均，只有一边用那一边，都没有则整块不渲染
   const rating = computeCardRating(group.enrich);
 
@@ -49,9 +54,9 @@ export function MovieGroupCard({
       className="hkm-glass group flex h-full flex-col overflow-hidden rounded-2xl"
     >
       <div className="relative aspect-[2/3] w-full overflow-hidden bg-black">
-        {m.poster ? (
+        {poster ? (
           <PosterImage
-            src={m.poster}
+            src={poster}
             alt={group.displayName}
             sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
             className="object-cover transition-transform duration-300 group-hover:scale-105"

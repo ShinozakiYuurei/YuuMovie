@@ -120,8 +120,12 @@ function isLocalPoster(p: string): boolean {
  *      原样下发，首页白背约 8.9MB。
  *
  * 解法：scripts/fetch-posters.mjs 在构建前把海报抓到服务器、
- *       转成 400w WebP 存进 public/posters/，页面引用同源 /posters/*.webp。
+ *       转成 800w WebP 存进 public/posters/，页面引用同源 /posters/*.webp。
  *       实测 390KB → 45KB（省 88%），且同源静态文件会被 Cloudflare 边缘缓存。
+ *
+ * ★ 2026-09-20 由 400w 提到 800w：卡片实际渲染 268×401 CSS px，
+ *   HiDPI 屏需要 536×802 物理像素，400w 是被放大显示的（必然发糊）。
+ *   详见 scripts/fetch-posters.mjs 的 WIDTH 注释与实测 PSNR。
  *
  * 惰性读取（不是模块级常量）：readJson 定义在本文件下方，
  *   模块级求值会踩 TDZ。另外只需在 load() 里查一次表，本就无需提前。
@@ -140,7 +144,7 @@ function posterManifest(): Record<string, string> {
  *
  * ★ 为什么需要缩略图：
  *   影院页（app/cinema/[id]/page.tsx）把海报渲染在 32×48px 的位置，
- *   却引用了 400w 主图。实测单页 52 张 × 28KB ≈ 1.43MB，而 64w 缩略图
+ *   却引用了 800w 主图。实测单页 52 张 × 28KB ≈ 1.43MB，而 64w 缩略图
  *   只要 ~1KB —— 单张浪费约 25 倍，全站 42 个影院页共引用 6094 张。
  *
  * ★ 为什么要在此校验文件存在（而不是直接拼字符串）：
@@ -218,6 +222,110 @@ function slimPoster(url: string | null, width: number): string | null {
   } catch {
     return url;
   }
+}
+
+/**
+ * 读取本地 WebP 的实际像素宽（只看文件头，不解码整图）。
+ *
+ * ★ 为什么要读文件头而不是「按文件名推断」：
+ *   fetch-posters.mjs 用 `withoutEnlargement` 缩放，文件名里的宽度是
+ *   **目标**宽度。源图小于目标时（MCL 只有 290×390）产物仍是 290，
+ *   文件名却说 800 —— 按文件名比大小会把 290w 当成 800w，
+ *   于是「挑最清晰的海报」完全失效。文件头里的才是真值。
+ *
+ * 只在构建期跑一次（~300 个文件，每个读 30 字节），不进请求路径。
+ */
+function readWebpWidth(file: string): number | null {
+  let fd: number | null = null;
+  try {
+    fd = fs.openSync(file, 'r');
+    const b = Buffer.alloc(30);
+    if (fs.readSync(fd, b, 0, 30, 0) < 30) return null;
+    // RIFF....WEBP
+    if (b.toString('latin1', 0, 4) !== 'RIFF' || b.toString('latin1', 8, 12) !== 'WEBP') return null;
+    const chunk = b.toString('latin1', 12, 16);
+    if (chunk === 'VP8 ') return b.readUInt16LE(26) & 0x3fff; // 有损：14 位宽
+    if (chunk === 'VP8L') {
+      const bits = b.readUInt32LE(21); // 无损：14 位宽 + 14 位高
+      return (bits & 0x3fff) + 1;
+    }
+    if (chunk === 'VP8X') return (b[24] | (b[25] << 8) | (b[26] << 16)) + 1; // 扩展：24 位
+    return null;
+  } catch {
+    return null;
+  } finally {
+    if (fd != null) try { fs.closeSync(fd); } catch { /* 忽略 */ }
+  }
+}
+
+/**
+ * 本地海报的真实像素宽：**本地海报路径** → 宽度
+ *
+ * ★ key 必须是本地路径（posterUrl(name)）而不是原始 URL：
+ *   load() 在分组之前就把 m.poster 改写成了本地路径（见 slimPoster），
+ *   所以 pickDisplayPoster 拿到的是 /posters/xxx.webp。
+ *   若按原始 URL 建表，查找永远 miss，整个「挑最清晰海报」静默失效。
+ *
+ * 惰性 + memo：load() 只跑一次，但分组函数可能被多次调用。
+ */
+let _posterWidths: Map<string, number> | null = null;
+
+function posterWidths(): Map<string, number> {
+  if (_posterWidths) return _posterWidths;
+  const out = new Map<string, number>();
+  try {
+    const dir = process.env.POSTER_DIR || path.join(process.cwd(), 'public', 'posters');
+    for (const name of Object.values(posterManifest())) {
+      const w = readWebpWidth(path.join(dir, name));
+      if (w) out.set(posterUrl(name), w);
+    }
+  } catch {
+    /* 目录不存在（尚未跑抓图）→ 全部按未知处理，回退到 primary 的海报 */
+  }
+  _posterWidths = out;
+  return out;
+}
+
+/**
+ * 选组的展示海报：组内**最清晰**的那张，而不是 primary 的那张。
+ *
+ * ★ 为什么需要（2026-09-20，用户报「海报好模糊」）：
+ *
+ *   primary 的选取规则是「原版优先，其次场次最多」（见下方第四步），
+ *   与海报分辨率无关。而 MCL 的 API 只提供 290×390 的小图，
+ *   百老汇 / 英皇 / Cinema City 给的是 800×1125 —— 同一部电影，
+ *   各院线的海报清晰度差一倍以上。
+ *
+ *   实测线上 183 组里有 20 组踩中：primary 恰好是 MCL 条目，
+ *   于是整张卡片用了 290w 小图，而同组其他院线有 800w 的同一张海报。
+ *   首页前 16 张里就有 4 张是这样（生化危機 / 歡迎來龍餐館 /
+ *   Look Back / 復仇者聯盟4）。
+ *
+ * 只影响**展示用**海报，不动 primary：primary 还决定 slug 与
+ *   displayName，换掉会让线上已有链接失效。
+ *
+ * 同宽时优先「原版」条目：格式版海报可能带 IMAX / 4DX 水印，
+ *   分辨率相同就没必要换成带角标的那张。
+ */
+function pickDisplayPoster(list: Movie[], primary: Movie): string | null {
+  const widths = posterWidths();
+  let best = primary.poster;
+  // 未知宽度记 -1：本地化的海报（已知宽度）应当胜过无法判断的那张
+  let bestW = primary.poster ? widths.get(primary.poster) ?? -1 : -1;
+  let bestBase = isBaseVersion(primary.nameZh || primary.nameEn);
+
+  for (const m of list) {
+    if (!m.poster || m.poster === best) continue;
+    const w = widths.get(m.poster);
+    if (w == null) continue; // 未本地化（远端 URL），不参与比较
+    const base = isBaseVersion(m.nameZh || m.nameEn);
+    if (w > bestW || (w === bestW && base && !bestBase)) {
+      best = m.poster;
+      bestW = w;
+      bestBase = base;
+    }
+  }
+  return best;
 }
 
 function resolveDataDir(): string {
@@ -584,6 +692,13 @@ export interface MovieGroup {
   primary: Movie;
   /** 展示用片名（已去除格式标记） */
   displayName: string;
+  /**
+   * 展示用海报：组内**最清晰**的那张（见 pickDisplayPoster 注释）。
+   *
+   * 与 primary.poster 可能不同：MCL 只给 290×390，而同一部片在
+   * 百老汇 / 英皇有 800×1125。卡片、详情页大图、JSON-LD 都应读这个字段。
+   */
+  displayPoster: string | null;
   /** 全部版本 */
   versions: MovieVersion[];
   /** 总场次数 */
@@ -825,6 +940,7 @@ function buildMovieGroups(status?: 'showing' | 'upcoming'): MovieGroup[] {
       key,
       primary,
       displayName: stripFormats(primary.nameZh || primary.nameEn),
+      displayPoster: pickDisplayPoster(list, primary),
       versions,
       totalShows,
       minPrice: prices.length ? Math.min(...prices) : null,

@@ -56,7 +56,7 @@ export async function generateMetadata({
     openGraph: {
       title: a.title,
       description: a.summary?.slice(0, 150),
-      images: a.poster ? [a.poster] : undefined,
+      images: group.displayPoster ? [group.displayPoster] : undefined,
     },
     alternates: { canonical: `/movie/${group.slug}` },
   };
@@ -84,6 +84,7 @@ export default async function MoviePage({ params }: { params: Promise<{ slug: st
     <article>
       <MovieJsonLd
         movie={group.primary}
+        image={group.displayPoster}
         extra={{
           // 外部评分：只有拿到分数才写进结构化数据，
           // aggregateRating 缺数时宁可省略（写 0 会误导搜索摘要）。

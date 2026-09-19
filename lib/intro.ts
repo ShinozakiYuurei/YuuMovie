@@ -98,7 +98,7 @@ export function buildIntro(group: MovieGroup): MovieIntro {
   return {
     title: group.displayName,
     subtitle: group.primary.nameEn && group.primary.nameEn !== group.displayName ? group.primary.nameEn : null,
-    poster: group.primary.poster,
+    poster: group.displayPoster,
     openingDate: group.displayOpeningDate,
     duration: group.displayDuration,
     durationText: formatDuration(group.displayDuration),

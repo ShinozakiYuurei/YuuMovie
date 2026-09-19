@@ -24,7 +24,7 @@ const nextConfig: NextConfig = {
     //   必须关掉（否则图片会 404）。
     //
     // 这不代表放弃图片优化：海报已在**构建前**由 scripts/fetch-posters.mjs
-    //   抓取并转为 400w WebP（实测 390KB → 45KB），真正的压缩在构建期完成，
+    //   抓取并转为 800w WebP（实测 390KB → 45KB），真正的压缩在构建期完成，
     //   与是否走 next/image 优化器无关。
     unoptimized: true,
 
