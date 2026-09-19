@@ -151,9 +151,25 @@ function FilterDropdown({
 
       {open && (
         <>
-          {/* 点击遮罩关闭 */}
+          {/*
+           * 点击遮罩关闭。
+           *
+           * z-30：低于顶栏（z-50），因此遮罩不会盖住顶栏 ——
+           * 用户展开下拉后仍能点导航。
+           */}
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} aria-hidden />
-          <div className="absolute left-0 z-40 mt-1.5 max-h-80 w-64 overflow-y-auto rounded-xl border border-white/12 bg-[#12141b] p-1.5 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.95)]">
+          {/*
+           * 下拉面板。
+           *
+           * ★ 2026-09-19 修：原为 z-40，而顶栏是 z-50 ——
+           *   筛选区滚到顶栏下方时展开下拉，菜单会被顶栏遮住一截
+           *   （表现为「筛选项顶进 sticky header 下面、叠在一起」）。
+           *   现提到 z-[60]（高于顶栏 z-50），保证菜单永远完整可见。
+           *
+           *   遮罩保持 z-30 不变：它只负责拦截面板外的点击，
+           *   低于顶栏反而正确（否则点导航会被遮罩吃掉）。
+           */}
+          <div className="absolute left-0 z-[60] mt-1.5 max-h-80 w-64 overflow-y-auto rounded-xl border border-white/12 bg-[#12141b] p-1.5 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.95)]">
             {options.length === 0 && <p className="px-3 py-2 text-sm text-gray-400">無可選項</p>}
 
             {options.map((o) => {
@@ -380,8 +396,36 @@ export function ShowtimeExplorer({
 
   return (
     <div>
-      {/* ============ 第一層：篩選 ============ */}
-      <section className="hkm-panel rounded-2xl p-4">
+      {/*
+       * ============ 第一層：篩選 ============
+       *
+       * ★ 2026-09-19 改为二级 sticky bar（用户建议）。
+       *
+       * 问题：筛选面板高约 200px，向下滚动后完全滚出视口 ——
+       *   用户想改筛选条件必须滚回顶部，而在几百条场次的长列表里
+       *   这个往返代价很高。
+       *
+       * 做法：
+       *   - sticky top-[var(--hkm-header-h)]：紧贴在顶栏下边缘，
+       *     两者不重叠（顶栏高度是变量，单一事实源）
+       *   - z-40：低于顶栏（z-50），保证顶栏永远在上层；
+       *     但高于内容与遮罩（z-30）
+       *   - 背景改用不透明底色：hkm-panel 是半透明（0.66）+ 模糊，
+       *     作为 sticky 元素时会透出下方滚动的场次列表，视觉上「叠在一起」。
+       *     这里换成接近实心的面板色，并保留毛玻璃以维持观感一致。
+       *
+       * ★ 移动端只在 sm 及以上启用 sticky：
+       *   面板约 200px（标题+四个下拉+排序行），在小屏上占近 1/3 视口，
+       *   常驻会把场次列表挤得几乎看不见 —— 得不偿失。
+       *   手机用户滚回顶部改筛选的代价，低于永久失去 1/3 屏幕。
+       *
+       * 为什么不让整个 200px 面板常驻：同上述理由，故把座位图例
+       *   （纯说明性，看完一次就不再需要）移出 sticky 区。
+       */}
+      <section
+        className="hkm-panel-sticky rounded-2xl p-4 sm:sticky sm:z-40"
+        style={{ top: 'var(--hkm-header-h)' }}
+      >
         <LayerHeader title="篩選" hint="同類可多選（或），跨類需同時符合（且）">
           <span className="tabular-nums text-xs text-gray-300">
             {sorted.length} / {rows.length} 場
@@ -437,10 +481,19 @@ export function ShowtimeExplorer({
           })}
         </div>
 
-        <div className="mt-3 border-t border-white/10 pt-3">
-          <SeatLegend />
-        </div>
+        {/*
+         * 座位图例不放进 sticky 区。
+         *
+         * ★ 为什么：sticky 区会**永久占据**屏幕顶部。图例（约 45px）
+         *   是纯说明性内容，用户看完一次就够了；把它留在 sticky 里
+         *   等于用宝贵的视口换一条不再需要的信息。
+         *   现改为紧随 sticky 面板之后（仍在筛选层内，语义不变）。
+         */}
       </section>
+
+      <div className="hkm-panel mt-2.5 rounded-2xl px-4 py-3">
+        <SeatLegend />
+      </div>
 
       {sorted.length === 0 ? (
         <p className="hkm-panel mt-6 rounded-2xl py-16 text-center text-base text-gray-300">

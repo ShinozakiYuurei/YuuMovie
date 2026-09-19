@@ -112,9 +112,22 @@ export default async function MoviePage({ params }: { params: Promise<{ slug: st
 
       <MovieIntro group={group} />
 
-      {/* 場次：多維篩選 + 多鍵排序 + 餘座顏色標記 */}
+      {/*
+       * 場次：多維篩選 + 多鍵排序 + 餘座顏色標記
+       *
+       * scroll-mt：锚点跳转时给顶栏留出空间。
+       *   ★ 2026-09-19 改为引用变量：原先写死 scroll-mt-20（80px），
+       *     而顶栏实际高度是 56px —— 两者无关联，改任一边都会错位。
+       *     现用 calc(var(--hkm-header-h) + 1rem)：顶栏高度 + 1rem 呼吸间距。
+       *     calc 写在内联 style 里而不是 Tailwind 类，因为 Tailwind 的
+       *     scroll-mt-* 不支持 CSS 变量运算。
+       */}
       {totalShows > 0 && (
-        <section id="versions" className="mt-8 scroll-mt-20">
+        <section
+          id="versions"
+          className="mt-8"
+          style={{ scrollMarginTop: 'calc(var(--hkm-header-h) + 1rem)' }}
+        >
           <div className="mb-4 flex flex-wrap items-baseline gap-3">
             <h2 className="text-2xl font-bold tracking-tight">場次及購票</h2>
             <span className="hkm-chip">

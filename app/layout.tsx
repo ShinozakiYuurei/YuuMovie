@@ -34,9 +34,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* 环境光层：固定定位，不参与滚动 */}
         <div className="hkm-aurora" aria-hidden />
 
-        {/* 顶栏：真毛玻璃（固定元素，模糊开销可控） */}
-        <header className="hkm-glass-bar sticky top-0 z-50">
-          <div className="mx-auto flex max-w-6xl items-center gap-6 px-4 py-3">
+        {/* 顶栏：真毛玻璃（固定元素，模糊开销可控）
+         *
+         * ★ 2026-09-19 改为固定高度：
+         *   原先用 py-3 撑出高度，实际值随字号/行高变动，页面里其他
+         *   「需要避开顶栏」的地方（内容区 padding-top、锚点 scroll-margin）
+         *   只能拍一个数字，对不上就出现内容顶进顶栏下面的叠压。
+         *   现统一为 var(--hkm-header-h)（定义在 globals.css），
+         *   内层用 h-full + items-center 垂直居中，不再靠 padding 撑。
+         */}
+        <header
+          className="hkm-glass-bar sticky top-0 z-50 h-[var(--hkm-header-h)]"
+        >
+          <div className="mx-auto flex h-full max-w-6xl items-center gap-6 px-4">
             <Link href="/" className="text-lg font-bold tracking-tight">
               Yuu<span className="text-accent">Movie</span>
             </Link>
@@ -63,6 +73,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </header>
 
+        {/*
+         * 内容区：padding-top 与顶栏高度对齐。
+         *
+         * ★ 为什么不需要「顶栏高度 + 额外间距」：顶栏是 sticky 而非 fixed，
+         *   它本来就占据文档流的第一屏位置（不像 fixed 会脱离文档流），
+         *   所以内容区的 py-6 是它与顶栏之间的正常视觉间距，
+         *   不需要再把顶栏高度加进去（加了反而多出一截空白）。
+         *   真正需要对齐顶栏的是**锚点跳转**（见 scroll-mt 相关注释）。
+         */}
         <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
 
         <footer className="mt-16 border-t border-white/6 px-4 py-8 text-xs leading-relaxed text-gray-500">
