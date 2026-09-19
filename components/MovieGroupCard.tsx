@@ -8,8 +8,8 @@ import { formatDuration, relativeDay } from '@/lib/format';
  * 电影卡片（合并版本）
  *
  * 海报区域：
- *   左上角：香港电影分级（黑底白字）
- *   不再展示版本数角标、底部版本 tag 与语言标签（用户偏好：更干净的卡片）
+ *   只有海报本身，不叠任何角标
+ *   （分级角标、版本数角标、底部版本 tag 与语言标签均已移除：用户偏好更干净的卡片）
  *
  * 文字区域：
  *   标题 / 英文片名
@@ -39,16 +39,6 @@ export function MovieGroupCard({ group }: { group: MovieGroup }) {
           <div className="flex h-full items-center justify-center text-xs text-gray-600">
             無海報
           </div>
-        )}
-
-        {/* 左上：分级（黑底白字加粗，仅显示香港官方分级 I/IIA/IIB/III） */}
-        {group.displayCategory && (
-          <span
-            data-testid="card-rating"
-            className="absolute left-2 top-2 inline-flex items-center rounded bg-black/85 px-1.5 py-0.5 text-[11px] font-bold text-white tracking-wide"
-          >
-            {group.displayCategory}
-          </span>
         )}
 
       </div>
