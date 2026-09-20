@@ -81,6 +81,9 @@ else
   [ -x "$TSX" ] || { echo "✖ 缺 $TSX，先跑 npm ci --include=dev"; exit 1; }
   "$TSC" --noEmit
   "$TSX" probe/check-danger.mts
+  # 选海报的规则全是取舍，错了不会报错、只会静默换封面（2026-09-21 就踩过），
+  # 所以跟错合并一样在发布前钉死。不读 data/、不联网，服务器上也能跑。
+  "$TSX" probe/check-poster-pick.mts
 fi
 
 # ---------- 2 存档 ----------

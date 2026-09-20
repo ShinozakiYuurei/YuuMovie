@@ -7,6 +7,7 @@ import {
   extractFormats,
   sortFormats,
   formatLabel,
+  hasFormatMarker,
   isBaseVersion,
   stripFormats,
 } from './versions';
@@ -287,44 +288,126 @@ function posterWidths(): Map<string, number> {
 }
 
 /**
- * 选组的展示海报：组内**最清晰**的那张，而不是 primary 的那张。
+ * 选组的展示海报：**原版优先，其次 IMAX，最后才轮到其他格式版**。
  *
- * ★ 为什么需要（2026-09-20，用户报「海报好模糊」）：
+ * ★ 2026-09-21 用户定的规则（原话）：
+ *   「当一部电影有多版本的时候，优先显示原版的海报，没有原版海报就用 IMAX 的
+ *     海报。两者都没有才能选择其他版本的海报」
+ *   这里的「原版」= 香港官方宣传海报，即院线为**普通场次**挂的那张
+ *   （片名不带任何格式/语言/活动标记，见 isBaseVersion）。
  *
- *   primary 的选取规则是「原版优先，其次场次最多」（见下方第四步），
- *   与海报分辨率无关。而 MCL 的 API 只提供 290×390 的小图，
- *   百老汇 / 英皇 / Cinema City 给的是 800×1125 —— 同一部电影，
- *   各院线的海报清晰度差一倍以上。
+ * 为什么原版优先压过「最清晰」（2026-09-20 那版是纯按分辨率挑的）：
+ *   同一部片不同版本的宣传物料**画面本身就不一样**，不是同一张图的不同大小。
+ *   实测（线上数据，均取自各院线官方条目）：
+ *     - 生化危機：原版是「门框倒吊」主视觉；IMAX 版整张换成
+ *       「FILMED FOR IMAX」街头奔跑图 + 金色 IMAX 大字，且分辨率并不更高。
+ *     - 奧德賽：原版（百老匯）是「森林巨人阵」；IMAX 版是「独眼巨人火海」
+ *       —— 后者其实更抓眼，但仍按用户规则让位给原版。
+ *     - CHIIKAWA：4DX 版在整张画面上压了巨大的黄色 4DX 字。
+ *   也就是说「挑最清晰的那张」会顺带把封面换成带 IMAX / 4DX 角标的另一套物料，
+ *   卡片一眼看去像在推特殊制式，而不是在介绍这部电影。
  *
- *   实测线上 183 组里有 20 组踩中：primary 恰好是 MCL 条目，
- *   于是整张卡片用了 290w 小图，而同组其他院线有 800w 的同一张海报。
- *   首页前 16 张里就有 4 张是这样（生化危機 / 歡迎來龍餐館 /
- *   Look Back / 復仇者聯盟4）。
+ * 分层（tier 越小越优先）：
+ *   0 原版        —— 片名里**完全没有**版本/语言/活动标记的条目
+ *   1 IMAX        —— 原版缺失时的兜底（IMAX 物料通常仍是官方主视觉的变体）
+ *   2 其他格式版  —— 4DX / MX4D / LUXE / 全景聲 / 菲林版 / 日語版 / 特典場…
+ *
+ * ★ 判「原版」用的是 hasFormatMarker（看原始片名），不是 isBaseVersion。
+ *   后者会把 bestar 的「劇場版 CHIIKAWA 人魚島的秘密 (日)」算作原版 ——
+ *   可那张海报上印着「日語版 JAPANESE VERSION」横幅，与 broadway 的
+ *   「(日語版)」是同一套物料。详见 lib/versions.ts 里 hasFormatMarker 的注释。
+ *
+ * 同层内的排序：先比**片名纯净度**，再比清晰度。
+ *
+ * ★ 为什么纯净度要排在清晰度前面（2026-09-21，用户报「为何这张是 IMAX 的」）：
+ *   只看清晰度会在同层里撞上**冠名物料**。实测《復仇者聯盟4》同层全是 800w，
+ *   而 emperor 有一条名字叫「(IV) 復仇者聯盟4：終局之戰 加碼重映」——
+ *   emperor 的 `(IV)` 是 Infinity Vision 的缩写，那张图顶上压着一条
+ *   彩色 Infinity Vision 横带；而「復仇者聯盟4：終局之戰 加碼重映」那张
+ *   （MCU 神級英雄集結…9.24 見證傳奇）才是香港官方海报。
+ *   两张同宽，只能靠「谁的名字更素」来分：纯净度 = 片名里被剥掉的字符数，
+ *   越小越接近裸片名。
+ *
+ * ★ 同时也修了顺序依赖：原先同档同宽时用 `<=` 保留先到的，
+ *   而 `list` 的顺序来自抓取次序 —— 同一份数据换个遍历顺序就换一张封面，
+ *   不可复现。现在同档同宽同纯净度时保留先到的（稳定），
+ *   但纯净度这一层已经把「冠名版 vs 官方版」分开了，不再看运气。
+ *
+ * 唯一一处「不照原版优先」的例外：**未本地化的远端 URL**。
+ *   海报本地化（scripts/fetch-posters.mjs）存在的唯一原因就是
+ *   www.mclcinema.com 对用户侧网络完全不可达 —— 页面直接引用它等于裂图。
+ *   所以若某组的原版条目没被本地化（源站 404 / 下载失败），而组里
+ *   另有已本地化的 IMAX 或其他格式海报，宁可给一张能打开的 IMAX 图，
+ *   也不给一张永远转圈的原版图。
+ *   正常情况下抓图跑在构建之前，所有能拿到的海报都是本地路径，
+ *   这条例外根本不会触发。
  *
  * 只影响**展示用**海报，不动 primary：primary 还决定 slug 与
  *   displayName，换掉会让线上已有链接失效。
- *
- * 同宽时优先「原版」条目：格式版海报可能带 IMAX / 4DX 水印，
- *   分辨率相同就没必要换成带角标的那张。
  */
+function posterTier(m: Movie): number {
+  const name = m.nameZh || m.nameEn;
+  if (!hasFormatMarker(name)) return 0;
+  return extractFormats(name).includes('IMAX') ? 1 : 2;
+}
+
+/**
+ * 片名纯净度：被剥掉的字符数（越小越接近裸片名）。
+ *
+ * 用「剥掉的字符数」而不是「命中了几个 token」：前者能一并盖住
+ * emperor 的 `(IV)`（它是 Infinity Vision 缩写，但走的是
+ * preprocessTitle 里「括号内罗马序号」那条剥离规则，不在 FORMAT_TOKENS 里，
+ * 所以按 token 数根本数不到它）。
+ */
+function nameNoise(m: Movie): number {
+  const name = m.nameZh || m.nameEn || '';
+  return Math.max(0, name.length - stripFormats(name).length);
+}
+
 function pickDisplayPoster(list: Movie[], primary: Movie): string | null {
-  const widths = posterWidths();
-  let best = primary.poster;
-  // 未知宽度记 -1：本地化的海报（已知宽度）应当胜过无法判断的那张
-  let bestW = primary.poster ? widths.get(primary.poster) ?? -1 : -1;
-  let bestBase = isBaseVersion(primary.nameZh || primary.nameEn);
+  return pickPosterByTier(list, posterWidths()) ?? primary.poster;
+}
+
+/**
+ * 选海报的纯函数核心：不读文件系统，宽度表由调用方传入。
+ *
+ * 拆出来只为了让 probe/check-poster-pick.mts 能在部署自检里钉死这套规则
+ * （规则全是取舍，改错了没人看得出来，只会静默换封面）。
+ */
+export function pickPosterByTier(list: Movie[], widths: Map<string, number>): string | null {
+  let best: string | null = null;
+  let bestTier = Number.POSITIVE_INFINITY;
+  let bestNoise = Number.POSITIVE_INFINITY;
+  let bestW = Number.NEGATIVE_INFINITY;
+  let bestLocal = false;
 
   for (const m of list) {
-    if (!m.poster || m.poster === best) continue;
-    const w = widths.get(m.poster);
-    if (w == null) continue; // 未本地化（远端 URL），不参与比较
-    const base = isBaseVersion(m.nameZh || m.nameEn);
-    if (w > bestW || (w === bestW && base && !bestBase)) {
-      best = m.poster;
-      bestW = w;
-      bestBase = base;
+    if (!m.poster) continue;
+    const tier = posterTier(m);
+    const noise = nameNoise(m);
+    const local = widths.has(m.poster);
+    const w = local ? widths.get(m.poster)! : -1;
+
+    if (best != null) {
+      if (bestLocal !== local) {
+        // 未本地化的一律让位（见上方例外说明）
+        if (!local) continue;
+      } else if (tier !== bestTier) {
+        if (tier > bestTier) continue;
+      } else if (noise !== bestNoise) {
+        if (noise > bestNoise) continue;
+      } else if (w <= bestW) {
+        continue;
+      }
     }
+
+    best = m.poster;
+    bestTier = tier;
+    bestNoise = noise;
+    bestW = w;
+    bestLocal = local;
   }
+
   return best;
 }
 

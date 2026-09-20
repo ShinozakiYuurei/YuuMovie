@@ -366,7 +366,84 @@ export function extractFormats(name: string | null | undefined): string[] {
   return [...new Set(dedupeOverlaps([...found]))];
 }
 
-/** 是否为「原版」（无格式标记） */
+/**
+ * 括号里的方言缩写：「(日)」「(粵語)」「(日本語)」
+ * 与 preprocessTitle 里那条剥除规则同源（那边是全局 replace，这边只做判定）。
+ */
+const DIALECT_SHORTHAND_RE = /[（(【\[]\s*[日粵國英韓台美陸法](?:語|語版|片)?\s*[)）】\]]/;
+
+/**
+ * 这些标记**不改变海报画面**，因此判定「原版海报」时要忽略它们。
+ *
+ * 分类依据是「会不会换图 / 压角标」，不是「算不算版本」：
+ *   - 活动标签（Infinity Vision / bcSunday / 影展名…）：只是场次归类，物料同一套
+ *   - 放映轮次（Encore / 重映 / 加碼重映 / Live Viewing）：同一套宣传物料
+ *   - 场次类型（特典場 / 優先場 / 應援場 / 見面場）：同上
+ *   - 2D / 3D：香港默认规格，没有专属物料
+ *
+ * ★ 为什么必须分开（实测案例，2026-09-21）：
+ *   《復仇者聯盟4 加碼重映》整组**没有一条**不带标记的条目，
+ *   若把「加碼重映」当成会换图的标记，整个原版档就空了，
+ *   于是会跳到 IMAX 档 —— 而那张 IMAX 图是英文的
+ *   「REASSEMBLE THE TEAM IN IMAX / ENDGAME ENCORE」通用物料；
+ *   而「復仇者聯盟4 終局之戰 加碼重映」那张（MCU 神級英雄集結…9.24 見證傳奇）
+ *   才是这次重映的香港官方海报。两者一对比，该选后者。
+ *
+ * 反例（必须算「非原版」）：IMAX / 4DX / 全景聲 / 菲林版 / 日語版 / 4K修復版…
+ *   —— 这些会换图或压角标（实测：生化危機 IMAX 整张换成「FILMED FOR IMAX」
+ *   街头奔跑图；CHIIKAWA 4DX 在画面上压了巨大的黄色 4DX 字）。
+ */
+const NON_ART_TOKENS = new Set<string>([
+  ...ACTIVITY_TAGS,
+  // 放映轮次
+  'Encore', '重映', '加碼重映', '限定重映', 'Live Viewing',
+  // 场次类型
+  '特典應援場', '特典場', '特典场', '優先場', '應援場', '中秋特典場', '椅套特典場',
+  '椅套', '見面場', 'Hi Bye Meet & Greet', '期間限定', 'LIMITED',
+  // 影展 / 节目单元
+  'HKLGFF', 'GFF', 'KINO', 'InDPanda', 'anifest動画藝術祭', 'New Wave',
+]);
+
+/** 不改变画面的格式标记（从 SORTED_FORMAT_TOKENS 里刨掉 NON_ART_TOKENS） */
+const ART_FORMAT_TOKENS = SORTED_FORMAT_TOKENS.filter((t) => !NON_ART_TOKENS.has(t));
+
+/**
+ * 片名里是否带着**会改变海报画面**的版本 / 语言标记。
+ *
+ * ★ 与 isBaseVersion 的区别（2026-09-21 选海报时发现的坑）：
+ *
+ *   isBaseVersion 的口径是「先剥离，再看剩下什么」，而 preprocessTitle
+ *   会顺手剥掉括号里的方言缩写与场次主题词 —— 于是 bestar 的
+ *   「劇場版 CHIIKAWA 人魚島的秘密 (日)」被判成「原版」
+ *   （extractFormats 返回空数组），可那张图上明明印着
+ *   「日語版 JAPANESE VERSION」大横幅，和 broadway 的「(日語版)」是同一套物料。
+ *
+ *   分组必须保持宽松（(日) 与 (日語版) 要能合并，见 probe/check-danger.mts
+ *   的 must 列表），所以 isBaseVersion 不能改；
+ *   但「挑一张最像官方原版的封面」需要严格：带标记的条目直接出局。
+ *
+ * 与 hasFormatMarker 的区别：本函数是宽松口径（先剥离再判定），
+ *   专供分组使用；选海报请用 hasFormatMarker。
+ *
+ * 判定的是**原始片名**（只做 NFKC 正规化），不经过任何剥离。
+ */
+export function hasFormatMarker(name: string | null | undefined): boolean {
+  if (!name) return false;
+  const raw = normalizeText(name);
+  if (DIALECT_SHORTHAND_RE.test(raw)) return true;
+  // 注意传 'i' 而不是默认的 'gi'：带 g 的正则 test() 会记 lastIndex，
+  // 同一个 token 第二次判定就会漏。
+  return ART_FORMAT_TOKENS.some((t) => tokenRegex(t, 'i').test(raw));
+}
+
+/**
+ * 是否为「原版」（无格式标记）
+ *
+ * ★ 口径是「先剥离，再看剩下什么」，因此**偏宽松**：
+ *   「劇場版 CHIIKAWA 人魚島的秘密 (日)」也会返回 true。
+ *   这是分组需要的（(日) 必须与 (日語版) 归一），不要为了选海报收紧它 ——
+ *   需要严格判定时用 hasFormatMarker。
+ */
 export function isBaseVersion(name: string | null | undefined): boolean {
   return extractFormats(name).length === 0;
 }
