@@ -58,19 +58,49 @@ export function FilterDropdown({
   onChange: (next: string[]) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; width: number; maxH: number } | null>(
+    null
+  );
   const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const has = selected.length > 0;
 
-  /** 量按鈕位置 → 算出不越出視窗的 fixed 坐標 */
+  /**
+   * 量按鈕位置 → 算出不越出視窗的 fixed 坐標與可用高度
+   *
+   * 高度也要算：菜單有 21 條規格，在 720px 高的視窗裡展開後會超出下邊 ——
+   * 原先固定 `max-h-80`（320px）並不管「按鈕下面只剩多少空間」，
+   * 結果靠下的選項（「特色影廳」那一整組）直接被切在視窗外，
+   * 又因為無法滾動（見上面的說明），用戶根本選不到。
+   *
+   * 現在：下方空間夠就往下展開；不夠就翻到按鈕上方；
+   * 兩邊都不夠（矮屏）則取空間大的一側，並把高度限在該側空間內 ——
+   * 無論哪種情形，菜單都完整落在視窗裡且可滾動。
+   */
   const place = useCallback(() => {
     const el = btnRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
     const vw = window.innerWidth;
+    const vh = window.innerHeight;
     const width = Math.min(256, vw - 16);
     const left = Math.max(8, Math.min(r.left, vw - width - 8));
-    setPos({ top: r.bottom + 6, left, width });
+
+    const GAP = 6;
+    const MARGIN = 8;
+    const below = vh - r.bottom - GAP - MARGIN;
+    const above = r.top - GAP - MARGIN;
+    const flip = below < 200 && above > below;
+    /*
+     * 高度上限 420px（約 11 項）而非原先的 320px：
+     * 規格有 21 條 + 2 個分組標題，320px 只看得到 8 項，
+     * 在 1080p 這種完全裝得下的屏幕上還要滾兩次 —— 沒必要。
+     * 420px 仍不到 1080p 視窗的一半，不會顯得突兀。
+     */
+    const maxH = Math.max(120, Math.min(420, flip ? above : below));
+    const top = flip ? Math.max(MARGIN, r.top - GAP - maxH) : r.bottom + GAP;
+
+    setPos({ top, left, width, maxH });
   }, []);
 
   const openMenu = () => {
@@ -78,17 +108,54 @@ export function FilterDropdown({
     setOpen(true);
   };
 
+  /**
+   * 滾動/縮放：**重新貼合按鈕**，而不是關閉菜單
+   *
+   * ===== 為什麼不「一滾就關」（踩過的坑，2026-09-21）=====
+   *
+   * 最初寫的是「監聽 scroll 就 close」，因為菜單是 position:fixed、
+   * 位置是展開時量一次定下來的 —— 頁面一滾就會與按鈕錯位。
+   *
+   * 但這個策略有三個漏斗，全部都會把菜單意外關掉：
+   *   1. **菜單自己的滾動**（規格 21 條裝不下，必須能滾）——
+   *      原先加了 capture:true，內層 scroll 也傳到 window，一滾就自關。
+   *      用户看到的就是「無法滑動、選不到下面的項」。
+   *   2. **瀏覽器的 scroll anchoring** —— 選中一項後我們重渲染了清單，
+   *      瀏覽器為了「保持可見內容不跳」會把頁面微調幾個像素（實測 300 → 305），
+   *      這也觸發 scroll 事件。於是「勾完一項菜單就消失」，多選直接沒法用。
+   *   3. **focus 引起的滾動** —— 聚焦按鈕時瀏覽器會把元素滾入視口。
+   *
+   * 與其不斷給 close 加例外，不如換個方向：**錯位就修正位置**。
+   * 重跑 place() 用的是按鈕**當下**的 rect，所以菜單會一直貼着按鈕，
+   * 用户滾動頁面時菜單跟着走 —— 比「突然消失」體驗好，也不會漏掉任何一種滾動來源。
+   *
+   * 唯一該關的情形是「按鈕已經完全離開視窗」：那時菜單已經沒有錨點，
+   * 飄在屏幕中間只會讓用户莫名其妙。
+   */
   useEffect(() => {
     if (!open) return;
-    const close = () => setOpen(false);
-    // capture: true —— sticky 容器自身也可能成为滚动容器
-    window.addEventListener('scroll', close, true);
-    window.addEventListener('resize', close);
-    return () => {
-      window.removeEventListener('scroll', close, true);
-      window.removeEventListener('resize', close);
+    const onScrollOrResize = (e: Event) => {
+      // 菜單自身的滾動不算「頁面滾動」—— 那是用户在翻選項，位置不需要修正
+      const t = e.target;
+      if (t instanceof Node && menuRef.current?.contains(t)) return;
+
+      const el = btnRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      // 按鈕已完全滾出視窗 → 失去錨點，關閉
+      if (r.bottom < 0 || r.top > window.innerHeight) {
+        setOpen(false);
+        return;
+      }
+      place();
     };
-  }, [open]);
+    window.addEventListener('scroll', onScrollOrResize);
+    window.addEventListener('resize', onScrollOrResize);
+    return () => {
+      window.removeEventListener('scroll', onScrollOrResize);
+      window.removeEventListener('resize', onScrollOrResize);
+    };
+  }, [open, place]);
 
   const toggle = (v: string) => {
     onChange(has && selected.includes(v) ? selected.filter((x) => x !== v) : [...selected, v]);
@@ -98,12 +165,39 @@ export function FilterDropdown({
 
   return (
     <div className="relative">
+      {/*
+       * 打開時把**按鈕自己**抬到遮罩之上（relative z-40）
+       *
+       * ===== 為什麼（踩過的坑） =====
+       *
+       * 遮罩是 `fixed inset-0 z-30`，它蓋住整個視窗 —— **包括按鈕自己**。
+       * 而按鈕的 onClick 是 toggle（開著就關）：
+       *   點按鈕 → 命中的是遮罩 → 遮罩關掉菜單
+       * 結果看起來「再點按鈕能關」，其實是按鈕的 toggle 分支**從沒被執行過**
+       * （實測 elementFromPoint：按鈕中心的最上層元素是 div.fixed.inset-0.z-30）。
+       *
+       * ⚠️ 不能改成「給外層 relative 容器加 z-40」：
+       *   position:relative + z-index 會**建立層疊上下文**，
+       *   菜單的 z-[60] 就會被關在那個上下文裡 ——
+       *   容器本身 z-40 < 頂欄 z-50，菜單反而被頂欄遮住（實測確認）。
+       *
+       * 所以只抬按鈕：按鈕 `relative z-40` 高於遮罩 z-30、仍低於頂欄 z-50
+       *（滚到頂欄下面時按鈕不該浮在導航上）；
+       * 而外層容器保持無 z-index，菜單的 z-[60] 繼續留在根層疊上下文，
+       * 依然高於頂欄。
+       *
+       * 其他下拉的按鈕仍被遮罩蓋著 —— 點它們 = 關掉當前菜單，
+       * 與用户預期一致（相當於「點空白處」）。
+       */}
       <button
         ref={btnRef}
         type="button"
         onClick={() => (open ? setOpen(false) : openMenu())}
         aria-expanded={open}
-        className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
+        aria-haspopup="listbox"
+        className={`relative flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
+          open ? 'z-40' : ''
+        } ${
           has
             ? 'border-accent/60 bg-accent/15 text-fg'
             : 'border-hairline-strong bg-veil text-fg-soft hover:border-hairline-strong hover:bg-veil-strong hover:text-fg'
@@ -130,8 +224,9 @@ export function FilterDropdown({
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} aria-hidden />
           <div
-            style={{ top: pos.top, left: pos.left, width: pos.width }}
-            className="fixed z-[60] max-h-80 overflow-y-auto rounded-xl border border-hairline-strong bg-surface-hover p-1.5 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.95)]"
+            ref={menuRef}
+            style={{ top: pos.top, left: pos.left, width: pos.width, maxHeight: pos.maxH }}
+            className="fixed z-[60] overflow-y-auto overscroll-contain rounded-xl border border-hairline-strong bg-surface-hover p-1.5 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.95)]"
           >
             {options.length === 0 && <p className="px-3 py-2 text-sm text-fg-muted">無可選項</p>}
 

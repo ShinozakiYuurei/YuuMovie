@@ -18,6 +18,8 @@ import { zhGenres, dropParents } from './genre-zh';
 import { zhLanguages, zhSubtitles } from './lang-zh';
 import { inferGeo, districtOrder, REGION_ORDER } from './region';
 import { hallSpecsOf, sortSpecs, HALL_SPECS, specLabel, SPEC_GROUP_LABEL } from './cinema-specs';
+import { bookingFeeOf } from './booking-fee';
+import type { BookingFee } from './booking-fee';
 import { CINEMA_DISPLAY_NAME } from './cinema-names';
 import type { Region } from './types';
 // 紧凑传输格式的编解码在同目录的 compact.ts（零依赖，客户端组件也要用）
@@ -1315,6 +1317,8 @@ export interface CinemaRow {
   region: Region | null;
   district: string | null;
   specs: { key: string; label: string }[];
+  /** 網上購票手續費（每張票）；規則見 lib/booking-fee.ts */
+  fee: BookingFee;
 }
 
 /**
@@ -1340,6 +1344,7 @@ export function getCinemaRows(): CinemaRow[] {
     region: c.region ?? null,
     district: c.district ?? null,
     specs: (c.specs ?? []).map((k) => ({ key: k, label: specLabel(k) })),
+    fee: bookingFeeOf(c.id, c.source),
   }));
 }
 
@@ -1441,6 +1446,19 @@ export interface ShowRow {
   cinemaMapUrl: string;
   region: Region | null;
   district: string | null;
+  /**
+   * 網上購票手續費（每張戲票，HKD）
+   *
+   * ★ 2026-09-21 用戶指定：場次卡片群組的「戲院名下方那行」由地址改為手續費。
+   *   放在戲院層級（而非每場一行）—— 同一間戲院全線同價，
+   *   逐場存會讓壓縮後的傳輸量白漲（見 lib/compact.ts 的影院字典）。
+   *   規則與出處見 lib/booking-fee.ts。
+   */
+  cinemaFee: number;
+  /** 手續費說明（hover 提示；0 元時負責解釋「為何是 0」） */
+  cinemaFeeNote: string;
+  /** 顯示票價是否已含手續費（決定文案寫「$8 手續費」還是「$8 手續費（已含）」） */
+  cinemaFeeIncluded: boolean;
   /** 版本 key（如 'imax' / '__base__'），用于筛选 */
   versionKey: string;
   /** 版本展示名（如 'IMAX' / '原版'） */
@@ -1493,6 +1511,8 @@ export function getShowRowsForGroup(group: MovieGroup): ShowRow[] {
     const movie = movieById.get(s.movieId);
     const formats = sortFormats(extractFormats(movie?.nameZh || movie?.nameEn || ''));
     const cinema = cinemaById.get(s.cinemaId);
+    // 手續費是戲院級常量，逐場重算一次純函數查表（無 IO，可忽略）
+    const fee = bookingFeeOf(s.cinemaId, s.source);
 
     rows.push({
       id: s.id,
@@ -1513,6 +1533,9 @@ export function getShowRowsForGroup(group: MovieGroup): ShowRow[] {
       cinemaMapUrl: cinema?.mapUrl || '',
       region: cinema?.region ?? null,
       district: cinema?.district ?? null,
+      cinemaFee: fee.amount,
+      cinemaFeeNote: fee.note,
+      cinemaFeeIncluded: fee.included,
       versionKey: formats.length ? formats.join('|').toLowerCase() : '__base__',
       versionLabel: formats.length ? formats.map(formatLabel).join(' + ') : '原版',
       versionText: formatVersionText(formats, filmLang),

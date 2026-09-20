@@ -169,7 +169,22 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
                       </span>
                     )}
                   </div>
-                  {c.address && <p className="mt-1 text-xs text-fg-muted">{c.address}</p>}
+                  {/*
+                   * 手續費行（原為地址）
+                   *
+                   * ★ 2026-09-21 用戶指定：戲院名下方那行改為手續費（免則標 $0）。
+                   *   與場次頁（components/ShowtimeExplorer.tsx）保持同一視覺語言 ——
+                   *   手續費是選戲院時的決策資訊，地址退到地圖按鈕的 hover 提示。
+                   */}
+                  <p className="mt-1 text-xs text-fg-muted">
+                    <span className="font-semibold tabular-nums text-fg" title={c.fee.note}>
+                      ${c.fee.amount}
+                    </span>{' '}
+                    <span title={c.fee.note}>手續費</span>
+                    {c.fee.amount > 0 && c.fee.included && (
+                      <span className="text-fg-dim">（已含）</span>
+                    )}
+                  </p>
 
                   {/*
                    * 規格標籤：只列出這間戲院真的有的。
@@ -198,6 +213,7 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
                         href={c.mapUrl}
                         target="_blank"
                         rel="noopener noreferrer"
+                        title={c.address ? `地址：${c.address}` : undefined}
                         className="hkm-btn-ghost rounded-full px-3.5 py-1.5 text-xs"
                       >
                         地圖 ↗

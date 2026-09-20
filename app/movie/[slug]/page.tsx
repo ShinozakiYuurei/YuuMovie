@@ -104,7 +104,8 @@ export default async function MoviePage({ params }: { params: Promise<{ slug: st
       />
 
       <nav className="mb-4 text-xs text-fg-dim">
-        <Link href="/" className="hover:text-fg">
+        {/* 面包屑与顶栏同一落点：/ 是导流首页，列表在 /showing */}
+        <Link href="/showing" className="hover:text-fg">
           現正上映
         </Link>
         <span className="mx-1">/</span>

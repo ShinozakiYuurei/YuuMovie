@@ -482,19 +482,50 @@ export function ShowtimeExplorer({
                         </span>
                       )}
                       {c.cinemaMapUrl && (
+                        /*
+                         * 地圖連結同時兼任「地址的容器」：
+                         * 地址不再单独占一行（那一行 2026-09-21 用户指定改为手续费），
+                         * 但地址仍是有用信息，故挂到这里的 title 上按需可见。
+                         */
                         <a
                           href={c.cinemaMapUrl}
                           target="_blank"
                           rel="noopener noreferrer"
+                          title={c.cinemaAddress ? `地址：${c.cinemaAddress}` : undefined}
                           className="ml-auto shrink-0 text-xs text-fg-muted hover:text-fg"
                         >
                           地圖 ↗
                         </a>
                       )}
                     </div>
-                    {c.cinemaAddress && (
-                      <p className="mb-3 text-xs leading-relaxed text-fg-muted">{c.cinemaAddress}</p>
-                    )}
+
+                    {/*
+                     * 手續費行（原為戲院地址）
+                     *
+                     * ★ 用户 2026-09-21：「把电影院名下面的地址换成手续费。
+                     *   当网上购票免手续费时候，标明 $0 手續費；
+                     *   当网上购票需手续费时，表明 $xx 手續費」
+                     *
+                     * 金额用 text-fg（主文字）而「手續費」三字用 text-fg-muted：
+                     * 用户扫这一行时找的是数字，不是「手续费」这个词。
+                     * 0 元同样显示（$0）—— 显式告诉用户「这里不额外收钱」
+                     * 比留空更有信息量，也正是用户要的。
+                     *
+                     * title 写明 0 元的来历（会员豁免）与是否已含在票价内，
+                     * 避免用户到付款页才发现口径不同。
+                     */}
+                    <p className="mb-3 text-xs leading-relaxed text-fg-muted">
+                      <span
+                        className="font-semibold tabular-nums text-fg"
+                        title={c.cinemaFeeNote}
+                      >
+                        ${c.cinemaFee}
+                      </span>{' '}
+                      <span title={c.cinemaFeeNote}>手續費</span>
+                      {c.cinemaFee > 0 && c.cinemaFeeIncluded && (
+                        <span className="text-fg-dim">（已含）</span>
+                      )}
+                    </p>
 
                     {/*
                      * 自适应网格（用户 2026-09-21：「手机上场次卡片很别扭，改成自适应」）。

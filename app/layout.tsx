@@ -3,6 +3,7 @@ import Link from 'next/link';
 import './globals.css';
 import { getMeta, SOURCE_LABEL } from '@/lib/data';
 import type { Source } from '@/lib/types';
+import { NavLinks } from '@/components/NavLinks';
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
 
@@ -50,26 +51,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="text-lg font-bold tracking-tight">
               Yuu<span className="text-accent">Movie</span>
             </Link>
-            <nav className="flex gap-1 text-sm">
-              <Link
-                href="/"
-                className="rounded-full px-3 py-1.5 text-fg-muted transition hover:bg-veil-strong hover:text-fg"
-              >
-                現正上映
-              </Link>
-              <Link
-                href="/upcoming"
-                className="rounded-full px-3 py-1.5 text-fg-muted transition hover:bg-veil-strong hover:text-fg"
-              >
-                即將上映
-              </Link>
-              <Link
-                href="/cinema"
-                className="rounded-full px-3 py-1.5 text-fg-muted transition hover:bg-veil-strong hover:text-fg"
-              >
-                戲院
-              </Link>
-            </nav>
+            {/*
+             * 主导航：文案与落点见 components/NavLinks.tsx
+             * ★ 「現正上映」指向 /showing（全部上映中列表），不是首页 /。
+             *   首页是只有 8 张海报的导流页，把导航项指过去等于让用户
+             *   多点一次才能看到完整清单。
+             */}
+            <NavLinks />
           </div>
         </header>
 

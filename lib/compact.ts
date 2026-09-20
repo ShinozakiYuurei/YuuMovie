@@ -23,6 +23,10 @@ import type { ShowRow } from './data';
  * 展平后单行 JSON 约 619 字节 —— 影院名/地址/地图链接/购票链接
  * 在 610 行里反复重复。最热的《生化危機》页因此达到 1.7MB。
  *
+ * ★ 2026-09-21 起影院字典多带手续费（每张票，见 lib/booking-fee.ts）。
+ *   它跟着影院走（同院线全线同价），所以仍只占「每间影院一份」，
+ *   而不是「每场一份」—— 与本次改动的压缩目的不冲突。
+ *
  * 观察：唯一值其实极少（25 家影院、6 个日期、1 个版本），
  * 故把重复字段抽成字典，行内只存整数索引：
  *
@@ -43,6 +47,17 @@ export interface CompactRows {
     district: string | null;
     source: Source;
     sourceLabel: string;
+    /**
+     * 網上手續費（每張票）
+     *
+     * ★ 為什麼放在影院字典而不是行內元組：
+     *   同一間戲院全線同價（見 lib/booking-fee.ts），
+     *   放行內會讓最熱的場次頁重複寫上千次同一個數字。
+     *   字典化後，多出的成本只是每間戲院一次 note 字串。
+     */
+    fee: number;
+    feeNote: string;
+    feeIncluded: boolean;
   }[];
   /** 影厅名字典 */
   houses: string[];
@@ -105,6 +120,9 @@ export function toCompact(rows: ShowRow[]): CompactRows {
       district: r.district,
       source: r.source,
       sourceLabel: r.sourceLabel,
+      fee: r.cinemaFee,
+      feeNote: r.cinemaFeeNote,
+      feeIncluded: r.cinemaFeeIncluded,
     }));
     const h = dictIx(hIx, houses, r.houseName, () => r.houseName);
     const d = dictIx(dIx, dates, r.date, () => r.date);
@@ -163,6 +181,9 @@ export function fromCompact(c: CompactRows): ShowRow[] {
       cinemaMapUrl: cin.mapUrl,
       region: cin.region,
       district: cin.district,
+      cinemaFee: cin.fee,
+      cinemaFeeNote: cin.feeNote,
+      cinemaFeeIncluded: cin.feeIncluded,
       versionKey: ver.key,
       versionLabel: ver.label,
       versionText: ver.text,
