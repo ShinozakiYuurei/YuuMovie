@@ -350,60 +350,20 @@ a {
 }
 
 /* ============================================================
-   卡片右下角的综合评分徽章
+   卡片评分（纯黄文字）
 
-   口径：(IMDb + 豆瓣) ÷ 2；只有一方有分则直接用那一方（见 lib/rating.ts）。
+   ★ 2026-09-21 删除了 .hkm-score / -value / -label / -imdb / -douban
+   五条规则。原因：用户要求评分在卡片上以纯黄文字展示，不要胶囊底色、
+   也不要「綜合 / IMDb / 豆瓣」来源小字。
 
-   为什么要用整块「数值 + 来源」的两行结构，而不是一颗药丸：
-     卡片信息行已经很密（时长 · 場次 · 价格），再塞一颗带文字的
-     药丸会把格式 chip 挤掉；两行窄徽章只占一行高度，与 chip 底部对齐。
+   那套 CSS 只被 MovieGroupCard 使用，现在评分改为一个 inline 的
+   text-[#facc15] span（来源与算法仍在 tooltip 里），
+   留着这五条就是死代码 —— 而且它们按来源切换紫/琥珀/绿三套配色，
+   与「不要注明来源」的要求正好相反，容易让后人误以为还能用。
 
-   配色沿用详情页两个来源的官方色（IMDb 琥珀 / 豆瓣绿，见 MovieIntro），
-   综合分用站点强调紫 —— 一眼能分辨这个分是「单源」还是「平均」。
+   黄色选 #facc15：在卡片 #18181B 上对比度 11.57:1（远过 AA），
+   且色相偏亮黄而非橙，与座位色的橙 #f59e0b 不会混淆。
    ============================================================ */
-.hkm-score {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-width: 2.5rem;
-  padding: 0.125rem 0.375rem 0.1875rem;
-  border-radius: 0.5rem;
-  border: 1px solid rgb(139 124 255 / 0.3);
-  background: rgb(139 124 255 / 0.12);
-  color: #c4b5fd;
-  line-height: 1;
-  cursor: help;
-}
-
-.hkm-score-value {
-  font-size: 0.8125rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  font-variant-numeric: tabular-nums;
-}
-
-.hkm-score-label {
-  margin-top: 0.1875rem;
-  font-size: 0.5625rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  opacity: 0.75;
-}
-
-/* 单源配色：IMDb 琥珀 */
-.hkm-score-imdb {
-  border-color: rgb(245 197 24 / 0.3);
-  background: rgb(245 197 24 / 0.12);
-  color: #f0c040;
-}
-
-/* 单源配色：豆瓣绿 */
-.hkm-score-douban {
-  border-color: rgb(46 150 61 / 0.4);
-  background: rgb(46 150 61 / 0.15);
-  color: #7bd48f;
-}
 
 /* 主要按钮：渐变 + 光晕 */
 .hkm-btn-primary {

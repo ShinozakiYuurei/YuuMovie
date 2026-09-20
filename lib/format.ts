@@ -46,6 +46,24 @@ export function formatDuration(min: number | null): string {
   return h > 0 ? `${h}小時${m}分` : `${m}分鐘`;
 }
 
+/**
+ * 时长（紧凑版）：94 → 「94分鐘」，134 → 「134分鐘」
+ *
+ * ★ 与 formatDuration 的区别（2026-09-21 新增）：
+ *   formatDuration 输出「1小時34分」，是**口语化**写法，适合详情页
+ *   （那里有充足横向空间，且是句读式阅读）。
+ *   但海报卡片的信息行是「数字 + 单位」的并列结构（`$40 起`、评分 `7.9`），
+ *   「1小時34分」在这里会显得零碎，且与旁边的票价长度不一致 ——
+ *   改用「134分鐘」后，时长与票价同为「数值 + 量词」形态，一眼可比较。
+ *
+ * 为什么不写成「2.2小時」：分钟的精度对选片有意义（90 vs 94 分钟），
+ * 小时小数反而要心算。统一用分钟，单位一致才可比。
+ */
+export function formatDurationShort(min: number | null): string {
+  if (!min) return '—';
+  return `${min}分鐘`;
+}
+
 /** 相对今天的天数描述 */
 export function relativeDay(date: string): string {
   const today = new Date();

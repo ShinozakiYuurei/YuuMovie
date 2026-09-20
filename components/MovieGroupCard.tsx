@@ -1,8 +1,7 @@
 import Link from 'next/link';
 import { PosterImage } from './PosterImage';
 import type { MovieGroup } from '@/lib/data';
-import { formatLabel } from '@/lib/data';
-import { formatDuration, relativeDay } from '@/lib/format';
+import { formatDurationShort, relativeDay } from '@/lib/format';
 import { computeCardRating, ratingTitle } from '@/lib/rating';
 
 /**
@@ -12,14 +11,24 @@ import { computeCardRating, ratingTitle } from '@/lib/rating';
  *   只有海报本身，不叠任何角标
  *   （分级角标、版本数角标、底部版本 tag 与语言标签均已移除：用户偏好更干净的卡片）
  *
- * 文字区域：
- *   标题 / 英文片名
- *   上映中：时长 · 场次 · 起价
+ * 文字区域（2026-09-21 精简）：
+ *   标题（中文，单行截断）
+ *   上映中：时长 · 起价
  *   待映：相对天数 + 上映日期
- *   格式版本（IMAX / 4DX …；无格式标记则显示「原版」）
- *   右下角：綜合評分徽章（(IMDb + 豆瓣) ÷ 2，只有一方时直接用那一方）
+ *   右侧：评分（纯黄文字）
  *
- * 标题：单行中文，过长截断（hover 显示全名）；不再另起一行显示外文名
+ * ★ 2026-09-21 用户要求去掉的四个元素及理由：
+ *   1. 格式标签（IMAX / 4DX / 原版…）—— 卡片上最占位、却最不影响
+ *      「要不要看这部片」决策的信息。需要时详情页有完整版本列表。
+ *   2. 场次数量 —— 与时长、票价混在一行里，三个数字并列反而都不突出。
+ *   3. 评分的胶囊底色与来源小字（綜合 / IMDb / 豆瓣）—— 见下方说明。
+ *   4. 影厅／语言标签同理（原先也不在卡片上）。
+ *
+ * ★ 评分为什么改成「纯黄文字」：
+ *   原先是两行徽章（数值 + 來源小字）+ 按来源变化的三套配色（紫/琥珀/绿）。
+ *   但卡片上用户只需要知道「这片分高不高」，不需要知道分从哪来 ——
+ *   来源与算法是 hover 才需要的信息，放在 tooltip 里即可。
+ *   去掉底色后，黄色数字本身就成了视觉锚点，比徽章更轻也更醒目。
  */
 export function MovieGroupCard({
   group,
@@ -45,7 +54,7 @@ export function MovieGroupCard({
   //   而 MCL 只提供 290×390、其他院线给 800×1125（见 pickDisplayPoster）。
   //   兜底回 primary.poster：极端情况下（没跑过抓图）两者相同，不会白图。
   const poster = group.displayPoster || m.poster;
-  // 综合评分：两边都有取平均，只有一边用那一边，都没有则整块不渲染
+  // 评分：两边都有取平均，只有一边用那一边，都没有则整块不渲染
   const rating = computeCardRating(group.enrich);
 
   return (
@@ -71,59 +80,49 @@ export function MovieGroupCard({
       </div>
 
       <div className="flex flex-1 flex-col gap-1.5 p-3">
-        {/* 单行中文标题：过长截断，hover 显示全名 */}
+        {/* 单行中文标题：过长截断，hover 显示全名。
+            ★ 2026-09-21 由 13px 提到 15px：片名是卡片上真正被扫读的信息，
+              13px 在手机上和下方的元信息（12px）几乎同重量，主次不分。 */}
         <h3
-          className="line-clamp-1 text-[13px] font-semibold leading-snug tracking-tight text-fg"
+          className="line-clamp-1 text-[15px] font-semibold leading-snug tracking-tight text-fg"
           title={group.displayName}
         >
           {group.displayName}
         </h3>
 
-        <div className="mt-auto pt-2">
+        <div className="mt-auto flex flex-wrap items-baseline gap-x-2 gap-y-1 pt-2">
           {group.status === 'upcoming' && m.openingDate ? (
-            <p className="text-[11px] font-medium text-accent">
+            <p className="min-w-0 text-xs font-medium text-accent">
               {relativeDay(m.openingDate)}上映 · {m.openingDate}
             </p>
           ) : (
-            <p className="flex flex-wrap items-baseline gap-x-1.5 text-[11px] text-fg-muted">
-              <span>{group.displayDuration ? formatDuration(group.displayDuration) : '—'}</span>
-              {group.totalShows > 0 && (
-                <>
-                  <span className="text-fg-faint">·</span>
-                  <span>{group.totalShows} 場</span>
-                </>
-              )}
+            /* 时长与票价同为「数字 + 单位」形态、同一字重与亮度：
+               两者都是选片时的硬指标，之前时长偏暗（次级色）而票价偏亮，
+               看上去像两种不同性质的信息。 */
+            <p className="flex flex-wrap items-baseline gap-x-1.5 text-xs font-medium text-fg-soft">
+              <span>
+                {group.displayDuration ? formatDurationShort(group.displayDuration) : '—'}
+              </span>
               {group.minPrice != null && (
                 <>
                   <span className="text-fg-faint">·</span>
-                  <span className="font-medium text-fg-soft">${group.minPrice} 起</span>
+                  <span>${group.minPrice} 起</span>
                 </>
               )}
             </p>
           )}
 
-          {/* 格式版本（替代此前的院线）+ 右下角综合评分 */}
-          <div className="mt-1.5 flex items-end justify-between gap-2">
-            <span className="hkm-chip min-w-0 truncate">
-              {group.allFormats.length > 0
-                ? group.allFormats
-                    .slice(0, 2)
-                    .map(formatLabel)
-                    .join(' · ') +
-                  (group.allFormats.length > 2 ? ` +${group.allFormats.length - 2}` : '')
-                : '原版'}
+          {/* 评分：纯黄文字，无底色、无来源小字。
+              来源与算法仍保留在 tooltip（hover 才可见，不占视觉）——
+              卡片上只需要「分高不高」这一个判断。 */}
+          {rating && (
+            <span
+              className="ml-auto shrink-0 text-base font-bold leading-none text-[#facc15]"
+              title={ratingTitle(rating)}
+            >
+              {rating.value.toFixed(1)}
             </span>
-
-            {rating && (
-              <span
-                className={`hkm-score hkm-score-${rating.source} shrink-0`}
-                title={ratingTitle(rating)}
-              >
-                <span className="hkm-score-value">{rating.value.toFixed(1)}</span>
-                <span className="hkm-score-label">{rating.label}</span>
-              </span>
-            )}
-          </div>
+          )}
         </div>
       </div>
     </Link>
