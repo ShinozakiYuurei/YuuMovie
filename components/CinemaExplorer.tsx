@@ -183,7 +183,10 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
                    *
                    * ★ 同日再修：「手續費」三字原本用次级色 text-fg-muted，
                    *   与前面的金额（text-fg）不同色；用户要求两者一致，故整行 text-fg。
-                   *   （「（已含）」仍留次级色：它是限定语，不是主信息。）
+                   *   （「（已含於票價）」仍留次级色：它是限定语，不是主信息。）
+                   *
+                   * ★ 同日三修：「（已含）」→「（已含於票價）」—— 三个页面同一文案。
+                   *   原词太短，用户看不出「含」的是什么，写全才与「結帳時外加」分得开。
                    */}
                   <p className="mt-1 text-xs text-fg">
                     <span className="font-semibold tabular-nums" title={c.fee.note}>
@@ -191,7 +194,7 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
                     </span>{' '}
                     <span title={c.fee.note}>手續費</span>
                     {c.fee.amount > 0 && c.fee.included && (
-                      <span className="text-fg-dim">（已含）</span>
+                      <span className="text-fg-dim">（已含於票價）</span>
                     )}
                   </p>
 

@@ -1467,7 +1467,7 @@ export interface ShowRow {
   cinemaFee: number;
   /** 手續費說明（hover 提示；0 元時負責解釋「為何是 0」） */
   cinemaFeeNote: string;
-  /** 顯示票價是否已含手續費（決定文案寫「$8 手續費」還是「$8 手續費（已含）」） */
+  /** 顯示票價是否已含手續費（決定文案寫「$8 手續費」還是「$8 手續費（已含於票價）」） */
   cinemaFeeIncluded: boolean;
   /** 版本 key（如 'imax' / '__base__'），用于筛选 */
   versionKey: string;

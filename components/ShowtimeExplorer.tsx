@@ -519,7 +519,11 @@ export function ShowtimeExplorer({
                      *   （理由：用户扫这一行时找的是数字）。
                      *   实测拆成两色反而像「$10」与「手續費」是两件事，
                      *   同一行同一语义就该同一颜色，故整行统一 text-fg。
-                     *   仍保留次级色的只有「（已含）」—— 那是限定语，不是主信息。
+                     *   仍保留次级色的只有「（已含於票價）」—— 那是限定语，不是主信息。
+                     *
+                     * ★ 同日三修：「（已含）」→「（已含於票價）」。
+                     *   原词太短，用户第一眼看不懂「含」的是什么（含什么？含在哪？）。
+                     *   写全「於票價」才能与「結帳時外加」的院线一眼分开。
                      * 0 元同样显示（$0）—— 显式告诉用户「这里不额外收钱」
                      * 比留空更有信息量，也正是用户要的。
                      *
@@ -532,7 +536,7 @@ export function ShowtimeExplorer({
                       </span>{' '}
                       <span title={c.cinemaFeeNote}>手續費</span>
                       {c.cinemaFee > 0 && c.cinemaFeeIncluded && (
-                        <span className="text-fg-dim">（已含）</span>
+                        <span className="text-fg-dim">（已含於票價）</span>
                       )}
                     </p>
 

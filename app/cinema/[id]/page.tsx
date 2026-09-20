@@ -91,13 +91,15 @@ export default async function CinemaPage({ params }: { params: Promise<{ id: str
          *
          * ★ 同日再修：整行改為 text-fg。原先「$10」用 text-fg、「手續費」
          *   用 text-fg-muted，用戶要求「手續費的字體顏色和前面的金額一致」。
+         *
+         * ★ 同日三修：「（已含）」→「（已含於票價）」—— 三個頁面同一文案。
          */}
         <p className="mt-2 text-sm text-fg">
           <span className="font-semibold tabular-nums" title={fee.note}>
             ${fee.amount}
           </span>{' '}
           <span title={fee.note}>手續費</span>
-          {fee.amount > 0 && fee.included && <span className="text-fg-dim">（已含）</span>}
+          {fee.amount > 0 && fee.included && <span className="text-fg-dim">（已含於票價）</span>}
         </p>
         {cinema.mapUrl && (
           <a
