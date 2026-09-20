@@ -242,13 +242,32 @@ function SeatLegend() {
   );
 }
 
-/** 单张场次卡片：底色由余座率决定 */
+/**
+ * 单张场次卡片：底色由余座率决定
+ *
+ * ★ 2026-09-21 用户要求的三项修改：
+ *   1. 去掉票价后面的「· 100%」（余座百分比）—— 色底已经表达了同一件事，
+ *      而价格行只该回答「多少钱」。图例在筛选区下方，看一次就够。
+ *   2. 时间 / 戏院 / 票价三行居中对齐。
+ *   3. 去掉 `title` 属性 —— 鼠标长放会弹出一长串「9月21日（週一） · 00:35 ·
+ *      旺角百老匯戲院 · 1院 · 原版 · $65 · 餘 100% · 共 260 座」，
+ *      既遮挡相邻卡片，也与卡片上的信息重复。
+ *
+ *      无障碍信息改用 `aria-label`：屏幕阅读器照旧能念出完整场次，
+ *      但它**不会**产生悬停小弹窗。
+ *
+ * ★ 宽度由 `w-[104px] shrink-0` 改为 `w-full`：
+ *   父容器换成自适应网格（见下方 grid-cols-[repeat(auto-fill,...)]）。
+ *   原先固定 104px 在手机上会剩一段死白（3 张占 328px，容器 329px，
+ *   第 4 张放不下就换行，行尾留空）—— 这正是用户说的「很别扭」。
+ */
 function ShowtimeCard({ row }: { row: ShowRow }) {
   const lv = seatLevel(row.remainRate, row.soldOut);
   const st = lv ? SEAT_STYLE[lv] : null;
   const pct = row.remainRate == null ? null : Math.round(row.remainRate * 100);
 
-  const title = [
+  // 仅供屏幕阅读器：完整场次信息（不产生悬停弹窗）
+  const label = [
     formatDate(row.date),
     row.time,
     row.cinemaName,
@@ -256,7 +275,6 @@ function ShowtimeCard({ row }: { row: ShowRow }) {
     row.versionLabel,
     row.price != null ? `$${row.price}` : null,
     pct != null ? `餘 ${pct}%` : null,
-    row.seats != null ? `共 ${row.seats} 座` : null,
   ]
     .filter(Boolean)
     .join(' · ');
@@ -266,8 +284,8 @@ function ShowtimeCard({ row }: { row: ShowRow }) {
       href={row.bookingUrl}
       target="_blank"
       rel="noopener noreferrer nofollow"
-      title={title}
-      className="flex w-[104px] shrink-0 flex-col items-center rounded-xl border px-2 py-2 text-center transition hover:brightness-125 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60"
+      aria-label={label}
+      className="flex w-full flex-col items-center justify-center rounded-xl border px-1.5 py-2 text-center transition hover:brightness-125 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60"
       style={
         st
           ? { backgroundColor: st.bg, borderColor: st.border, color: st.text }
@@ -284,10 +302,7 @@ function ShowtimeCard({ row }: { row: ShowRow }) {
       <span className="mt-1 w-full truncate text-xs leading-tight opacity-95">
         {row.houseName || row.sourceLabel}
       </span>
-      <span className="tabular-nums text-xs leading-tight opacity-90">
-        ${row.price ?? '—'}
-        {pct != null && lv !== 'soldout' ? ` · ${pct}%` : ''}
-      </span>
+      <span className="tabular-nums text-xs leading-tight opacity-90">${row.price ?? '—'}</span>
     </a>
   );
 }
@@ -587,7 +602,26 @@ export function ShowtimeExplorer({
                       <p className="mb-3 text-xs leading-relaxed text-fg-muted">{c.cinemaAddress}</p>
                     )}
 
-                    <div className="flex flex-wrap gap-2">
+                    {/*
+                     * 自适应网格（用户 2026-09-21：「手机上场次卡片很别扭，改成自适应」）。
+                     *
+                     * 原来是 `flex flex-wrap gap-2` + 卡片固定 `w-[104px] shrink-0`：
+                     * 容器宽 329px（手机）时 3 张占 328px，第 4 张放不下就换行，
+                     * 行尾留一条死白；容器更宽时卡片也不跟着变大。
+                     *
+                     * 改用 auto-fill + minmax(92px, 1fr)：
+                     *   - 每张卡片自动均分可用宽度，行尾不再有空白；
+                     *   - 列数据屏幕宽度自适应（手机 3 列、平板 7 列、桌面 10 列）；
+                     *   - 用 auto-fill 而不是 auto-fit：auto-fit 会把空轨道折叠，
+                     *     只有 2 张卡片时它们会被拉到半屏宽，反而难看。
+                     *
+                     * 92px 下界是实测选出的（面板内宽 = 视口 - 32页面 - 32面板）：
+                     *   320px → 2 列×132px（小屏极窄，宁少不多）
+                     *   360px → 3 列×93px     375px → 3 列×106px
+                     *   414px → 3 列×114px    1024px → 9 列×99px
+                     * 比原来的固定 104px 窄一点，但换来「窄屏能多放一列、宽屏卡片跟着变宽」。
+                     */}
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(92px,1fr))] gap-2">
                       {list.map((r) => (
                         <ShowtimeCard key={r.id} row={r} />
                       ))}

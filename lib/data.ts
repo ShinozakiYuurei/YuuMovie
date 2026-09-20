@@ -13,7 +13,7 @@ import {
 } from './versions';
 // key 归一化与 scrapers/enrich.js 共用同一份实现（见该文件头注释）
 import { enrichKey } from './enrich-key.js';
-import { zhGenres } from './genre-zh';
+import { zhGenres, dropParents } from './genre-zh';
 import { zhLanguages, zhSubtitles } from './lang-zh';
 import { inferGeo, districtOrder, REGION_ORDER } from './region';
 import { CINEMA_DISPLAY_NAME } from './cinema-names';
@@ -704,7 +704,10 @@ function pickDisplayCast(list: Movie[], limit = 12): string[] {
 function pickDisplayGenres(list: Movie[]): string[] {
   const merged: string[] = [];
   for (const m of list) for (const g of zhGenres(m.genres)) if (!merged.includes(g)) merged.push(g);
-  return merged;
+  // ★ 跨院线合并后必须再去一次父子标签：
+  //   「音樂」（百老匯 Music）与「演唱會」（英皇）往往来自不同条目，
+  //   在 zhGenres 内部看不到彼此，会以「音樂 / 演唱會」并列展示。
+  return dropParents(merged);
 }
 
 /**

@@ -42,6 +42,7 @@ data.local-test/
 # ── probe/：默认全不入库，只点名收回归探针 ────────────
 # 入库标准：不联网、只依赖仓库内代码与 data/，因为**部署链路会真的执行它们**。
 #   - check-danger.mts 由 deploy/sync.sh 在本地自检阶段跑（挡错合并）
+#   - check-genres.mts 由 deploy/sync.sh 在本地自检阶段跑（挡类型标签重复/简繁混用）
 #   - check-poster-pick.mts 由 deploy/sync.sh 在本地自检阶段跑（挡选错海报）
 #   - check-published-links.mjs 由 deploy/vps-deploy.sh 在服务器上跑（挡死链）
 # 其余是抓包、逆向签名、基准测试等一次性调试现场（含 52MB HTML 转储），
@@ -54,5 +55,6 @@ data.local-test/
 # 否则整行变成一个永远匹配不上的模式（本文件曾因此白名单整体失效）。
 probe/*
 !probe/check-danger.mts
+!probe/check-genres.mts
 !probe/check-poster-pick.mts
 !probe/check-published-links.mjs
