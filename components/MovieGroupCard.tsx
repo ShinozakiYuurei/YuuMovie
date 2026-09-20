@@ -81,10 +81,19 @@ export function MovieGroupCard({
 
       <div className="flex flex-1 flex-col gap-1.5 p-3">
         {/* 单行中文标题：过长截断，hover 显示全名。
-            ★ 2026-09-21 由 13px 提到 15px：片名是卡片上真正被扫读的信息，
-              13px 在手机上和下方的元信息（12px）几乎同重量，主次不分。 */}
+
+            ★ 2026-09-21 对齐 hkmovie6（用户要求「参考 hkmovie6」）：
+              实测 hkmovie6 的标题为 16px / font-weight 700 / line-height 24px，
+              其卡片宽 196~225px；我们的卡片桌面端 270px、手机端 172px ——
+              空间上完全放得下同样的字号。
+              本轮由 15px/600 调到 16px/700。
+
+            ⚠️ 颜色刻意**不跟** hkmovie6 的纯白 #FFFFFF：
+              用户在暗色规范里明确指定主文字用 #F4F4F5
+              （「微弱的米白，避免亮字在暗底上发光晕开」）。
+              参考的是字号与字重，不是配色。 */}
         <h3
-          className="line-clamp-1 text-[15px] font-semibold leading-snug tracking-tight text-fg"
+          className="line-clamp-1 text-base font-bold leading-snug tracking-tight text-fg"
           title={group.displayName}
         >
           {group.displayName}
