@@ -53,19 +53,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <nav className="flex gap-1 text-sm">
               <Link
                 href="/"
-                className="rounded-full px-3 py-1.5 text-gray-300 transition hover:bg-white/8 hover:text-white"
+                className="rounded-full px-3 py-1.5 text-fg-muted transition hover:bg-veil-strong hover:text-fg"
               >
                 現正上映
               </Link>
               <Link
                 href="/upcoming"
-                className="rounded-full px-3 py-1.5 text-gray-300 transition hover:bg-white/8 hover:text-white"
+                className="rounded-full px-3 py-1.5 text-fg-muted transition hover:bg-veil-strong hover:text-fg"
               >
                 即將上映
               </Link>
               <Link
                 href="/cinema"
-                className="rounded-full px-3 py-1.5 text-gray-300 transition hover:bg-white/8 hover:text-white"
+                className="rounded-full px-3 py-1.5 text-fg-muted transition hover:bg-veil-strong hover:text-fg"
               >
                 戲院
               </Link>
@@ -84,14 +84,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
          */}
         <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
 
-        <footer className="mt-16 border-t border-white/6 px-4 py-8 text-xs leading-relaxed text-gray-500">
+        <footer className="mt-16 border-t border-hairline px-4 py-8 text-xs leading-relaxed text-fg-dim">
           <div className="mx-auto max-w-6xl space-y-2">
             <p>
               本網站僅提供電影資訊聚合服務，所有場次及票價資料來自各院線官方網站，僅供參考。
               實際放映時間及票價以院線官方公佈為準，購票請前往院線官方網站。
             </p>
             <p>本站與各院線無隸屬關係。如權利人認為內容不當，請聯絡我們移除。</p>
-            <p className="pt-2 text-gray-600">
+            <p className="pt-2 text-fg-dim">
               資料來源：
               {meta.sources
                 .map((s) => SOURCE_LABEL[s as Source] ?? s)

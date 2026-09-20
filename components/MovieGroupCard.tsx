@@ -63,7 +63,7 @@ export function MovieGroupCard({
             priority={priority}
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-xs text-gray-600">
+          <div className="flex h-full items-center justify-center text-xs text-fg-dim">
             無海報
           </div>
         )}
@@ -73,7 +73,7 @@ export function MovieGroupCard({
       <div className="flex flex-1 flex-col gap-1.5 p-3">
         {/* 单行中文标题：过长截断，hover 显示全名 */}
         <h3
-          className="line-clamp-1 text-[13px] font-semibold leading-snug tracking-tight text-white"
+          className="line-clamp-1 text-[13px] font-semibold leading-snug tracking-tight text-fg"
           title={group.displayName}
         >
           {group.displayName}
@@ -85,18 +85,18 @@ export function MovieGroupCard({
               {relativeDay(m.openingDate)}上映 · {m.openingDate}
             </p>
           ) : (
-            <p className="flex flex-wrap items-baseline gap-x-1.5 text-[11px] text-gray-400">
+            <p className="flex flex-wrap items-baseline gap-x-1.5 text-[11px] text-fg-muted">
               <span>{group.displayDuration ? formatDuration(group.displayDuration) : '—'}</span>
               {group.totalShows > 0 && (
                 <>
-                  <span className="text-white/15">·</span>
+                  <span className="text-fg-faint">·</span>
                   <span>{group.totalShows} 場</span>
                 </>
               )}
               {group.minPrice != null && (
                 <>
-                  <span className="text-white/15">·</span>
-                  <span className="font-medium text-white/90">${group.minPrice} 起</span>
+                  <span className="text-fg-faint">·</span>
+                  <span className="font-medium text-fg-soft">${group.minPrice} 起</span>
                 </>
               )}
             </p>

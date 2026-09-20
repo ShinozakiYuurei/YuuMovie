@@ -29,12 +29,12 @@ export default function ShowingAllPage() {
     <>
       <section className="mb-7">
         <h1 className="text-3xl font-bold tracking-tight">
-          全部<span className="bg-gradient-to-r from-[#8b7cff] to-[#22d3ee] bg-clip-text text-transparent">上映中</span>
+          全部<span className="hkm-grad-text">上映中</span>
         </h1>
-        <p className="mt-2 text-sm text-gray-400">
+        <p className="mt-2 text-sm text-fg-muted">
           共 {groups.length} 部電影，按場次多寡排列。含僅放一两場的藝術影院、影展及特典長尾。
         </p>
-        <p className="mt-1 text-xs text-gray-500">
+        <p className="mt-1 text-xs text-fg-dim">
           資料來源共 {meta.counts.movies} 部電影 / {meta.counts.shows} 場次
         </p>
       </section>
@@ -56,7 +56,7 @@ export default function ShowingAllPage() {
         ))}
       </div>
 
-      {groups.length === 0 && <p className="py-20 text-center text-gray-500">暫無上映資料</p>}
+      {groups.length === 0 && <p className="py-20 text-center text-fg-dim">暫無上映資料</p>}
     </>
   );
 }

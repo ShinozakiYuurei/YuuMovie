@@ -103,12 +103,12 @@ export default async function MoviePage({ params }: { params: Promise<{ slug: st
         }}
       />
 
-      <nav className="mb-4 text-xs text-gray-500">
-        <Link href="/" className="hover:text-white">
+      <nav className="mb-4 text-xs text-fg-dim">
+        <Link href="/" className="hover:text-fg">
           現正上映
         </Link>
         <span className="mx-1">/</span>
-        <span className="text-gray-400">{a.title}</span>
+        <span className="text-fg-muted">{a.title}</span>
       </nav>
 
       <MovieIntro group={group} />
@@ -139,7 +139,7 @@ export default async function MoviePage({ params }: { params: Promise<{ slug: st
 
           <ShowtimeExplorer compact={compact} facets={facets} />
 
-          <p className="mt-3 text-[11px] text-gray-600">
+          <p className="mt-3 text-[11px] text-fg-dim">
             點擊場次將前往院線官方購票頁面（另開新視窗）。場次及票價以院線官方公佈為準。
           </p>
         </section>

@@ -19,24 +19,24 @@ export default function CinemaListPage() {
     <>
       <section className="mb-7">
         <h1 className="text-3xl font-bold tracking-tight">
-          戲<span className="bg-gradient-to-r from-[#8b7cff] to-[#22d3ee] bg-clip-text text-transparent">院</span>
+          戲<span className="hkm-grad-text">院</span>
         </h1>
-        <p className="mt-2 text-sm text-gray-400">
+        <p className="mt-2 text-sm text-fg-muted">
           共 {total} 間戲院，分屬 {groups.length} 條院線。
         </p>
       </section>
 
       {groups.map((g) => (
         <section key={g.source} className="mb-9">
-          <h2 className="mb-3.5 flex items-baseline gap-2 border-b border-white/8 pb-2.5 text-lg font-semibold tracking-tight">
+          <h2 className="mb-3.5 flex items-baseline gap-2 border-b border-hairline pb-2.5 text-lg font-semibold tracking-tight">
             {g.label}
             <span className="hkm-chip">{g.cinemas.length} 間</span>
           </h2>
           <div className="grid gap-3.5 sm:grid-cols-2">
             {g.cinemas.map((c) => (
               <div key={c.id} className="hkm-glass rounded-2xl p-4">
-                <h3 className="font-semibold text-white">{c.nameZh}</h3>
-                {c.address && <p className="mt-1 text-xs text-gray-400">{c.address}</p>}
+                <h3 className="font-semibold text-fg">{c.nameZh}</h3>
+                {c.address && <p className="mt-1 text-xs text-fg-muted">{c.address}</p>}
                 <div className="mt-3.5 flex gap-2">
                   <Link
                     href={`/cinema/${c.id}`}

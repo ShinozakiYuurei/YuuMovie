@@ -55,40 +55,58 @@ export const SEAT_THRESHOLDS = {
 /**
  * 档位 → 样式
  *
- * 色值直接取自 hkmovie6 实测的十六进制，
- * 保证与用户参照的站点视觉一致。
+ * ★ 2026-09-21 改为「淡彩底 + 同色发丝边 + 亮色文字」
+ *
+ * 原先用的是 hkmovie6 实测的**实心饱和色块**（#039704 / #ec7e0a / #ff0000）。
+ * 在新的暗色体系下它有两个问题：
+ *   1. 实心高饱和色块在 #0A0A0C 画布上会“发光”，成为整页最刺眼的元素，
+ *      与「克制、发丝边框、若隐若现」的整体调性相冲；
+ *   2. 满座深红 #7D0900 与新的卡片底 #18181B 亮度接近，边界几乎糊在一起。
+ *
+ * 改法：保留**完全相同的色相**（绿/橙/红/深红，辨识度不变），
+ * 但把实心填充换成 12~15% 的淡彩底，配同色系发丝边框与提亮文字。
+ * 这样色块仍然一眼可辨（红/绿对照比实心更清楚，因为文字也带色），
+ * 又不会在暗底上炸开。
+ *
+ * ⚠️ 若想回到实心色块，只需把下面的 bg 改回注释里的原值即可。
+ *
+ * 分档阈值（SEAT_THRESHOLDS）未动，仍与 hkmovie6 实测口径一致。
  */
 export const SEAT_STYLE: Record<
   SeatLevel,
   { bg: string; border: string; text: string; label: string; dot: string }
 > = {
+  /* 原实心色：#039704 */
   plenty: {
-    bg: '#039704',
-    border: '#039704',
-    text: '#ffffff',
+    bg: 'rgb(3 151 4 / 0.16)',
+    border: 'rgb(34 197 94 / 0.42)',
+    text: '#86efac',
     label: '餘座充足',
-    dot: '#039704',
+    dot: '#22c55e',
   },
+  /* 原实心色：#ec7e0a */
   limited: {
-    bg: '#ec7e0a',
-    border: '#ec7e0a',
-    text: '#ffffff',
+    bg: 'rgb(236 126 10 / 0.16)',
+    border: 'rgb(245 158 11 / 0.42)',
+    text: '#fcd34d',
     label: '餘座緊張',
-    dot: '#ec7e0a',
+    dot: '#f59e0b',
   },
+  /* 原实心色：#ff0000 */
   few: {
-    bg: '#ff0000',
-    border: '#ff0000',
-    text: '#ffffff',
+    bg: 'rgb(255 0 0 / 0.15)',
+    border: 'rgb(239 68 68 / 0.45)',
+    text: '#fca5a5',
     label: '餘座少量',
-    dot: '#ff0000',
+    dot: '#ef4444',
   },
+  /* 原实心色：#7D0900（比 few 更沉，表达“已无票”而非“快没了”） */
   soldout: {
-    bg: '#7D0900',
-    border: '#7D0900',
-    text: '#ffffff',
+    bg: 'rgb(125 9 0 / 0.42)',
+    border: 'rgb(153 27 27 / 0.55)',
+    text: '#e8a5a0',
     label: '滿座',
-    dot: '#7D0900',
+    dot: '#7d0900',
   },
 };
 

@@ -21,20 +21,20 @@ const RATING_STYLE: Record<IntroRating['source'], { bg: string; fg: string; mark
 function RatingCard({ r }: { r: IntroRating }) {
   const st = RATING_STYLE[r.source];
   const body = (
-    <div className={`flex items-center gap-2.5 rounded-xl border border-white/8 px-3 py-2 ${st.bg}`}>
+    <div className={`flex items-center gap-2.5 rounded-xl border border-hairline px-3 py-2 ${st.bg}`}>
       <span
-        className={`flex h-7 items-center rounded-md px-1.5 text-[11px] font-bold leading-none ${st.markBg} ${r.source === 'imdb' ? 'text-[#0b0d12]' : 'text-white'}`}
+        className={`flex h-7 items-center rounded-md px-1.5 text-[11px] font-bold leading-none ${st.markBg} ${r.source === 'imdb' ? 'text-canvas' : 'text-white'}`}
       >
         {st.mark}
       </span>
       <span className="min-w-0">
-        <span className="block text-[10px] leading-none text-gray-500">{r.label}評分</span>
+        <span className="block text-[10px] leading-none text-fg-dim">{r.label}評分</span>
         <span className="mt-1 flex items-baseline gap-1.5">
           <span className={`text-base font-semibold leading-none ${st.fg}`}>
             {r.value != null ? r.value.toFixed(1) : '—'}
           </span>
           {r.value == null && (
-            <span className="text-[10px] leading-none text-gray-500">暫無評分</span>
+            <span className="text-[10px] leading-none text-fg-dim">暫無評分</span>
           )}
         </span>
       </span>
@@ -52,9 +52,9 @@ function RatingCard({ r }: { r: IntroRating }) {
 /** 资料表的一行：左标签右值，值为空时整行不渲染（避免一排「—」） */
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex gap-3 border-b border-white/5 py-2 last:border-0 sm:py-2.5">
-      <dt className="w-16 shrink-0 text-[13px] leading-relaxed text-gray-500">{label}</dt>
-      <dd className="min-w-0 flex-1 text-[13px] leading-relaxed text-gray-200 sm:text-sm">{children}</dd>
+    <div className="flex gap-3 border-b border-hairline-soft py-2 last:border-0 sm:py-2.5">
+      <dt className="w-16 shrink-0 text-[13px] leading-relaxed text-fg-dim">{label}</dt>
+      <dd className="min-w-0 flex-1 text-[13px] leading-relaxed text-fg-soft sm:text-sm">{children}</dd>
     </div>
   );
 }
@@ -79,10 +79,10 @@ export function MovieIntro({ group }: { group: MovieGroup }) {
               height={384}
               priority
               sizes="(max-width: 640px) 176px, (max-width: 1024px) 224px, 256px"
-              className="w-full rounded-xl border border-white/10 object-cover shadow-[0_18px_50px_-20px_rgba(0,0,0,0.9)]"
+              className="w-full rounded-xl border border-hairline-strong object-cover shadow-[0_16px_40px_-24px_rgba(0,0,0,0.95)]"
             />
           ) : (
-            <div className="flex aspect-[2/3] items-center justify-center rounded-xl border border-white/10 bg-white/4 text-xs text-gray-500">
+            <div className="flex aspect-[2/3] items-center justify-center rounded-xl border border-hairline bg-veil text-xs text-fg-dim">
               無海報
             </div>
           )}
@@ -90,33 +90,33 @@ export function MovieIntro({ group }: { group: MovieGroup }) {
 
         <div className="min-w-0 flex-1">
           {/* 片名 */}
-          <h1 className="text-2xl font-bold leading-tight tracking-tight text-white sm:text-3xl">
+          <h1 className="text-2xl font-bold leading-tight tracking-tight text-fg sm:text-3xl">
             {a.title}
           </h1>
-          {a.subtitle && <p className="mt-1.5 truncate text-sm text-gray-400">{a.subtitle}</p>}
+          {a.subtitle && <p className="mt-1.5 truncate text-sm text-fg-muted">{a.subtitle}</p>}
 
           {/* 元信息行：hkmovie6 在片名下方直接排「上映日期 · 片長 · 級別」 */}
-          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px] text-gray-400">
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px] text-fg-muted">
             {a.openingDate && (
               <span>
-                上映日期: <span className="text-gray-200">{a.openingDate}</span>
+                上映日期: <span className="text-fg-soft">{a.openingDate}</span>
               </span>
             )}
             {a.duration != null && (
               <span className="flex items-center gap-3">
-                <span className="h-3 w-px bg-white/10" />
-                片長: <span className="text-gray-200">{a.duration} 分鐘</span>
+                <span className="h-3 w-px bg-hairline-strong" />
+                片長: <span className="text-fg-soft">{a.duration} 分鐘</span>
               </span>
             )}
             <span className="flex items-center gap-3">
-              <span className="h-3 w-px bg-white/10" />
+              <span className="h-3 w-px bg-hairline-strong" />
               級別:{' '}
               {a.category ? (
-                <span className="ml-1 rounded bg-white/10 px-1.5 py-0.5 text-[11px] font-semibold text-white">
+                <span className="ml-1 rounded bg-veil-strong px-1.5 py-0.5 text-[11px] font-semibold text-fg">
                   {a.category}
                 </span>
               ) : (
-                <span className="text-gray-500">TBC</span>
+                <span className="text-fg-dim">TBC</span>
               )}
             </span>
           </div>
@@ -188,16 +188,16 @@ export function MovieIntro({ group }: { group: MovieGroup }) {
 
       {/* 简介 */}
       {a.summary && (
-        <section className="mt-5 border-t border-white/6 pt-4">
-          <h2 className="mb-2 text-sm font-semibold text-gray-300">劇情簡介</h2>
-          <p className="max-w-3xl whitespace-pre-line text-[13px] leading-relaxed text-gray-400 sm:text-sm">
+        <section className="mt-5 border-t border-hairline-soft pt-4">
+          <h2 className="mb-2 text-sm font-semibold text-fg-soft">劇情簡介</h2>
+          <p className="max-w-3xl whitespace-pre-line text-[13px] leading-relaxed text-fg-muted sm:text-sm">
             {a.summary}
           </p>
         </section>
       )}
 
       {a.enrichAt && (
-        <p className="mt-4 text-[11px] text-gray-600">
+        <p className="mt-4 text-[11px] text-fg-dim">
           評分資料更新於 {a.enrichAt.slice(0, 10)}，來源豆瓣 / IMDb；上映、場次與票價以院線官方公佈為準。
         </p>
       )}

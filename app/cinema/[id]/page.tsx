@@ -55,20 +55,20 @@ export default async function CinemaPage({ params }: { params: Promise<{ id: str
 
   return (
     <>
-      <nav className="mb-4 text-xs text-gray-500">
-        <Link href="/cinema" className="hover:text-white">
+      <nav className="mb-4 text-xs text-fg-dim">
+        <Link href="/cinema" className="hover:text-fg">
           戲院
         </Link>
         <span className="mx-1">/</span>
-        <span className="text-gray-400">{cinema.nameZh}</span>
+        <span className="text-fg-muted">{cinema.nameZh}</span>
       </nav>
 
       <header className="mb-7">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-3xl font-bold tracking-tight text-white">{cinema.nameZh}</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-fg">{cinema.nameZh}</h1>
           <span className="hkm-chip">{SOURCE_LABEL[cinema.source]}</span>
         </div>
-        {cinema.address && <p className="mt-2 text-sm text-gray-400">{cinema.address}</p>}
+        {cinema.address && <p className="mt-2 text-sm text-fg-muted">{cinema.address}</p>}
         {cinema.mapUrl && (
           <a
             href={cinema.mapUrl}
@@ -81,13 +81,13 @@ export default async function CinemaPage({ params }: { params: Promise<{ id: str
         )}
       </header>
 
-      {dates.length === 0 && <p className="py-16 text-center text-gray-500">暫無場次資料</p>}
+      {dates.length === 0 && <p className="py-16 text-center text-fg-dim">暫無場次資料</p>}
 
       {dates.map((date) => {
         const byMovie = byDate.get(date)!;
         return (
           <section key={date} className="mb-9">
-            <h2 className="mb-3.5 flex items-baseline gap-2 border-b border-white/8 pb-2.5 text-lg font-semibold tracking-tight">
+            <h2 className="mb-3.5 flex items-baseline gap-2 border-b border-hairline pb-2.5 text-lg font-semibold tracking-tight">
               {formatDate(date)}
             </h2>
             <div className="space-y-3.5">
@@ -126,15 +126,15 @@ export default async function CinemaPage({ params }: { params: Promise<{ id: str
                       {group ? (
                         <Link
                           href={`/movie/${group.slug}`}
-                          className="text-sm font-semibold text-white transition hover:text-accent"
+                          className="text-sm font-semibold text-fg transition hover:text-accent"
                         >
                           {label}
                         </Link>
                       ) : (
                         // 无可归属的组（院线未回片名的脏条目）：给纯文本，不链 404
-                        <span className="text-sm font-semibold text-gray-400">{label}</span>
+                        <span className="text-sm font-semibold text-fg-muted">{label}</span>
                       )}
-                      <span className="ml-auto text-[11px] text-gray-500">{list.length} 場</span>
+                      <span className="ml-auto text-[11px] text-fg-dim">{list.length} 場</span>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {list.map((s) => (
@@ -144,12 +144,12 @@ export default async function CinemaPage({ params }: { params: Promise<{ id: str
                           target="_blank"
                           rel="noopener noreferrer nofollow"
                           title={`${s.houseName} $${s.price ?? '?'}${s.seats != null ? ` · 餘 ${s.seats}` : ''}`}
-                          className="rounded-xl border border-white/8 bg-white/4 px-2.5 py-1 text-center transition hover:border-accent/60 hover:bg-accent/12"
+                          className="rounded-xl border border-hairline bg-veil px-2.5 py-1 text-center transition hover:border-accent/60 hover:bg-accent/12"
                         >
-                          <span className="text-sm font-bold text-white">
+                          <span className="text-sm font-bold text-fg">
                             {formatTime(s.startAt)}
                           </span>
-                          <span className="ml-2 text-[10px] text-gray-400">
+                          <span className="ml-2 text-[10px] text-fg-muted">
                             {s.houseName || '—'} · ${s.price ?? '—'}
                           </span>
                         </a>

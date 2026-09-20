@@ -26,24 +26,24 @@ export default function UpcomingPage() {
     <>
       <section className="mb-7">
         <h1 className="text-3xl font-bold tracking-tight">
-          即將<span className="bg-gradient-to-r from-[#8b7cff] to-[#22d3ee] bg-clip-text text-transparent">上映</span>
+          即將<span className="hkm-grad-text">上映</span>
         </h1>
-        <p className="mt-2 text-sm text-gray-400">
+        <p className="mt-2 text-sm text-fg-muted">
           共 {total} 部電影，按月歸類，月內按上映日期排列。
         </p>
       </section>
 
       {months.map((m) => (
         <section key={m.month} className="mb-9">
-          <div className="mb-3.5 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-white/8 pb-2.5">
-            <h2 className="text-lg font-semibold tracking-tight text-white">
+          <div className="mb-3.5 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-hairline pb-2.5">
+            <h2 className="text-lg font-semibold tracking-tight text-fg">
               {m.month === '未定' ? '上映日期未定' : formatMonth(m.month)}
             </h2>
             {/* 本月最早的片：给出「还有多久」的相对感（未定月无日期，不显示） */}
             {m.month !== '未定' && (
               <span className="hkm-chip text-accent">{relativeDay(m.groups[0].primary.openingDate || '')}</span>
             )}
-            <span className="ml-auto text-xs text-gray-500">{m.groups.length} 部</span>
+            <span className="ml-auto text-xs text-fg-dim">{m.groups.length} 部</span>
           </div>
           <div className="hkm-stagger grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {m.groups.map((grp, i) => (
@@ -60,7 +60,7 @@ export default function UpcomingPage() {
         </section>
       ))}
 
-      {months.length === 0 && <p className="py-20 text-center text-gray-500">暫無即將上映資料</p>}
+      {months.length === 0 && <p className="py-20 text-center text-fg-dim">暫無即將上映資料</p>}
     </>
   );
 }

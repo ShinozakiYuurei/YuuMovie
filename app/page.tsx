@@ -41,8 +41,8 @@ function SectionBar({
       className="hkm-glass group/bar flex flex-wrap items-center justify-between gap-4 rounded-2xl p-5"
     >
       <div>
-        <h2 className="text-xl font-bold tracking-tight text-white">{title}</h2>
-        <p className="mt-1 text-sm text-gray-400">{subtitle}</p>
+        <h2 className="text-xl font-bold tracking-tight text-fg">{title}</h2>
+        <p className="mt-1 text-sm text-fg-muted">{subtitle}</p>
       </div>
       <span className="hkm-btn-primary shrink-0 rounded-full px-4 py-2 text-xs font-semibold">
         {cta} →
@@ -85,10 +85,7 @@ export default function HomePage() {
           href="/showing"
           title={
             <>
-              現正
-              <span className="bg-gradient-to-r from-[#8b7cff] to-[#22d3ee] bg-clip-text text-transparent">
-                上映
-              </span>
+              現正<span className="hkm-grad-text">上映</span>
             </>
           }
           subtitle={`共 ${meta.counts.movies} 部電影 · ${meta.counts.shows} 場次，按排片場次排列。`}
@@ -96,7 +93,7 @@ export default function HomePage() {
         />
         <PosterGrid groups={showing} />
         {showing.length === 0 && (
-          <p className="py-16 text-center text-gray-500">暫無上映資料</p>
+          <p className="py-16 text-center text-fg-dim">暫無上映資料</p>
         )}
       </section>
 
@@ -106,10 +103,7 @@ export default function HomePage() {
           href="/upcoming"
           title={
             <>
-              即將
-              <span className="bg-gradient-to-r from-[#8b7cff] to-[#22d3ee] bg-clip-text text-transparent">
-                上映
-              </span>
+              即將<span className="hkm-grad-text">上映</span>
             </>
           }
           subtitle={`共 ${meta.counts.upcoming} 部電影等待上映，查看上映日期與場次。`}
@@ -117,7 +111,7 @@ export default function HomePage() {
         />
         <PosterGrid groups={upcoming} />
         {upcoming.length === 0 && (
-          <p className="py-16 text-center text-gray-500">暫無即將上映資料</p>
+          <p className="py-16 text-center text-fg-dim">暫無即將上映資料</p>
         )}
       </section>
     </div>

@@ -88,14 +88,14 @@ function LayerHeader({
 }) {
   return (
     <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-      <h3 className="flex items-center gap-2 text-base font-semibold tracking-tight text-white">
+      <h3 className="flex items-center gap-2 text-base font-semibold tracking-tight text-fg">
         <span
           aria-hidden
-          className="inline-block h-4 w-[3px] rounded-full bg-gradient-to-b from-[#8b7cff] to-[#22d3ee]"
+          className="inline-block h-4 w-[3px] rounded-full bg-gradient-to-b from-accent-soft to-accent2"
         />
         {title}
       </h3>
-      {hint && <span className="text-xs text-gray-400">{hint}</span>}
+      {hint && <span className="text-xs text-fg-muted">{hint}</span>}
       {children && <span className="ml-auto flex items-center gap-2">{children}</span>}
     </div>
   );
@@ -128,8 +128,8 @@ function FilterDropdown({
         aria-expanded={open}
         className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
           has
-            ? 'border-accent/60 bg-accent/15 text-white'
-            : 'border-white/12 bg-white/5 text-gray-200 hover:border-white/25 hover:text-white'
+            ? 'border-accent/60 bg-accent/15 text-fg'
+            : 'border-hairline-strong bg-veil text-fg-soft hover:border-hairline-strong hover:bg-veil-strong hover:text-fg'
         }`}
       >
         <span className="truncate font-medium">
@@ -169,8 +169,8 @@ function FilterDropdown({
            *   遮罩保持 z-30 不变：它只负责拦截面板外的点击，
            *   低于顶栏反而正确（否则点导航会被遮罩吃掉）。
            */}
-          <div className="absolute left-0 z-[60] mt-1.5 max-h-80 w-64 overflow-y-auto rounded-xl border border-white/12 bg-[#12141b] p-1.5 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.95)]">
-            {options.length === 0 && <p className="px-3 py-2 text-sm text-gray-400">無可選項</p>}
+          <div className="absolute left-0 z-[60] mt-1.5 max-h-80 w-64 overflow-y-auto rounded-xl border border-hairline-strong bg-surface-hover p-1.5 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.95)]">
+            {options.length === 0 && <p className="px-3 py-2 text-sm text-fg-muted">無可選項</p>}
 
             {options.map((o) => {
               const on = selected.includes(o.value);
@@ -179,11 +179,11 @@ function FilterDropdown({
                   key={o.value}
                   type="button"
                   onClick={() => toggle(o.value)}
-                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition hover:bg-white/10"
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition hover:bg-veil-strong"
                 >
                   <span
                     className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                      on ? 'border-accent bg-accent' : 'border-white/30'
+                      on ? 'border-accent bg-accent' : 'border-hairline-strong'
                     }`}
                   >
                     {on && (
@@ -192,10 +192,10 @@ function FilterDropdown({
                       </svg>
                     )}
                   </span>
-                  <span className={`flex-1 truncate ${on ? 'font-medium text-white' : 'text-gray-200'}`}>
+                  <span className={`flex-1 truncate ${on ? 'font-medium text-fg' : 'text-fg-soft'}`}>
                     {o.label}
                   </span>
-                  <span className="shrink-0 tabular-nums text-xs text-gray-400">{o.count}</span>
+                  <span className="shrink-0 tabular-nums text-xs text-fg-muted">{o.count}</span>
                 </button>
               );
             })}
@@ -204,7 +204,7 @@ function FilterDropdown({
               <button
                 type="button"
                 onClick={() => onChange([])}
-                className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm text-gray-300 transition hover:bg-white/10 hover:text-white"
+                className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm text-fg-soft transition hover:bg-veil-strong hover:text-fg"
               >
                 清除此項
               </button>
@@ -219,18 +219,20 @@ function FilterDropdown({
 /** 颜色图例（与 hkmovie6 的余座标记一致） */
 function SeatLegend() {
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-gray-300">
-      <span className="text-gray-400">餘座：</span>
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-fg-soft">
+      <span className="text-fg-muted">餘座：</span>
       {(['plenty', 'limited', 'few', 'soldout'] as const).map((lv) => (
         <span key={lv} className="flex items-center gap-1.5">
+          {/* 图例用 .dot（饱和实色）：SEAT_STYLE.bg 现在是 12~16% 的淡彩底，
+              作为 12px 小方块会几乎看不见，起不到「色卡」的作用。 */}
           <span
             className="inline-block h-3 w-3 rounded-sm"
-            style={{ backgroundColor: SEAT_STYLE[lv].bg }}
+            style={{ backgroundColor: SEAT_STYLE[lv].dot }}
           />
           {SEAT_STYLE[lv].label}
         </span>
       ))}
-      <span className="tabular-nums text-gray-500">
+      <span className="tabular-nums text-fg-dim">
         綠 ≥{Math.round(SEAT_THRESHOLDS.plenty * 100)}% ・ 橙{' '}
         {Math.round(SEAT_THRESHOLDS.limited * 100)}–
         {Math.round(SEAT_THRESHOLDS.plenty * 100) - 1}% ・ 紅 &lt;
@@ -265,11 +267,15 @@ function ShowtimeCard({ row }: { row: ShowRow }) {
       target="_blank"
       rel="noopener noreferrer nofollow"
       title={title}
-      className="flex w-[104px] shrink-0 flex-col items-center rounded-xl px-2 py-2 text-center transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60"
+      className="flex w-[104px] shrink-0 flex-col items-center rounded-xl border px-2 py-2 text-center transition hover:brightness-125 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60"
       style={
         st
-          ? { backgroundColor: st.bg, color: st.text }
-          : { backgroundColor: 'rgba(255,255,255,0.07)', color: '#e8ebf3' }
+          ? { backgroundColor: st.bg, borderColor: st.border, color: st.text }
+          : {
+              backgroundColor: 'rgb(255 255 255 / 0.05)',
+              borderColor: 'rgb(255 255 255 / 0.08)',
+              color: '#e8ebf3',
+            }
       }
     >
       <span className="tabular-nums text-base font-bold leading-tight">
@@ -427,14 +433,14 @@ export function ShowtimeExplorer({
         style={{ top: 'var(--hkm-header-h)' }}
       >
         <LayerHeader title="篩選" hint="同類可多選（或），跨類需同時符合（且）">
-          <span className="tabular-nums text-xs text-gray-300">
+          <span className="tabular-nums text-xs text-fg-soft">
             {sorted.length} / {rows.length} 場
           </span>
           {activeFilters > 0 && (
             <button
               type="button"
               onClick={clearAll}
-              className="rounded-full border border-white/15 px-3 py-1 text-xs text-gray-200 transition hover:border-white/35 hover:text-white"
+              className="rounded-full border border-hairline-strong px-3 py-1 text-xs text-fg-soft transition hover:border-accent/50 hover:text-fg"
             >
               清除全部
             </button>
@@ -449,8 +455,8 @@ export function ShowtimeExplorer({
         </div>
 
         {/* 排序（可多键叠加） */}
-        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
-          <span className="text-xs text-gray-400">排序</span>
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-hairline pt-3">
+          <span className="text-xs text-fg-muted">排序</span>
           {(['time', 'price', 'remain'] as const).map((k) => {
             const i = sortRules.findIndex((r) => r.key === k);
             const on = i >= 0;
@@ -462,8 +468,8 @@ export function ShowtimeExplorer({
                 title={on ? '點擊切換方向，再點移除' : '加入排序'}
                 className={`flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition ${
                   on
-                    ? 'border-accent/60 bg-accent/15 text-white'
-                    : 'border-white/12 bg-white/5 text-gray-300 hover:text-white'
+                    ? 'border-accent/60 bg-accent/15 text-fg'
+                    : 'border-hairline-strong bg-veil text-fg-soft hover:bg-veil-strong hover:text-fg'
                 }`}
               >
                 {/*
@@ -496,7 +502,7 @@ export function ShowtimeExplorer({
       </div>
 
       {sorted.length === 0 ? (
-        <p className="hkm-panel mt-6 rounded-2xl py-16 text-center text-base text-gray-300">
+        <p className="hkm-panel mt-6 rounded-2xl py-16 text-center text-base text-fg-soft">
           沒有符合篩選條件的場次
         </p>
       ) : (
@@ -522,19 +528,19 @@ export function ShowtimeExplorer({
                     onClick={() => setPickedDate(d)}
                     className={`flex w-[76px] shrink-0 flex-col items-center rounded-xl border px-2 py-2 transition ${
                       on
-                        ? 'border-white bg-white text-[#0b0d12] shadow-[0_8px_24px_-12px_rgba(255,255,255,0.5)]'
-                        : 'border-white/12 bg-white/5 text-gray-200 hover:border-white/30 hover:text-white'
+                        ? 'border-fg bg-fg text-canvas shadow-[0_8px_24px_-14px_rgba(255,255,255,0.45)]'
+                        : 'border-hairline-strong bg-veil text-fg-soft hover:border-hairline-strong hover:bg-veil-strong hover:text-fg'
                     }`}
                   >
                     <span className="tabular-nums text-sm font-bold leading-tight">
                       {formatDateShort(d)}
                     </span>
-                    <span className={`text-xs leading-tight ${on ? 'text-[#3b3f4d]' : 'text-gray-400'}`}>
+                    <span className={`text-xs leading-tight ${on ? 'text-canvas/70' : 'text-fg-muted'}`}>
                       {weekdayShort(d)}
                     </span>
                     <span
                       className={`mt-0.5 text-[11px] leading-tight ${
-                        on ? 'font-medium text-[#3b3f4d]' : 'text-gray-400'
+                        on ? 'font-medium text-canvas/70' : 'text-fg-muted'
                       }`}
                     >
                       {rel === '今天' || rel === '明天' || rel === '後天' ? rel : `${n} 場`}
@@ -558,10 +564,10 @@ export function ShowtimeExplorer({
                 return (
                   <div key={cinemaId} className="hkm-panel rounded-2xl p-4">
                     <div className="mb-3 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-                      <h4 className="text-sm font-semibold text-white">{c.cinemaName}</h4>
+                      <h4 className="text-sm font-semibold text-fg">{c.cinemaName}</h4>
                       <span className="hkm-chip">{c.sourceLabel}</span>
                       {c.region && (
-                        <span className="text-xs text-gray-300">
+                        <span className="text-xs text-fg-soft">
                           {c.region}
                           {c.district ? ` · ${c.district}` : ''}
                         </span>
@@ -571,14 +577,14 @@ export function ShowtimeExplorer({
                           href={c.cinemaMapUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="ml-auto shrink-0 text-xs text-gray-400 hover:text-white"
+                          className="ml-auto shrink-0 text-xs text-fg-muted hover:text-fg"
                         >
                           地圖 ↗
                         </a>
                       )}
                     </div>
                     {c.cinemaAddress && (
-                      <p className="mb-3 text-xs leading-relaxed text-gray-400">{c.cinemaAddress}</p>
+                      <p className="mb-3 text-xs leading-relaxed text-fg-muted">{c.cinemaAddress}</p>
                     )}
 
                     <div className="flex flex-wrap gap-2">
