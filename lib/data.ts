@@ -1442,6 +1442,16 @@ export interface ShowRow {
   sourceLabel: string;
   cinemaId: string;
   cinemaName: string;
+  /**
+   * 戲院完整地址
+   *
+   * ★ 2026-09-21 用戶指定（第二次修正）：「把戏院后面的地区区域补充为完整地址」。
+   *   場次卡片標題行原本顯示「香港 · 南區」這種大區·十八區 ——
+   *   那是**篩選維度的殘留**：用戶已在第一層用下拉篩過地區/區域，
+   *   卡片上再寫一次既重複、又對「怎麼去」毫無幫助。
+   *   改成完整地址（如「香港黃竹坑香葉道11號THE SOUTHSIDE3樓」）。
+   *   region / district 仍保留在 ShowRow 上，供篩選與 facets 使用。
+   */
   cinemaAddress: string;
   cinemaMapUrl: string;
   region: Region | null;

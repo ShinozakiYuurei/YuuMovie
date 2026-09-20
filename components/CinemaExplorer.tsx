@@ -161,13 +161,18 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
             <div className="grid gap-3.5 sm:grid-cols-2">
               {g.cinemas.map((c) => (
                 <div key={c.id} className="hkm-glass rounded-2xl p-4">
+                  {/*
+                   * 戲院名 + 完整地址
+                   *
+                   * ★ 2026-09-21 用戶指定（同場次頁同一條）：「把戲院後面的地區區域
+                   *   補充為完整地址」。原本這裡是「香港 · 南區」這種大區·十八區 ——
+                   *   那是**篩選維度的殘留**（上方已有「所有地區 / 所有區域」下拉），
+                   *   對「這間戲院怎麼去」沒幫助，故換成完整地址。
+                   *   地址仍可 hover 地圖按鈕查看（下方 mapUrl 連結）。
+                   */}
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                     <h3 className="font-semibold text-fg">{c.nameZh}</h3>
-                    {(c.region || c.district) && (
-                      <span className="text-xs text-fg-muted">
-                        {[c.region, c.district].filter(Boolean).join(' · ')}
-                      </span>
-                    )}
+                    {c.address && <span className="text-xs text-fg-muted">{c.address}</span>}
                   </div>
                   {/*
                    * 手續費行（原為地址）
@@ -175,9 +180,13 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
                    * ★ 2026-09-21 用戶指定：戲院名下方那行改為手續費（免則標 $0）。
                    *   與場次頁（components/ShowtimeExplorer.tsx）保持同一視覺語言 ——
                    *   手續費是選戲院時的決策資訊，地址退到地圖按鈕的 hover 提示。
+                   *
+                   * ★ 同日再修：「手續費」三字原本用次级色 text-fg-muted，
+                   *   与前面的金额（text-fg）不同色；用户要求两者一致，故整行 text-fg。
+                   *   （「（已含）」仍留次级色：它是限定语，不是主信息。）
                    */}
-                  <p className="mt-1 text-xs text-fg-muted">
-                    <span className="font-semibold tabular-nums text-fg" title={c.fee.note}>
+                  <p className="mt-1 text-xs text-fg">
+                    <span className="font-semibold tabular-nums" title={c.fee.note}>
                       ${c.fee.amount}
                     </span>{' '}
                     <span title={c.fee.note}>手續費</span>
@@ -213,7 +222,6 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
                         href={c.mapUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        title={c.address ? `地址：${c.address}` : undefined}
                         className="hkm-btn-ghost rounded-full px-3.5 py-1.5 text-xs"
                       >
                         地圖 ↗

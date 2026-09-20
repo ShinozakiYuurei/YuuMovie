@@ -11,6 +11,7 @@ import {
   SOURCE_LABEL,
 } from '@/lib/data';
 import { getCinemas } from '@/lib/data';
+import { bookingFeeOf } from '@/lib/booking-fee';
 import { formatDate, formatTime } from '@/lib/format';
 
 // 静态导出：预先列出所有戏院 id，让每间戏院的详情页都被生成出来。
@@ -41,6 +42,8 @@ export default async function CinemaPage({ params }: { params: Promise<{ id: str
   if (!cinema) notFound();
 
   const shows = getShowsByCinema(cinema.id);
+  // 網上手續費（每張票）；規則與出處見 lib/booking-fee.ts
+  const fee = bookingFeeOf(cinema.id, cinema.source);
 
   // 按日期 → 影片分组
   const byDate = new Map<string, Map<string, typeof shows>>();
@@ -64,11 +67,38 @@ export default async function CinemaPage({ params }: { params: Promise<{ id: str
       </nav>
 
       <header className="mb-7">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <h1 className="text-3xl font-bold tracking-tight text-fg">{cinema.nameZh}</h1>
           <span className="hkm-chip">{SOURCE_LABEL[cinema.source]}</span>
+          {/*
+           * 完整地址（★ 2026-09-21 用戶：「把戲院後面的地區區域補充為完整地址」）
+           *
+           * 戲院名右邊原本什麼都沒有（地址那行被手續費佔了，
+           * 地址只剩地圖按鈕的 hover）。現把完整地址放回戲院名旁邊，
+           * 手續費仍獨立成行 —— 兩者都是選戲院要看的資訊，不互相頂替。
+           */}
+          {cinema.address && (
+            <span className="text-sm text-fg-muted">{cinema.address}</span>
+          )}
         </div>
-        {cinema.address && <p className="mt-2 text-sm text-fg-muted">{cinema.address}</p>}
+        {/*
+         * 手續費行（原為戲院地址）
+         *
+         * ★ 用戶 2026-09-21 指定：本行地址改為手續費。
+         *   與場次頁/戲院列表頁同一規則與同一視覺語言（免則標 $0）。
+         *   ★ 同日再修：地址不再只存於 hover —— 已放回戲院名右側（上方 header），
+         *   手續費獨立成行，兩者互不頂替。
+         *
+         * ★ 同日再修：整行改為 text-fg。原先「$10」用 text-fg、「手續費」
+         *   用 text-fg-muted，用戶要求「手續費的字體顏色和前面的金額一致」。
+         */}
+        <p className="mt-2 text-sm text-fg">
+          <span className="font-semibold tabular-nums" title={fee.note}>
+            ${fee.amount}
+          </span>{' '}
+          <span title={fee.note}>手續費</span>
+          {fee.amount > 0 && fee.included && <span className="text-fg-dim">（已含）</span>}
+        </p>
         {cinema.mapUrl && (
           <a
             href={cinema.mapUrl}

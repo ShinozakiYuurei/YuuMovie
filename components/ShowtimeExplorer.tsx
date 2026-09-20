@@ -472,26 +472,34 @@ export function ShowtimeExplorer({
                 const c = list[0];
                 return (
                   <div key={cinemaId} className="hkm-panel rounded-2xl p-4">
+                    {/*
+                     * 戲院標題行
+                     *
+                     * ★ 用户 2026-09-21 兩處指定：
+                     *   1.「把卡片里的院线名去掉」—— 原本戲院名右邊有一個
+                     *      hkm-chip 院線標籤（百老匯 / MCL / 英皇…）。
+                     *      場次卡群組已經按戲院分組、標題就是戲院全名，
+                     *      而院線在名稱裡大多已可辨（英皇戲院 Plus+、MCL 海大戲院…），
+                     *      院線篩選也仍在第一層，故這枚標籤只是重複噪音。
+                     *   2.「把戏院后面的地区区域补充为完整地址」—— 原本這裡是
+                     *      「香港 · 南區」這種大區·十八區（那是**篩選維度的殘留**，
+                     *      用戶篩完之後就不再需要），改為完整地址
+                     *      （如「香港黃竹坑香葉道11號THE SOUTHSIDE3樓」），
+                     *      出門前要用的正是這個。
+                     *
+                     * 地址仍然可點：地圖連結就在同一行右端，
+                     * 不必再把地址藏進 hover（見下方 mapUrl 連結）。
+                     */}
                     <div className="mb-3 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
                       <h4 className="text-sm font-semibold text-fg">{c.cinemaName}</h4>
-                      <span className="hkm-chip">{c.sourceLabel}</span>
-                      {c.region && (
-                        <span className="text-xs text-fg-soft">
-                          {c.region}
-                          {c.district ? ` · ${c.district}` : ''}
-                        </span>
+                      {c.cinemaAddress && (
+                        <span className="text-xs text-fg-muted">{c.cinemaAddress}</span>
                       )}
                       {c.cinemaMapUrl && (
-                        /*
-                         * 地圖連結同時兼任「地址的容器」：
-                         * 地址不再单独占一行（那一行 2026-09-21 用户指定改为手续费），
-                         * 但地址仍是有用信息，故挂到这里的 title 上按需可见。
-                         */
                         <a
                           href={c.cinemaMapUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          title={c.cinemaAddress ? `地址：${c.cinemaAddress}` : undefined}
                           className="ml-auto shrink-0 text-xs text-fg-muted hover:text-fg"
                         >
                           地圖 ↗
@@ -506,19 +514,20 @@ export function ShowtimeExplorer({
                      *   当网上购票免手续费时候，标明 $0 手續費；
                      *   当网上购票需手续费时，表明 $xx 手續費」
                      *
-                     * 金额用 text-fg（主文字）而「手續費」三字用 text-fg-muted：
-                     * 用户扫这一行时找的是数字，不是「手续费」这个词。
+                     * ★ 用户 2026-09-21 修正：「把手续费的字体颜色和前面的金额一致」。
+                     *   原设计金额用 text-fg、「手續費」三字用 text-fg-muted
+                     *   （理由：用户扫这一行时找的是数字）。
+                     *   实测拆成两色反而像「$10」与「手續費」是两件事，
+                     *   同一行同一语义就该同一颜色，故整行统一 text-fg。
+                     *   仍保留次级色的只有「（已含）」—— 那是限定语，不是主信息。
                      * 0 元同样显示（$0）—— 显式告诉用户「这里不额外收钱」
                      * 比留空更有信息量，也正是用户要的。
                      *
                      * title 写明 0 元的来历（会员豁免）与是否已含在票价内，
                      * 避免用户到付款页才发现口径不同。
                      */}
-                    <p className="mb-3 text-xs leading-relaxed text-fg-muted">
-                      <span
-                        className="font-semibold tabular-nums text-fg"
-                        title={c.cinemaFeeNote}
-                      >
+                    <p className="mb-3 text-xs leading-relaxed text-fg">
+                      <span className="font-semibold tabular-nums" title={c.cinemaFeeNote}>
                         ${c.cinemaFee}
                       </span>{' '}
                       <span title={c.cinemaFeeNote}>手續費</span>
