@@ -120,6 +120,14 @@ export interface Cinema {
   region?: Region | null;
   /** 十八區（中西區 / 油尖旺區 …）；澳門无此值 */
   district?: string | null;
+  /**
+   * 影廳規格（如 ['imax','atmos'] / ['luxe']）
+   *
+   * 读取层由「影厅名 + 场次版本 + 片名」三处证据推断（见 lib/cinema-specs.ts），
+   * 非抓取字段。只列出**本戲院真的有**的规格 —— 空数组表示没有可识别的规格厅
+   * （普通厅戏院占多数，它们不出现在筛选结果里是对的）。
+   */
+  specs?: string[];
 }
 
 /** 香港大區（与 hkmovie6 的「所有地區」一致） */

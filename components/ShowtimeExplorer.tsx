@@ -6,6 +6,7 @@ import { seatLevel, SEAT_STYLE, SEAT_THRESHOLDS } from '@/lib/seat';
 import { fromCompact } from '@/lib/compact';
 import type { CompactRows } from '@/lib/compact';
 import type { Facets, ShowRow } from '@/lib/data';
+import { FilterDropdown } from './FilterDropdown';
 
 /**
  * 場次瀏覽器：分層式（篩選 → 日期 → 場次）+ 多選篩選 + 多鍵排序 + 餘座顏色標記
@@ -101,120 +102,7 @@ function LayerHeader({
   );
 }
 
-/** 多选下拉：点击展开，勾选后不关闭（便于连续多选） */
-function FilterDropdown({
-  dim,
-  options,
-  selected,
-  onChange,
-}: {
-  dim: FilterDim;
-  options: { value: string; label: string; count: number }[];
-  selected: string[];
-  onChange: (next: string[]) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const has = selected.length > 0;
-
-  const toggle = (v: string) => {
-    onChange(has && selected.includes(v) ? selected.filter((x) => x !== v) : [...selected, v]);
-  };
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
-          has
-            ? 'border-accent/60 bg-accent/15 text-fg'
-            : 'border-hairline-strong bg-veil text-fg-soft hover:border-hairline-strong hover:bg-veil-strong hover:text-fg'
-        }`}
-      >
-        <span className="truncate font-medium">
-          {has
-            ? selected.length === 1
-              ? options.find((o) => o.value === selected[0])?.label ?? FILTER_LABELS[dim]
-              : `${FILTER_LABELS[dim].replace('所有', '')} · ${selected.length} 項`
-            : FILTER_LABELS[dim]}
-        </span>
-        <svg
-          className={`ml-auto h-3.5 w-3.5 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
-          viewBox="0 0 12 12"
-          fill="none"
-          aria-hidden
-        >
-          <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        </svg>
-      </button>
-
-      {open && (
-        <>
-          {/*
-           * 点击遮罩关闭。
-           *
-           * z-30：低于顶栏（z-50），因此遮罩不会盖住顶栏 ——
-           * 用户展开下拉后仍能点导航。
-           */}
-          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} aria-hidden />
-          {/*
-           * 下拉面板。
-           *
-           * ★ 2026-09-19 修：原为 z-40，而顶栏是 z-50 ——
-           *   筛选区滚到顶栏下方时展开下拉，菜单会被顶栏遮住一截
-           *   （表现为「筛选项顶进 sticky header 下面、叠在一起」）。
-           *   现提到 z-[60]（高于顶栏 z-50），保证菜单永远完整可见。
-           *
-           *   遮罩保持 z-30 不变：它只负责拦截面板外的点击，
-           *   低于顶栏反而正确（否则点导航会被遮罩吃掉）。
-           */}
-          <div className="absolute left-0 z-[60] mt-1.5 max-h-80 w-64 overflow-y-auto rounded-xl border border-hairline-strong bg-surface-hover p-1.5 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.95)]">
-            {options.length === 0 && <p className="px-3 py-2 text-sm text-fg-muted">無可選項</p>}
-
-            {options.map((o) => {
-              const on = selected.includes(o.value);
-              return (
-                <button
-                  key={o.value}
-                  type="button"
-                  onClick={() => toggle(o.value)}
-                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition hover:bg-veil-strong"
-                >
-                  <span
-                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                      on ? 'border-accent bg-accent' : 'border-hairline-strong'
-                    }`}
-                  >
-                    {on && (
-                      <svg className="h-3 w-3 text-white" viewBox="0 0 10 10" fill="none" aria-hidden>
-                        <path d="M2 5L4 7L8 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                      </svg>
-                    )}
-                  </span>
-                  <span className={`flex-1 truncate ${on ? 'font-medium text-fg' : 'text-fg-soft'}`}>
-                    {o.label}
-                  </span>
-                  <span className="shrink-0 tabular-nums text-xs text-fg-muted">{o.count}</span>
-                </button>
-              );
-            })}
-
-            {has && (
-              <button
-                type="button"
-                onClick={() => onChange([])}
-                className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm text-fg-soft transition hover:bg-veil-strong hover:text-fg"
-              >
-                清除此項
-              </button>
-            )}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
+/** 多選下拉的实现在 ./FilterDropdown.tsx（場次頁與戲院頁共用同一份） */
 
 /** 颜色图例（与 hkmovie6 的余座标记一致） */
 function SeatLegend() {
@@ -255,6 +143,12 @@ function SeatLegend() {
  *
  *      无障碍信息改用 `aria-label`：屏幕阅读器照旧能念出完整场次，
  *      但它**不会**产生悬停小弹窗。
+ *
+ * ★ 2026-09-21 第二轮：中行由影厅名换成「影片版本·语言」（用户指定）。
+ *   原先中行是 `houseName`（「1院」「House 1」）—— 对「选哪一场」
+ *   几乎没有帮助；而「这场是 IMAX 还是原版、什么语言」才是关键信息。
+ *   文案规则见 lib/versions.ts 的 formatVersionText。
+ *   厅名仍然保留在 `aria-label` 里（无障碍需要完整的场次描述）。
  *
  * ★ 宽度由 `w-[104px] shrink-0` 改为 `w-full`：
  *   父容器换成自适应网格（见下方 grid-cols-[repeat(auto-fill,...)]）。
@@ -300,7 +194,7 @@ function ShowtimeCard({ row }: { row: ShowRow }) {
         {lv === 'soldout' ? '滿座' : row.time}
       </span>
       <span className="mt-1 w-full truncate text-xs leading-tight opacity-95">
-        {row.houseName || row.sourceLabel}
+        {row.versionText}
       </span>
       <span className="tabular-nums text-xs leading-tight opacity-90">${row.price ?? '—'}</span>
     </a>
@@ -463,10 +357,10 @@ export function ShowtimeExplorer({
         </LayerHeader>
 
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-          <FilterDropdown dim="sources" options={facets.sources} selected={sel.sources} onChange={setDim('sources')} />
-          <FilterDropdown dim="versions" options={facets.versions} selected={sel.versions} onChange={setDim('versions')} />
-          <FilterDropdown dim="regions" options={facets.regions} selected={sel.regions} onChange={setDim('regions')} />
-          <FilterDropdown dim="districts" options={facets.districts} selected={sel.districts} onChange={setDim('districts')} />
+          <FilterDropdown placeholder={FILTER_LABELS.sources} options={facets.sources} selected={sel.sources} onChange={setDim('sources')} />
+          <FilterDropdown placeholder={FILTER_LABELS.versions} options={facets.versions} selected={sel.versions} onChange={setDim('versions')} />
+          <FilterDropdown placeholder={FILTER_LABELS.regions} options={facets.regions} selected={sel.regions} onChange={setDim('regions')} />
+          <FilterDropdown placeholder={FILTER_LABELS.districts} options={facets.districts} selected={sel.districts} onChange={setDim('districts')} />
         </div>
 
         {/* 排序（可多键叠加） */}

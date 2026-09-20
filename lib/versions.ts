@@ -492,6 +492,69 @@ export function sortFormats(formats: string[]): string[] {
   });
 }
 
+/**
+ * 语言版本标记 → 展示用语言名
+ *
+ * 与 NON_ART_TOKENS 不同：这些标记**确实是「版本」的一部分**
+ * （日語版 / 粵語版 是不同场次），只是展示时要换写成语言名。
+ */
+const LANGUAGE_TOKENS: Record<string, string> = {
+  日語版: '日語',
+  英語版: '英語',
+  粵語版: '粵語',
+  國語版: '國語',
+  原聲版: '原聲',
+};
+
+/**
+ * 放映规格标签：从版本标签里挑出**真正描述「怎么放」**的那些。
+ *
+ * 排除两类：
+ *   - 活动标记（重映 / 特典場 / 應援場 / 影展名…）：只是场次归类，不是放映规格
+ *   - 语言标记（日語版 / 粵語版…）：语言单独展示在中行的「·语言」位置
+ */
+export function projectionFormats(formats: string[]): string[] {
+  return formats.filter((f) => !NON_ART_TOKENS.has(f) && !(f in LANGUAGE_TOKENS));
+}
+
+/** 版本标签里的语言（日語版 → 日語）；没有则返回 null */
+export function versionLanguage(formats: string[]): string | null {
+  for (const f of formats) if (LANGUAGE_TOKENS[f]) return LANGUAGE_TOKENS[f];
+  return null;
+}
+
+/**
+ * 场次卡片中行的「影片版本·语言」文案（用户 2026-09-21 指定）。
+ *
+ * 取代原先的影厅名 —— 影厅名（「1院」「House 1」）对选场次几乎没帮助，
+ * 而「这场是 IMAX 还是原版、什么语言」才是用户真正要看的。
+ *
+ * 语言取值优先级（用户确认）：
+ *   1. 版本自带的语言标记（日語版 → 日語）—— 它比影片整体语言更准确
+ *   2. 影片本身的对白语言（buildIntro 的 spoken）
+ *
+ * 四种组合的实测结果：
+ *   IMAX + 影片英語        → "IMAX·英語"
+ *   4DX + 日語版           → "4DX·日語"
+ *   粵語版（无放映规格）      → "粵語版"（语言已在版本里，不再重复后缀）
+ *   原版 + 影片英語        → "原版·英語"
+ *
+ * 「加碼重映」「特典場」这类活动标记会被丢掉 —— 它们不影响「怎么放」。
+ */
+export function formatVersionText(
+  formats: string[],
+  filmLanguage: string | null
+): string {
+  const proj = projectionFormats(formats).map(formatLabel);
+  const fromMarker = versionLanguage(formats);
+  const lang = fromMarker ?? filmLanguage;
+
+  if (proj.length) return lang ? `${proj.join(' + ')}·${lang}` : proj.join(' + ');
+  // 无放映规格：语言标记本身就是版本（「粵語版」），不再缀语言
+  if (fromMarker) return `${fromMarker}版`;
+  return lang ? `原版·${lang}` : '原版';
+}
+
 /** 版本标签的显示名（补上"版"字更自然） */
 export function formatLabel(fmt: string): string {
   const map: Record<string, string> = {

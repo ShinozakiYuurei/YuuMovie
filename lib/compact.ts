@@ -48,7 +48,7 @@ export interface CompactRows {
   houses: string[];
   /** 日期字典 YYYY-MM-DD */
   dates: string[];
-  versions: { key: string; label: string }[];
+  versions: { key: string; label: string; text: string }[];
   /** 场次行；字段顺序见下方元组 */
   rows: [
     id: string,
@@ -111,6 +111,7 @@ export function toCompact(rows: ShowRow[]): CompactRows {
     const v = dictIx(vIx, versions, r.versionKey, () => ({
       key: r.versionKey,
       label: r.versionLabel,
+      text: r.versionText,
     }));
 
     rowsOut.push([
@@ -164,6 +165,7 @@ export function fromCompact(c: CompactRows): ShowRow[] {
       district: cin.district,
       versionKey: ver.key,
       versionLabel: ver.label,
+      versionText: ver.text,
       formats: ver.key === '__base__' ? [] : ver.key.split('|'),
     };
   });

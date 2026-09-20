@@ -18,10 +18,30 @@ const RATING_STYLE: Record<IntroRating['source'], { bg: string; fg: string; mark
   imdb: { bg: 'bg-[rgb(245_197_24/0.12)]', fg: 'text-[#f0c040]', markBg: 'bg-[#f0c040]', mark: 'IMDb' },
 };
 
+/**
+ * 评分卡
+ *
+ * ★ 2026-09-21 用户要求「IMDb 评分和豆瓣评分的卡片，两个尺寸要一样」。
+ *
+ * 原先宽度由内容决定，实测（1280px 视口）两张卡不一样宽：
+ *   IMDb  125.8×48   （「IMDb評分 / 8.4」）
+ *   豆瓣  110.0×48   （「豆瓣評分 / 8.5」）
+ *   豆瓣  133.3×48   （无分时多出「暫無評分」四个字）
+ *
+ * 三处宽度都不同，并排看参差不齐。现改为**固定宽度**：
+ *   两张卡恒定同宽，不随内容（分数位数 / 有无分）变化。
+ *
+ * 宽度 138px 的来由：最宽的组合是「豆瓣評分 — 暫無評分」（实测 133.3px），
+ *   留 ~4px 余量吸收不同系统字体的字宽差异（Windows 的 Microsoft JhengHei
+ *   比 macOS 的 PingFang HK 略宽）。固定宽比 min-w 更好 —— min-w 只保证
+ *   下限，内容短的卡仍会比长的窄，还是不一样宽。
+ */
 function RatingCard({ r }: { r: IntroRating }) {
   const st = RATING_STYLE[r.source];
   const body = (
-    <div className={`flex items-center gap-2.5 rounded-xl border border-hairline px-3 py-2 ${st.bg}`}>
+    <div
+      className={`flex w-[138px] items-center gap-2.5 rounded-xl border border-hairline px-3 py-2 ${st.bg}`}
+    >
       <span
         className={`flex h-7 items-center rounded-md px-1.5 text-[11px] font-bold leading-none ${st.markBg} ${r.source === 'imdb' ? 'text-canvas' : 'text-white'}`}
       >
@@ -67,8 +87,27 @@ export function MovieIntro({ group }: { group: MovieGroup }) {
     : null;
 
   return (
-    <header className="hkm-panel hkm-enter rounded-2xl p-4 sm:p-6">
-      <div className="flex flex-col gap-5 sm:flex-row sm:gap-6">
+    <header className="hkm-panel hkm-enter relative overflow-hidden rounded-2xl p-4 sm:p-6">
+      {/*
+       * 海报主色氛围光：把同一张海报模糊后铺在顶部背景。
+       *
+       * ★ 用户 2026-09-21：「提取左侧海报的主色调，在顶部大背景区域做
+       *   一层极淡的高斯模糊（Glassmorphism）」。
+       *   用海报本身而不是构建期提取的色值 —— 同一 URL 命中浏览器缓存，
+       *   不产生额外请求，且色调与海报 100% 一致。
+       *
+       * aria-hidden：纯装饰。
+       * 用原生 <img> 而不是 next/image：这里不需要尺寸优化（原图已在本
+       *   地且会被模糊掉），而 next/image 在 unoptimized 下会多包一层。
+       */}
+      {a.poster && (
+        <div className="hkm-poster-glow" aria-hidden>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={a.poster} alt="" />
+        </div>
+      )}
+
+      <div className="relative flex flex-col gap-5 sm:flex-row sm:gap-6">
         {/* 海报 */}
         <div className="w-44 shrink-0 self-center sm:self-start sm:w-56 lg:w-64">
           {a.poster ? (
@@ -79,7 +118,7 @@ export function MovieIntro({ group }: { group: MovieGroup }) {
               height={384}
               priority
               sizes="(max-width: 640px) 176px, (max-width: 1024px) 224px, 256px"
-              className="w-full rounded-xl border border-hairline-strong object-cover shadow-[0_16px_40px_-24px_rgba(0,0,0,0.95)]"
+              className="hkm-poster w-full rounded-xl object-cover"
             />
           ) : (
             <div className="flex aspect-[2/3] items-center justify-center rounded-xl border border-hairline bg-veil text-xs text-fg-dim">
@@ -169,9 +208,33 @@ export function MovieIntro({ group }: { group: MovieGroup }) {
             {group.totalShows > 0 && (
               <a
                 href="#versions"
-                className="hkm-btn-primary rounded-full px-5 py-2.5 text-sm font-semibold"
+                className="hkm-btn-primary flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold"
               >
-                查看 {group.totalShows} 個場次
+                {/*
+                 * ★ 2026-09-21 用户要求：把「查看 358 個場次」换成「图标 + 場次」。
+                 *
+                 * 图标用 Ticket（票券轮廓）—— 用户给的参考图是电影票/胶片风格，
+                 * Ticket 是最贴近的那个（候选对比见 components 里的提交说明：
+                 * film / clapperboard / popcorn / armchair / theater 都不如它贴切）。
+                 * 内联 SVG 而不装图标库：全站只此一处用图标，
+                 * 为它引入 lucide-react 会往首屏包里多加一个依赖。
+                 */}
+                <svg
+                  className="h-4 w-4 shrink-0"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden
+                >
+                  <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
+                  <path d="M13 5v2" />
+                  <path d="M13 17v2" />
+                  <path d="M13 11v2" />
+                </svg>
+                場次
               </a>
             )}
             <a
@@ -186,20 +249,39 @@ export function MovieIntro({ group }: { group: MovieGroup }) {
         </div>
       </div>
 
-      {/* 简介 */}
+      {/* 简介
+        *
+        * ★ 2026-09-21 用户要求：
+        *   3. 去掉下面那行「評分資料更新於 … 來源豆瓣 / IMDb …」小字，
+        *      并把「劇情簡介」放大成类似标题的作用。
+        *   4. 正文字距与行高略显拥挤 → 行高调到 1.6~1.8，
+        *      颜色从纯白微调为 rgba(255,255,255,0.85)。
+        *
+        * 「剧情简介」从 text-sm（14px）提到 text-lg（18px）/ font-semibold，
+        * 与页面主标题（text-2xl~3xl）拉开层级但仍明显是标题；
+        * 标题左侧沿用与场次区一致的强调色竖条（视觉语言统一）。
+        *
+        * 正文：leading-[1.75] 落在用户要求的 1.6~1.8 中值；
+        * 颜色用 rgba(255,255,255,0.85)（用户明确给的写法，而不是令牌变量 ——
+        * 这是「纯白微调」的精确值，用令牌反而对不上）。
+        * 字号也一并从 13/14px 提到 15px：行高放宽后小字号会显得更小。
+        */}
       {a.summary && (
-        <section className="mt-5 border-t border-hairline-soft pt-4">
-          <h2 className="mb-2 text-sm font-semibold text-fg-soft">劇情簡介</h2>
-          <p className="max-w-3xl whitespace-pre-line text-[13px] leading-relaxed text-fg-muted sm:text-sm">
+        <section className="mt-5 border-t border-hairline-soft pt-5">
+          <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold tracking-tight text-fg">
+            <span
+              aria-hidden
+              className="inline-block h-4 w-[3px] rounded-full bg-gradient-to-b from-accent-soft to-accent2"
+            />
+            劇情簡介
+          </h2>
+          <p
+            className="max-w-3xl whitespace-pre-line text-[15px] leading-[1.75] sm:text-base"
+            style={{ color: 'rgb(255 255 255 / 0.85)' }}
+          >
             {a.summary}
           </p>
         </section>
-      )}
-
-      {a.enrichAt && (
-        <p className="mt-4 text-[11px] text-fg-dim">
-          評分資料更新於 {a.enrichAt.slice(0, 10)}，來源豆瓣 / IMDb；上映、場次與票價以院線官方公佈為準。
-        </p>
       )}
     </header>
   );

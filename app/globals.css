@@ -318,6 +318,86 @@ a {
   -webkit-backdrop-filter: blur(14px) saturate(140%);
 }
 
+/* ============================================================
+   详情页海报：立体浮现
+
+   ★ 2026-09-21 用户要求：
+     「左侧海报可以加一层非常轻微的投影（Drop Shadow）或 1px 的
+      极细半透明白边，让海报在暗色背景中立体浮现出来」
+
+   原先只有 `shadow-[0_16px_40px_-24px_rgba(0,0,0,0.95)]` ——
+   那层阴影扩散 40px 但负向收缩 24px，在 #0A0A0C 上几乎不可见，
+   海报看起来是「贴」在卡片上的。
+
+   现用两件东西叠加（都很克制）：
+     1. 1px 极细半透明白边（用户点名要的那个）
+     2. 两层暗投影：紧贴的一层负责「浮起」，外圈一层负责与背景分离
+
+   为什么用 border 而不是 box-shadow 做白边：海报是 object-cover 的
+   <img>，阴影在图片**背后**，1px 白边会被图片自身的像素盖掉一部分；
+   border 占位在图片外，才能得到干净的一圈。
+   ============================================================ */
+.hkm-poster {
+  border: 1px solid rgb(255 255 255 / 0.14);
+  box-shadow:
+    0 8px 24px -8px rgb(0 0 0 / 0.85),
+    0 20px 50px -28px rgb(0 0 0 / 0.95);
+}
+
+/* ============================================================
+   海报主色氛围光（Atmosphere）
+
+   ★ 2026-09-21 用户要求：
+     「提取左侧海报的主色调，在顶部大背景区域做一层极淡的高斯模糊
+      （Glassmorphism），瞬间拉满影院级大片氛围」
+
+   ★ 为什么用「海报本身模糊」而不是构建期提取主色：
+     - 构建期提取要改 fetch-posters.mjs 写一张颜色表、lib/data.ts 读它、
+       再把颜色透传到页面 —— 多一条数据链路，多一处会不一致的地方；
+     - 而 <img> 用的就是海报同一个 URL，浏览器**命中缓存**，不产生第二次
+       网络请求；模糊后色调与海报 100% 一致（不是「近似」）。
+
+   性能：固定不滚动 + 只做一次 filter，不引起 layout / paint；
+     与 .hkm-aurora 同属「静态装饰层」。
+     低端设备上 blur(80px) 仍有开销，因此在移动端收窄、
+     prefers-reduced-motion 下直接关掉。
+   ============================================================ */
+.hkm-poster-glow {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.hkm-poster-glow img {
+  position: absolute;
+  top: -55%;
+  left: 50%;
+  width: 78%;
+  transform: translateX(-50%);
+  filter: blur(80px) saturate(170%);
+  opacity: 0.32;
+}
+
+/* 手机上光晕收小：屏幕窄，同样的 78% 会占满整屏而显得脏 */
+@media (max-width: 640px) {
+  .hkm-poster-glow img {
+    top: -30%;
+    width: 110%;
+    filter: blur(60px) saturate(160%);
+    opacity: 0.26;
+  }
+}
+
+/* 用户要求减少动效：关掉这层纯装饰，避免无谓的合成开销 */
+@media (prefers-reduced-motion: reduce) {
+  .hkm-poster-glow {
+    display: none;
+  }
+}
+
 /* 药丸标签（院线 / 版本 / 分类等） */
 .hkm-chip {
   display: inline-flex;

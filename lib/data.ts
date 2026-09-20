@@ -7,6 +7,7 @@ import {
   extractFormats,
   sortFormats,
   formatLabel,
+  formatVersionText,
   hasFormatMarker,
   isBaseVersion,
   stripFormats,
@@ -16,6 +17,7 @@ import { enrichKey } from './enrich-key.js';
 import { zhGenres, dropParents } from './genre-zh';
 import { zhLanguages, zhSubtitles } from './lang-zh';
 import { inferGeo, districtOrder, REGION_ORDER } from './region';
+import { hallSpecsOf, sortSpecs, HALL_SPECS, specLabel, SPEC_GROUP_LABEL } from './cinema-specs';
 import { CINEMA_DISPLAY_NAME } from './cinema-names';
 import type { Region } from './types';
 // 紧凑传输格式的编解码在同目录的 compact.ts（零依赖，客户端组件也要用）
@@ -489,6 +491,28 @@ function load() {
     // 直接渲染会在标题里多出一个空行，统一清掉。
     c.nameZh = c.nameZh.trim();
   }
+
+  // ★ 戲院影廳規格：同样在读取时推断（见 lib/cinema-specs.ts 的说明）
+  //
+  // 必须等 movies / shows 都读完之后：百老匯系的规格只写在**片名**里
+  // （「IMAX 生化危機」），单看戲院与影厅名（「5院」）什么都推不出来。
+  // 这里先把 movieId → 片名 建好索引，避免在内层循环里反复 find。
+  const movieTitleById = new Map<string, string>();
+  for (const m of movies) movieTitleById.set(m.id, m.nameZh || m.nameEn || '');
+
+  const specsByCinema = new Map<string, Set<string>>();
+  for (const s of shows) {
+    const keys = hallSpecsOf({
+      houseName: s.houseName,
+      version: s.version,
+      title: movieTitleById.get(s.movieId) ?? '',
+    });
+    if (!keys.length) continue;
+    let set = specsByCinema.get(s.cinemaId);
+    if (!set) specsByCinema.set(s.cinemaId, (set = new Set()));
+    for (const k of keys) set.add(k);
+  }
+  for (const c of cinemas) c.specs = sortSpecs([...(specsByCinema.get(c.id) ?? [])]);
 
   // 海报瘦身：只在载入时做一次，随后进缓存（不重复解析 URL）
   // 命中本地清单则改为同源 /posters/*.webp（见 slimPoster 注释）
@@ -1271,17 +1295,111 @@ export function getShowsByCinema(cinemaId: string): Show[] {
     .sort((a, b) => a.startAt.localeCompare(b.startAt));
 }
 
-/** 影院按院线分组 */
-export function getCinemasBySource(): { source: Source; label: string; cinemas: Cinema[] }[] {
-  const { cinemas } = load(); // 原实现在 map 内反复调用 load()
-  return SOURCE_ORDER.map((source) => ({
-    source,
-    label: SOURCE_LABEL[source],
-    cinemas: cinemas
-      .filter((c) => c.source === source)
-      .sort((a, b) => a.nameZh.localeCompare(b.nameZh)),
-  })).filter((g) => g.cinemas.length > 0);
+/**
+ * 戲院頁的篩選列（展平給客戶端組件）
+ *
+ * ===== 為什麼不直接把 Cinema[] 給客戶端 =====
+ *
+ * Cinema 裡有 address / mapUrl / detailUrl 等大字段，且 specs 是原始 key。
+ * 篩選只需 5 個維度 + 顯示用的 3 個短字段，單獨展平可：
+ *   1. 把規格預先算成 { key, label } —— 客戶端不必再依賴 lib/cinema-specs
+ *      （那是服務端模塊，打進客戶端 bundle 純屬浪費）
+ *   2. 語義明確：這是一個為篩選而生的形狀，不是 Cinema 的第二種寫法
+ */
+export interface CinemaRow {
+  id: string;
+  nameZh: string;
+  address: string;
+  mapUrl: string;
+  source: Source;
+  region: Region | null;
+  district: string | null;
+  specs: { key: string; label: string }[];
 }
+
+/**
+ * 戲院篩選面板的候選項
+ *
+ * specs 分兩組（放映格式 / 特色影廳），客戶端下拉按 group 插小標題。
+ * 只返回**實際有戲院**的選項，避免出現「選了卻沒有結果」的空選項。
+ */
+export interface CinemaFacets {
+  sources: { value: string; label: string; count: number }[];
+  specs: { value: string; label: string; count: number; group: string }[];
+  regions: { value: string; label: string; count: number }[];
+  districts: { value: string; label: string; count: number }[];
+}
+
+export function getCinemaRows(): CinemaRow[] {
+  return getAllCinemas().map((c) => ({
+    id: c.id,
+    nameZh: c.nameZh,
+    address: c.address,
+    mapUrl: c.mapUrl,
+    source: c.source,
+    region: c.region ?? null,
+    district: c.district ?? null,
+    specs: (c.specs ?? []).map((k) => ({ key: k, label: specLabel(k) })),
+  }));
+}
+
+export function getCinemaFacets(rows: CinemaRow[]): CinemaFacets {
+  const count = <T extends string>(get: (r: CinemaRow) => T | null) => {
+    const m = new Map<T, number>();
+    for (const r of rows) {
+      const v = get(r);
+      if (v == null || v === '') continue;
+      m.set(v, (m.get(v) ?? 0) + 1);
+    }
+    return m;
+  };
+
+  const srcCount = count((r) => r.source);
+  const regCount = count((r) => r.region);
+  const disCount = count((r) => r.district);
+
+  // 規格：一間戲院在一個規格上只計 1（同一規格不會在一間戲院重複）
+  const specCount = new Map<string, number>();
+  for (const r of rows) for (const s of r.specs) specCount.set(s.key, (specCount.get(s.key) ?? 0) + 1);
+
+  return {
+    sources: SOURCE_ORDER.filter((s) => srcCount.has(s)).map((s) => ({
+      value: s,
+      label: SOURCE_LABEL[s],
+      count: srcCount.get(s)!,
+    })),
+    // 展示顺序由 HALL_SPECS 决定（放映格式在前、特色影廳在后）
+    specs: HALL_SPECS.filter((s) => specCount.has(s.key)).map((s) => ({
+      value: s.key,
+      label: s.label,
+      count: specCount.get(s.key)!,
+      group: SPEC_GROUP_LABEL[s.group],
+    })),
+    regions: REGION_ORDER.filter((r) => regCount.has(r)).map((r) => ({
+      value: r,
+      label: r,
+      count: regCount.get(r)!,
+    })),
+    districts: [...disCount.entries()]
+      .sort((a, b) => districtOrder(a[0]) - districtOrder(b[0]) || a[0].localeCompare(b[0]))
+      .map(([value, c]) => ({ value, label: value, count: c })),
+  };
+}
+
+/**
+ * ★ 2026-09-21 删除了 getCinemasBySource()。
+ *
+ * 它原本只服务戲院列表页的「按院線分節」。现在戲院页改成客戶端筛选
+ * （CinemaExplorer），分節必須**跟隨篩選結果實時重算** ——
+ * 篩掉一條院線後那一節要整段消失，而這是靜態 HTML 做不到的。
+ * 因此分組邏輯隨之搬到了 components/CinemaExplorer.tsx，
+ * 排序仍在服務端的 getCinemaRows()（院線優先序 + 院名）裡做，
+ * 客戶端只負責分堆。
+ *
+ * 留著它會是一個「看起來能用但永遠不會被調用」的導出，
+ * 下次有人要做戲院分組時會先找到它 —— 然後才發現分完組
+ * 不會跟隨篩選，白跑一趟。
+ */
 
 export { formatLabel, extractFormats, normalizeTitle, stripFormats };
 
@@ -1327,6 +1445,14 @@ export interface ShowRow {
   versionKey: string;
   /** 版本展示名（如 'IMAX' / '原版'） */
   versionLabel: string;
+  /**
+   * 场次卡片中行的「影片版本·语言」文案（如 'IMAX·英語' / '原版·日語'）
+   *
+   * ★ 2026-09-21 用户指定：卡片中行不再显示影厅名（「1院」「House 1」），
+   *   改显示版本与语言 —— 那才是用户选场次时要看的。
+   *   文案规则见 lib/versions.ts 的 formatVersionText。
+   */
+  versionText: string;
   /** 版本标签数组（用于图标/角标） */
   formats: string[];
 }
@@ -1345,6 +1471,19 @@ export function getShowRowsForGroup(group: MovieGroup): ShowRow[] {
   const movieById = new Map(movies.map((m) => [m.id, m]));
   const cinemaById = new Map(cinemas.map((c) => [c.id, c]));
   const ids = new Set(group.versions.flatMap((v) => v.movieIds));
+
+  /**
+   * 影片级对白语言（如「英語」「日語」），作为版本语言的兵底。
+   *
+   * ★ 为什么要兵底（用户 2026-09-21 确认「语言取自影片本身的对白语言」）：
+   *   实测只有百老匯的条目带 dialect（emperor / cinemacity 全为 null），
+   *   而 IMAX 版常常没有语言标记。没有兵底的话
+   *   「IMAX 英語片」就只剩「IMAX」，与「原版·英語」不齐。
+   *
+   * 取首个语言（「粵語 / 普通話」取「粵語」）：卡片只有一行，
+   *   全部塞进去会折行；多个语言的情形在详情页资料表里有完整展示。
+   */
+  const filmLang = group.displayLanguageDetail.spoken?.split('/')[0]?.trim() || null;
 
   const rows: ShowRow[] = [];
 
@@ -1376,6 +1515,7 @@ export function getShowRowsForGroup(group: MovieGroup): ShowRow[] {
       district: cinema?.district ?? null,
       versionKey: formats.length ? formats.join('|').toLowerCase() : '__base__',
       versionLabel: formats.length ? formats.map(formatLabel).join(' + ') : '原版',
+      versionText: formatVersionText(formats, filmLang),
       formats,
     });
   }

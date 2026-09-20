@@ -48,8 +48,6 @@ export interface MovieIntro {
   summary: string | null;
 
   ratings: IntroRating[];
-  /** 外部评分抓取时间，用于标注「評分資料更新於」 */
-  enrichAt: string | null;
 }
 
 /**
@@ -110,6 +108,5 @@ export function buildIntro(group: MovieGroup): MovieIntro {
     cast: group.displayCast,
     summary: group.displayDescription,
     ratings,
-    enrichAt: e?.updatedAt || null,
   };
 }
