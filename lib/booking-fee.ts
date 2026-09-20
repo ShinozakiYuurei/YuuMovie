@@ -51,7 +51,7 @@ export interface BookingFee {
    * 到了付款頁才發現非會員要加錢，比不顯示更糟。
    */
   note: string;
-  /** 說明這筆費用是「含在顯示票價裡」還是「結帳時外加」 */
+  /** 說明這筆費用是「含在顯示票價裡」還是「結帳時外加」（後綴文案見 feeSuffix） */
   included: boolean;
 }
 
@@ -108,4 +108,28 @@ const UNKNOWN: BookingFee = {
  */
 export function bookingFeeOf(cinemaId: string, source: Source): BookingFee {
   return BY_CINEMA[cinemaId] ?? BY_SOURCE[source] ?? UNKNOWN;
+}
+
+/**
+ * 手續費行的後綴文案（三處頁面共用）
+ *
+ * ★ 2026-09-21 用戶指定：「外加手續費也標成「$10手續費（結帳另加）」，三處頁面統一。
+ *   （已含於票價）、（結帳另加），和主文字同色」
+ *
+ * 為什麼放在 lib/booking-fee.ts 而不是各頁面自己寫：
+ *   同一句話要在場次頁 / 戲院列表頁 / 戲院詳情頁各出現一次。
+ *   分散寫的話，下次改文案就會出現「已含於票價」和「已含票價」兩種寫法 ——
+ *   這種事在 2026-09-21 已經發生過一次（「（已含）」只改了兩處）。
+ *
+ * 三種情形：
+ *   amount = 0        → 免手續費。沒有「含/不含」可言，不加後綴。
+ *   included = true   → 手續費已算在顯示票價內，結帳不再加。
+ *   included = false  → 顯示票價不含，結帳時每張再加這筆錢。
+ *
+ * 「結帳另加」是必須的：$8 與 $10 長得差不多，但一個含一個不含，
+ * 不比價直接看數字會選錯。
+ */
+export function feeSuffix(amount: number, included: boolean): string | null {
+  if (amount <= 0) return null;
+  return included ? '（已含於票價）' : '（結帳另加）';
 }

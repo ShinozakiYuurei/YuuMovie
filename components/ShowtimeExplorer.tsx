@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { formatDate, formatDateShort, relativeDay, weekdayShort } from '@/lib/format';
 import { seatLevel, SEAT_STYLE, SEAT_THRESHOLDS } from '@/lib/seat';
 import { fromCompact } from '@/lib/compact';
+import { feeSuffix } from '@/lib/booking-fee';
 import type { CompactRows } from '@/lib/compact';
 import type { Facets, ShowRow } from '@/lib/data';
 import { FilterDropdown } from './FilterDropdown';
@@ -519,11 +520,16 @@ export function ShowtimeExplorer({
                      *   （理由：用户扫这一行时找的是数字）。
                      *   实测拆成两色反而像「$10」与「手續費」是两件事，
                      *   同一行同一语义就该同一颜色，故整行统一 text-fg。
-                     *   仍保留次级色的只有「（已含於票價）」—— 那是限定语，不是主信息。
                      *
                      * ★ 同日三修：「（已含）」→「（已含於票價）」。
                      *   原词太短，用户第一眼看不懂「含」的是什么（含什么？含在哪？）。
                      *   写全「於票價」才能与「結帳時外加」的院线一眼分开。
+                     *
+                     * ★ 同日四修（用户）：「外加手續費也標成「$10手續費（結帳另加）」，
+                     *   三處頁面統一。（已含於票價）、（結帳另加），和主文字同色」
+                     *   —— 後綴文案改由 lib/booking-fee.ts 的 feeSuffix() 單一提供，
+                     *   三處頁面不再各寫一份（今天已經因為各寫一份漏改過一次）。
+                     *   後綴也改成 text-fg：整行同一顏色，不再拆主次。
                      * 0 元同样显示（$0）—— 显式告诉用户「这里不额外收钱」
                      * 比留空更有信息量，也正是用户要的。
                      *
@@ -535,9 +541,7 @@ export function ShowtimeExplorer({
                         ${c.cinemaFee}
                       </span>{' '}
                       <span title={c.cinemaFeeNote}>手續費</span>
-                      {c.cinemaFee > 0 && c.cinemaFeeIncluded && (
-                        <span className="text-fg-dim">（已含於票價）</span>
-                      )}
+                      {feeSuffix(c.cinemaFee, c.cinemaFeeIncluded)}
                     </p>
 
                     {/*

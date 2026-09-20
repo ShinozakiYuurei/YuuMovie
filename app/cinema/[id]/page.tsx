@@ -11,7 +11,7 @@ import {
   SOURCE_LABEL,
 } from '@/lib/data';
 import { getCinemas } from '@/lib/data';
-import { bookingFeeOf } from '@/lib/booking-fee';
+import { bookingFeeOf, feeSuffix } from '@/lib/booking-fee';
 import { formatDate, formatTime } from '@/lib/format';
 
 // 静态导出：预先列出所有戏院 id，让每间戏院的详情页都被生成出来。
@@ -93,13 +93,18 @@ export default async function CinemaPage({ params }: { params: Promise<{ id: str
          *   用 text-fg-muted，用戶要求「手續費的字體顏色和前面的金額一致」。
          *
          * ★ 同日三修：「（已含）」→「（已含於票價）」—— 三個頁面同一文案。
+         *
+         * ★ 同日四修（用戶）：「外加手續費也標成「$10手續費（結帳另加）」，
+         *   三處頁面統一。（已含於票價）、（結帳另加），和主文字同色」
+         *   —— 後綴文案由 lib/booking-fee.ts 的 feeSuffix() 單一提供，
+         *   三處頁面不再各寫一份；後綴也改 text-fg，整行同一顏色。
          */}
         <p className="mt-2 text-sm text-fg">
           <span className="font-semibold tabular-nums" title={fee.note}>
             ${fee.amount}
           </span>{' '}
           <span title={fee.note}>手續費</span>
-          {fee.amount > 0 && fee.included && <span className="text-fg-dim">（已含於票價）</span>}
+          {feeSuffix(fee.amount, fee.included)}
         </p>
         {cinema.mapUrl && (
           <a
