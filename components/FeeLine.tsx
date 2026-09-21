@@ -43,7 +43,10 @@ export function FeeLine({
        *
        * .hkm-num 負責 $8 / $10 長度一致（用戶同日：「統一下長度，
        * 個位數的 8 元和兩位數的 10 元，最後的長度一樣」）。
-       * tabular-nums 讓 $10 內部兩個數字等寬，與 .hkm-num 的右對齊配合。
+       * ★ 左對齊而非右對齊：本行是「$ + 數字 + 手續費」整串左起排，
+       *   右對齊會把 $ 推歪（實測 $0 起於 x=21、$10 起於 x=14），
+       *   左對齊才能讓三者的起點全部一致。理由詳見 app/globals.css。
+       * tabular-nums 讓 $10 內部兩個數字等寬。
        */}
       <span className="hkm-num font-semibold tabular-nums" title={note}>
         ${amount}
