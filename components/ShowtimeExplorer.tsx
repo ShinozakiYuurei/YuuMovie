@@ -9,6 +9,7 @@ import type { CompactRows } from '@/lib/compact';
 import type { Facets, ShowRow } from '@/lib/data';
 import { FilterDropdown } from './FilterDropdown';
 import { CinemaMapDialog } from './CinemaMapDialog';
+import { CINEMA_COORD } from '@/lib/cinema-geo';
 
 /**
  * 場次瀏覽器：分層式（篩選 → 日期 → 場次）+ 多選篩選 + 多鍵排序 + 餘座顏色標記
@@ -102,6 +103,11 @@ function LayerHeader({
       {children && <span className="ml-auto flex items-center gap-2">{children}</span>}
     </div>
   );
+}
+
+/** 有座標才顯示地圖按鈕（座標表見 lib/cinema-geo.ts） */
+function hasCoord(id: string): boolean {
+  return CINEMA_COORD[id] != null;
 }
 
 /** 多選下拉的实现在 ./FilterDropdown.tsx（場次頁與戲院頁共用同一份） */
@@ -509,7 +515,7 @@ export function ShowtimeExplorer({
                       {c.cinemaAddress && (
                         <span className="text-xs text-fg-muted">{c.cinemaAddress}</span>
                       )}
-                      {c.cinemaMapUrl && (
+                      {hasCoord(cinemaId) && (
                         <button
                           type="button"
                           onClick={() => setMapCinemaId(cinemaId)}

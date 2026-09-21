@@ -1453,7 +1453,6 @@ export interface ShowRow {
    *   region / district 仍保留在 ShowRow 上，供篩選與 facets 使用。
    */
   cinemaAddress: string;
-  cinemaMapUrl: string;
   region: Region | null;
   district: string | null;
   /**
@@ -1540,7 +1539,6 @@ export function getShowRowsForGroup(group: MovieGroup): ShowRow[] {
       cinemaId: s.cinemaId,
       cinemaName: cinema?.nameZh || `戲院 #${s.cinemaId}`,
       cinemaAddress: cinema?.address || '',
-      cinemaMapUrl: cinema?.mapUrl || '',
       region: cinema?.region ?? null,
       district: cinema?.district ?? null,
       cinemaFee: fee.amount,

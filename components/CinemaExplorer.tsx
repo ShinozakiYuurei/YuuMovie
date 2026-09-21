@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { FilterDropdown } from './FilterDropdown';
 import { FeeLine } from './FeeLine';
 import { CinemaMapDialog } from './CinemaMapDialog';
+import { CINEMA_COORD } from '@/lib/cinema-geo';
 import type { CinemaFacets, CinemaRow } from '@/lib/data';
 
 /**
@@ -29,6 +30,11 @@ import type { CinemaFacets, CinemaRow } from '@/lib/data';
  * 規格為空的戲院（普通廳）不會出現在規格篩選裡；反過來，
  * 一旦用戶勾了任一規格，這些戲院自然被排除 —— 這正是用戶想要的。
  */
+/** 有座標才顯示地圖按鈕（座標表見 lib/cinema-geo.ts） */
+function hasCoord(id: string): boolean {
+  return CINEMA_COORD[id] != null;
+}
+
 export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: CinemaFacets }) {
   const [sources, setSources] = useState<string[]>([]);
   const [specs, setSpecs] = useState<string[]>([]);
@@ -225,7 +231,17 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
                     >
                       查看場次
                     </Link>
-                    {c.mapUrl && (
+                    {/*
+                     * 地圖按鈕
+                     *
+                     * ★ 條件是「有座標」而不是「有 mapUrl」（2026-09-21 修正）
+                     *
+                     *   地圖改用 OpenStreetMap 後，座標來源是 lib/cinema-geo.ts，
+                     *   與舊的 Google mapUrl 完全脫鉤 —— 而**有座標但沒 mapUrl 的
+                     *   戲院有 16 間**（英皇全線、Cinema City 兩間、星達全線）。
+                     *   若仍用 mapUrl 作條件，這 16 間會根本看不到地圖按鈕。
+                     */}
+                    {hasCoord(c.id) && (
                       <button
                         type="button"
                         onClick={() => setMapId(c.id)}

@@ -42,7 +42,6 @@ export interface CompactRows {
     id: string;
     name: string;
     address: string;
-    mapUrl: string;
     region: Region | null;
     district: string | null;
     source: Source;
@@ -115,7 +114,6 @@ export function toCompact(rows: ShowRow[]): CompactRows {
       id: r.cinemaId,
       name: r.cinemaName,
       address: r.cinemaAddress,
-      mapUrl: r.cinemaMapUrl,
       region: r.region,
       district: r.district,
       source: r.source,
@@ -178,7 +176,6 @@ export function fromCompact(c: CompactRows): ShowRow[] {
       cinemaId: cin.id,
       cinemaName: cin.name,
       cinemaAddress: cin.address,
-      cinemaMapUrl: cin.mapUrl,
       region: cin.region,
       district: cin.district,
       cinemaFee: cin.fee,
