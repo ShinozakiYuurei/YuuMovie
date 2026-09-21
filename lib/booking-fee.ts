@@ -111,25 +111,18 @@ export function bookingFeeOf(cinemaId: string, source: Source): BookingFee {
 }
 
 /**
- * 手續費行的後綴文案（三處頁面共用）
+ * 手續費行的文案（純文字，供 SEO / 測試 / 非 JSX 場景使用）
  *
- * ★ 2026-09-21 用戶指定：「外加手續費也標成「$10手續費（結帳另加）」，三處頁面統一。
- *   （已含於票價）、（結帳另加），和主文字同色」
+ * ★ 2026-09-21 用戶最終定稿：「算了，還是換成"$xx 手續費"這樣子，
+ *   然後統一下長度，個位數的 8 元和兩位數的 10 元，最後的長度一樣」
  *
- * 為什麼放在 lib/booking-fee.ts 而不是各頁面自己寫：
- *   同一句話要在場次頁 / 戲院列表頁 / 戲院詳情頁各出現一次。
- *   分散寫的話，下次改文案就會出現「已含於票價」和「已含票價」兩種寫法 ——
- *   這種事在 2026-09-21 已經發生過一次（「（已含）」只改了兩處）。
+ * 即：**不再加「（已含於票價）/（結帳另加）」後綴**，回到最簡的「$xx 手續費」。
+ *   含不含的差異仍可看 hover（note 裡寫得很清楚）。
  *
- * 三種情形：
- *   amount = 0        → 免手續費。沒有「含/不含」可言，不加後綴。
- *   included = true   → 手續費已算在顯示票價內，結帳不再加。
- *   included = false  → 顯示票價不含，結帳時每張再加這筆錢。
- *
- * 「結帳另加」是必須的：$8 與 $10 長得差不多，但一個含一個不含，
- * 不比價直接看數字會選錯。
+ * ★ 頁面渲染請用 components/FeeLine.tsx，不要直接用這個函數。
+ *   原因：長度對齊（$8 / $10 一樣寬）需要金額單獨成為一個元素、
+ *   掛上 .hkm-num，純字串做不到。這個函數只給需要「一行文字」的場合。
  */
-export function feeSuffix(amount: number, included: boolean): string | null {
-  if (amount <= 0) return null;
-  return included ? '（已含於票價）' : '（結帳另加）';
+export function feeText(amount: number): string {
+  return `$${amount} 手續費`;
 }

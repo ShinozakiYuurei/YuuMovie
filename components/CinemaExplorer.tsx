@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { FilterDropdown } from './FilterDropdown';
-import { feeSuffix } from '@/lib/booking-fee';
+import { FeeLine } from './FeeLine';
+import { CinemaMapDialog } from './CinemaMapDialog';
 import type { CinemaFacets, CinemaRow } from '@/lib/data';
 
 /**
@@ -33,6 +34,8 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
   const [specs, setSpecs] = useState<string[]>([]);
   const [regions, setRegions] = useState<string[]>([]);
   const [districts, setDistricts] = useState<string[]>([]);
+  /** 目前開啟地圖彈層的戲院 id（null = 未開啟） */
+  const [mapId, setMapId] = useState<string | null>(null);
 
   /** 多選篩選：同維度內 OR，維度之間 AND */
   const filtered = useMemo(() => {
@@ -186,20 +189,19 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
                    *   与前面的金额（text-fg）不同色；用户要求两者一致，故整行 text-fg。
                    *
                    * ★ 同日三修：「（已含）」→「（已含於票價）」—— 三个页面同一文案。
-                   *   原词太短，用户看不出「含」的是什么，写全才与「結帳時外加」分得开。
                    *
-                   * ★ 同日四修（用户）：「外加手續費也標成「$10手續費（結帳另加）」，
-                   *   三處頁面統一。（已含於票價）、（結帳另加），和主文字同色」
-                   *   —— 後綴文案改由 lib/booking-fee.ts 的 feeSuffix() 单一提供，
-                   *   三处页面不再各写一份；后缀也改 text-fg，整行同一颜色。
+                   * ★ 同日四修：外加的也补上後綴，三处统一。
+                   *
+                   * ★ 同日五修（用户最终定稿）：「算了，還是換成"$xx 手續費"這樣子，
+                   *   然後統一下長度，個位數的 8 元和兩位數的 10 元，最後的長度一樣」
+                   *   —— 後綴全部去掉；長度靠 .hkm-num 对齐。
+                   *   这一行改由 components/FeeLine.tsx 统一渲染。
                    */}
-                  <p className="mt-1 text-xs text-fg">
-                    <span className="font-semibold tabular-nums" title={c.fee.note}>
-                      ${c.fee.amount}
-                    </span>{' '}
-                    <span title={c.fee.note}>手續費</span>
-                    {feeSuffix(c.fee.amount, c.fee.included)}
-                  </p>
+                  <FeeLine
+                    amount={c.fee.amount}
+                    note={c.fee.note}
+                    className="mt-1 text-xs text-fg"
+                  />
 
                   {/*
                    * 規格標籤：只列出這間戲院真的有的。
@@ -224,14 +226,13 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
                       查看場次
                     </Link>
                     {c.mapUrl && (
-                      <a
-                        href={c.mapUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <button
+                        type="button"
+                        onClick={() => setMapId(c.id)}
                         className="hkm-btn-ghost rounded-full px-3.5 py-1.5 text-xs"
                       >
-                        地圖 ↗
-                      </a>
+                        地圖
+                      </button>
                     )}
                   </div>
                 </div>
@@ -240,6 +241,20 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
           </section>
         ))
       )}
+
+      {/* 地圖彈層（OpenStreetMap）；選型與大陸可達性實測見 CinemaMapDialog.tsx */}
+      {mapId &&
+        (() => {
+          const c = rows.find((x) => x.id === mapId);
+          return c ? (
+            <CinemaMapDialog
+              cinemaId={c.id}
+              name={c.nameZh}
+              address={c.address}
+              onClose={() => setMapId(null)}
+            />
+          ) : null;
+        })()}
     </div>
   );
 }

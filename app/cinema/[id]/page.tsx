@@ -11,7 +11,10 @@ import {
   SOURCE_LABEL,
 } from '@/lib/data';
 import { getCinemas } from '@/lib/data';
-import { bookingFeeOf, feeSuffix } from '@/lib/booking-fee';
+import { FeeLine } from '@/components/FeeLine';
+import { CinemaMapButton } from '@/components/CinemaMapButton';
+import { bookingFeeOf } from '@/lib/booking-fee';
+import { cinemaCoord } from '@/lib/cinema-geo';
 import { formatDate, formatTime } from '@/lib/format';
 
 // 静态导出：预先列出所有戏院 id，让每间戏院的详情页都被生成出来。
@@ -94,27 +97,32 @@ export default async function CinemaPage({ params }: { params: Promise<{ id: str
          *
          * ★ 同日三修：「（已含）」→「（已含於票價）」—— 三個頁面同一文案。
          *
-         * ★ 同日四修（用戶）：「外加手續費也標成「$10手續費（結帳另加）」，
-         *   三處頁面統一。（已含於票價）、（結帳另加），和主文字同色」
-         *   —— 後綴文案由 lib/booking-fee.ts 的 feeSuffix() 單一提供，
-         *   三處頁面不再各寫一份；後綴也改 text-fg，整行同一顏色。
+         * ★ 同日四修：外加的也補上後綴（結帳另加），三處統一。
+         *
+         * ★ 同日五修（用戶最終定稿）：「算了，還是換成"$xx 手續費"這樣子，
+         *   然後統一下長度，個位數的 8 元和兩位數的 10 元，最後的長度一樣」
+         *   —— 後綴全部去掉；長度靠 .hkm-num 對齊。
+         *   這一行改由 components/FeeLine.tsx 統一渲染。
          */}
-        <p className="mt-2 text-sm text-fg">
-          <span className="font-semibold tabular-nums" title={fee.note}>
-            ${fee.amount}
-          </span>{' '}
-          <span title={fee.note}>手續費</span>
-          {feeSuffix(fee.amount, fee.included)}
-        </p>
-        {cinema.mapUrl && (
-          <a
-            href={cinema.mapUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hkm-btn-ghost mt-3 inline-block rounded-full px-3.5 py-1.5 text-xs"
-          >
-            在地圖開啟 ↗
-          </a>
+        <FeeLine amount={fee.amount} note={fee.note} className="mt-2 text-sm text-fg" />
+        {/*
+         * 地圖按鈕（改開彈層，不再外鏈 Google Maps）
+         *
+         * ★ 用戶 2026-09-21：改用開源地圖，且大陸可直接訪問。
+         *   選型與實測數據見 components/CinemaMapDialog.tsx。
+         *
+         * 按鈕文案去掉了「↗」——它不再開新視窗（本來的箭頭會誤導），
+         * 彈層內有「在 OSM 開啟 ↗」才是真正的外鏈。
+         *
+         * 只在有座標時渲染：英皇戲院總部是辦公地址、不放映，
+         * 座標表裡沒有它（見 lib/cinema-geo.ts 的已知缺項說明）。
+         */}
+        {cinemaCoord(cinema.id) && (
+          <CinemaMapButton
+            cinemaId={cinema.id}
+            name={cinema.nameZh}
+            address={cinema.address}
+          />
         )}
       </header>
 

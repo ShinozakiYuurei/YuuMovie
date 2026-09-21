@@ -4,10 +4,11 @@ import { useMemo, useState } from 'react';
 import { formatDate, formatDateShort, relativeDay, weekdayShort } from '@/lib/format';
 import { seatLevel, SEAT_STYLE, SEAT_THRESHOLDS } from '@/lib/seat';
 import { fromCompact } from '@/lib/compact';
-import { feeSuffix } from '@/lib/booking-fee';
+import { FeeLine } from './FeeLine';
 import type { CompactRows } from '@/lib/compact';
 import type { Facets, ShowRow } from '@/lib/data';
 import { FilterDropdown } from './FilterDropdown';
+import { CinemaMapDialog } from './CinemaMapDialog';
 
 /**
  * 場次瀏覽器：分層式（篩選 → 日期 → 場次）+ 多選篩選 + 多鍵排序 + 餘座顏色標記
@@ -212,6 +213,15 @@ export function ShowtimeExplorer({
   // 紧凑字典 → 完整行（一次性，纯数组映射）
   const rows = useMemo(() => fromCompact(compact), [compact]);
 
+  /**
+   * 目前開啟地圖彈層的戲院 id（null = 未開啟）
+   *
+   * ★ 用 id 而不是整間戲院物件：彈層只用到 name / address 兩個字串，
+   *   而這兩個都能從 rows 裡現查（同一戲院全場次的值一樣）。
+   *   存 id 還能在篩選導致 rows 變動時自然失效，不會殘留舊戲院。
+   */
+  const [mapCinemaId, setMapCinemaId] = useState<string | null>(null);
+
   const [sel, setSel] = useState<Record<FilterDim, string[]>>({
     sources: [],
     versions: [],
@@ -299,6 +309,9 @@ export function ShowtimeExplorer({
 
   const activeFilters =
     sel.sources.length + sel.versions.length + sel.regions.length + sel.districts.length;
+
+  /** 彈層要顯示的戲院（從已展平的行裡現查，避免額外狀態） */
+  const mapCinema = mapCinemaId ? rows.find((r) => r.cinemaId === mapCinemaId) : undefined;
 
   const clearAll = () => {
     setSel({ sources: [], versions: [], regions: [], districts: [] });
@@ -497,14 +510,13 @@ export function ShowtimeExplorer({
                         <span className="text-xs text-fg-muted">{c.cinemaAddress}</span>
                       )}
                       {c.cinemaMapUrl && (
-                        <a
-                          href={c.cinemaMapUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="ml-auto shrink-0 text-xs text-fg-muted hover:text-fg"
+                        <button
+                          type="button"
+                          onClick={() => setMapCinemaId(cinemaId)}
+                          className="ml-auto shrink-0 text-xs text-fg-muted transition hover:text-fg"
                         >
                           地圖 ↗
-                        </a>
+                        </button>
                       )}
                     </div>
 
@@ -525,24 +537,25 @@ export function ShowtimeExplorer({
                      *   原词太短，用户第一眼看不懂「含」的是什么（含什么？含在哪？）。
                      *   写全「於票價」才能与「結帳時外加」的院线一眼分开。
                      *
-                     * ★ 同日四修（用户）：「外加手續費也標成「$10手續費（結帳另加）」，
-                     *   三處頁面統一。（已含於票價）、（結帳另加），和主文字同色」
-                     *   —— 後綴文案改由 lib/booking-fee.ts 的 feeSuffix() 單一提供，
-                     *   三處頁面不再各寫一份（今天已經因為各寫一份漏改過一次）。
-                     *   後綴也改成 text-fg：整行同一顏色，不再拆主次。
+                     * ★ 同日四修：外加的也补上後綴，三处统一。
+                     *
+                     * ★ 同日五修（用户最终定稿）：「算了，還是換成"$xx 手續費"這樣子，
+                     *   然後統一下長度，個位數的 8 元和兩位數的 10 元，最後的長度一樣」
+                     *   —— 後綴全部去掉（含不含看 hover 的 note），
+                     *   長度靠 .hkm-num（min-width:3ch + 右對齊）对齐。
+                     *   这一行改由 components/FeeLine.tsx 统一渲染。
+                     *
                      * 0 元同样显示（$0）—— 显式告诉用户「这里不额外收钱」
                      * 比留空更有信息量，也正是用户要的。
                      *
                      * title 写明 0 元的来历（会员豁免）与是否已含在票价内，
                      * 避免用户到付款页才发现口径不同。
                      */}
-                    <p className="mb-3 text-xs leading-relaxed text-fg">
-                      <span className="font-semibold tabular-nums" title={c.cinemaFeeNote}>
-                        ${c.cinemaFee}
-                      </span>{' '}
-                      <span title={c.cinemaFeeNote}>手續費</span>
-                      {feeSuffix(c.cinemaFee, c.cinemaFeeIncluded)}
-                    </p>
+                    <FeeLine
+                      amount={c.cinemaFee}
+                      note={c.cinemaFeeNote}
+                      className="mb-3 text-xs leading-relaxed text-fg"
+                    />
 
                     {/*
                      * 自适应网格（用户 2026-09-21：「手机上场次卡片很别扭，改成自适应」）。
@@ -574,6 +587,24 @@ export function ShowtimeExplorer({
             </div>
           </section>
         </>
+      )}
+
+      {/*
+       * 地圖彈層（OpenStreetMap）
+       *
+       * ★ 用戶 2026-09-21 指定：把 Google Maps 換成開源地圖，且大陸可直接訪問。
+       *   選型與實測數據見 components/CinemaMapDialog.tsx 的註釋。
+       *
+       * 放在最外層（不是每個戲院卡片裡）：彈層是 fixed 定位，
+       * 若寫在卡片內會隨卡片的 hover / 層疊上下文受影響。
+       */}
+      {mapCinemaId && mapCinema && (
+        <CinemaMapDialog
+          cinemaId={mapCinemaId}
+          name={mapCinema.cinemaName}
+          address={mapCinema.cinemaAddress}
+          onClose={() => setMapCinemaId(null)}
+        />
       )}
     </div>
   );

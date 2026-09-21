@@ -180,9 +180,27 @@ fi
 #   因此下面仍传 ENRICH=0 只是无害的兼容写法：脚本不读该变量，传了也不生效。
 #   若将来把评分补充接回 rebuild-static.sh，ENRICH 默认值需重新确认——
 #   两个 systemd 定时器直接 ExecStart 该脚本，默认值会同时影响它们。
-# REBUILD 可注入只为能在沙箱演练；默认即真实重建，线上行为不变。
-log "重建静态站（SCRAPE=${SCRAPE:-0} ENRICH=${ENRICH:-0}）"
-SCRAPE="${SCRAPE:-0}" ENRICH="${ENRICH:-0}" eval "${REBUILD:-bash deploy/rebuild-static.sh}"
+#
+# ★ 2026-09-21 修复：POSTER_ORIGIN 必须显式传下去
+#
+#   问题：两个 systemd 定时器（hk-movie-scrape-*.service）的 unit 里写了
+#     Environment=POSTER_ORIGIN=https://imgmove.yuurei.de
+#   但**本脚本没有**—— 它由 `sudo -u hkmovie bash vps-deploy.sh` 从 SSH 会话
+#   启动，不继承任何 systemd 的 Environment。于是 `bash deploy/rebuild-static.sh`
+#   读到的 POSTER_ORIGIN 是空字符串（脚本里 `${POSTER_ORIGIN:-}` 的默认值），
+#   海报被构建成同源 /posters/*.webp。
+#
+#   后果：每次 `deploy/sync.sh` 上线后，海报会退回经 CF 西雅图的慢路径，
+#   直到下一个定时器（最晚 2 小时）重建才恢复。大陆实测差距：
+#     同源 5 张海报 3852ms / TLS 0.33s  vs  子域 1735ms / TLS 0.10s
+#
+#   修法：把子域写成本脚本的默认值（与 unit 里的一致），并允许环境覆盖。
+#   注意这里不能用 `:-` 的空字符串默认—— 那正是 bug 的来源；
+#   回滚办法是显式传 POSTER_ORIGIN= （空）来强制同源。
+POSTER_ORIGIN="${POSTER_ORIGIN-https://imgmove.yuurei.de}"
+log "重建静态站（SCRAPE=${SCRAPE:-0} ENRICH=${ENRICH:-0} POSTER_ORIGIN=${POSTER_ORIGIN:-<同源>}）"
+SCRAPE="${SCRAPE:-0}" ENRICH="${ENRICH:-0}" POSTER_ORIGIN="$POSTER_ORIGIN" \
+  eval "${REBUILD:-bash deploy/rebuild-static.sh}"
 
 # ---------- 5 自检 + 记录线上版本 ----------
 verify_site
