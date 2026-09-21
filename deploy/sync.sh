@@ -15,6 +15,9 @@ VPS="${VPS_ALIAS:-伤心的云-HK}"
 APP_DIR="${APP_DIR:-/opt/hk-movie}"
 BRANCH="${DEPLOY_BRANCH:-main}"
 SITE="${SITE_URL:-https://hkmovie.yuurei.de}"
+# 伺服器上的站點目錄（與 deploy/vps-deploy.sh 的預設值一致）
+# 冒煙測試需要它 —— 要从產物裡取一個真實的 movie slug，見 smoke()。
+REMOTE_SITE_DIR="${SITE_DIR:-/home/web/html}"
 TSX=node_modules/.bin/tsx
 TSC=node_modules/.bin/tsc
 cd "$(dirname "$0")/.."
@@ -53,7 +56,7 @@ smoke() {
   # 先問伺服器上最新的 movie 目錄名，再請求它。
   #
   # 取不到（例如站點剛建、還沒任何電影）時略過此項，不把未知當失敗。
-  slug=$(vps "ls $SITE_DIR/movie 2>/dev/null | head -1" | tr -d '\r')
+  slug=$(vps "ls $REMOTE_SITE_DIR/movie 2>/dev/null | head -1" | tr -d '\r')
   if [ -n "$slug" ]; then
     c=$(curl -s -o /dev/null -m 25 -w '%{http_code}' "$SITE/movie/$slug/")
     echo "  首頁=$a  /showing=$b  抽檢電影頁($slug)=$c"
