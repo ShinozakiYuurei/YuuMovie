@@ -50,18 +50,48 @@ const CDNS = [
   'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/',
 ];
 
-/** 瓦片源：Carto 暗色（OSM 資料）→ 德國 OSM 官方鏡像兜底 */
+/**
+ * 瓦片源：德國 OSM 官方鏡像
+ *
+ * ===== 為什麽不是 CARTO（曾經用過，已棄）=====
+ *
+ * CARTO 的暗色瓦片原本是最優選：實測 0.21s（全場最快）且配色與本站一致。
+ * 但 2026-09-21 實測發現**它已經要求 API key** —— 瓦片能下載（HTTP 200），
+ * 圖上却印著滿屏「API KEY REQUIRED / carto.com/basemaps/apikey」水印，
+ * 用戶看到的是一張被水印蓋住的地圖。這類「200 但內容不對」的失敗最陰險，
+ * 不會報錯，只能靠截圖才看得出。
+ *
+ * ===== 為什麽是 tile.openstreetmap.de =====
+ *
+ * 大陸直連實測（各項均為真實延遲，非推測）：
+ *   tile.openstreetmap.de       1.03s  ✅ 德國 OSM 官方，無 key、無水印
+ *   a.tile.openstreetmap.fr     1.13s  ✅ 法國 OSM 鏡像，備選
+ *   tile.openstreetmap.org      ✖ 8s 逾時（主站在大陸不可達）
+ *   stadiamaps / jawg / arcgis  ✖ 逾時或需 key
+ *
+ * 它比 CARTO 慢約 5 倍，但在「免 key + 大陸可達 + 官方可信」三項上都更優。
+ * 地圖是次要功能（用戶多數只想知道地址），多等 0.8s 可以接受；
+ * 而水印或需注冊 key 的方案不可接受。
+ *
+ * 標準樣式是亮色的，與本站暗色體系不同 —— 這是刻意的取捨：
+ * 用 CSS filter 把亮色瓦片反色可以湊出暗色，但地名會變得難讀，
+ * 且 filter 會額外吃合成層效能。地圖彈層是獨立覆蓋層，
+ * 亮色底反而不易與背後的暗色內容混淆。
+ */
 const TILE_SOURCES = [
-  {
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    subdomains: 'abcd',
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> 貢獻者 &copy; <a href="https://carto.com/attributions">CARTO</a>',
-  },
   {
     url: 'https://tile.openstreetmap.de/{z}/{x}/{y}.png',
     subdomains: 'abc',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> 貢獻者',
+    maxZoom: 19,
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> 貢獻者',
+  },
+  {
+    url: 'https://a.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+    subdomains: 'abc',
+    maxZoom: 19,
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> 貢獻者， Humanitarian OSM Team',
   },
 ];
 
@@ -194,12 +224,12 @@ export function CinemaMapDialog({
         });
         mapRef.current = map;
 
-        // 瓦片：Carto 暗色（OSM 資料）。若該源不可用，使用者仍可用
-        // 底部「在 OSM 開啟」外鏈 —— 不做自動切換，因為切換會丟掉
-        // 已載入的瓦片快取，反而更慢。
+        // 瓦片：德國 OSM 官方鏡像（無 key、無水印）。
+        // 不自動切換到備選源：切換會丟掉已載入的瓦片快取，反而更慢；
+        // 若該源不可用，用戶仍可用底部「在 OSM 開啟」外鏈。
         L.tileLayer(TILE_SOURCES[0].url, {
           subdomains: TILE_SOURCES[0].subdomains,
-          maxZoom: 19,
+          maxZoom: TILE_SOURCES[0].maxZoom,
           attribution: TILE_SOURCES[0].attribution,
         }).addTo(map);
 
@@ -261,9 +291,33 @@ export function CinemaMapDialog({
           </button>
         </div>
 
-        {/* 地圖本體 */}
-        <div className="relative flex-1 bg-canvas" style={{ minHeight: 'min(60vh, 460px)' }}>
-          <div ref={boxRef} className="h-full w-full" />
+        {/*
+         * 地圖本體
+         *
+         * ★ 容器高度必須是**具體值**，不能用 h-full / flex-1（2026-09-21 踩坑）
+         *
+         *   起初寫成：
+         *     外層 flex-1 + style={minHeight:'min(60vh,460px)'}
+         *     內層 <div ref={boxRef} className="h-full w-full" />
+         *   結果 .leaflet-container 量到的高度是 **0** —— 瓦片其實都下載成功了
+         *   （4 張 200），卻全被壓進 0 高度的容器裡，用戶看到一片純黑。
+         *
+         *   兩個坑疊在一起：
+         *     1. h-full = height:100%，百分比高度要求父元素有**確定**高度；
+         *        flex-1 只給 flex-basis，min-height 也不算確定高度。
+         *     2. 就算給外層寫了 style height，**flex-1 依然會把它壓掉** ——
+         *        作為 flex 子項，其主軸尺寸由 flex-basis/flex-grow 決定，
+         *        height 被覆蓋（實測：外層 style 寫了 height 仍量到 0）。
+         *
+         *   修法：外層不用 flex-1，改 flexShrink-0 + 明確 height；
+         *   內層用絕對定位撐滿（絕對定位的百分比相對這個高度確定的父層，
+         *   不再依賴 flex 的高度傳遞）。
+         */}
+        <div
+          className="relative shrink-0"
+          style={{ height: 'min(60vh, 460px)' }}
+        >
+          <div ref={boxRef} className="absolute inset-0" />
 
           {state === 'loading' && (
             <div className="absolute inset-0 flex items-center justify-center text-sm text-fg-muted">
@@ -293,7 +347,7 @@ export function CinemaMapDialog({
             </a>
           )}
           <span className="text-[11px] leading-relaxed text-fg-dim">
-            地圖資料 © OpenStreetMap 貢獻者（ODbL），瓦片由 CARTO 提供。
+            地圖資料 © OpenStreetMap 貢獻者（ODbL）。
           </span>
         </div>
       </div>
@@ -302,9 +356,6 @@ export function CinemaMapDialog({
 }
 
 /**
- * 地圖資料 © OpenStreetMap 貢獻者（ODbL），瓦片由 CARTO 提供。
- *
- * 備用瓦片源：tile.openstreetmap.de（德國 OSM 官方鏡像，大陸 1.2s 可達）。
- * 目前不用它作首選，是因為 Carto 實測快 6 倍（0.21s）且為暗色主題；
- * 但若日後 Carto 在大陸失效，把上面 TILE_SOURCES[0] 換成它就即可。
+ * 備用瓦片源：a.tile.openstreetmap.fr（法國 OSM 鏡像，大陸 1.13s）。
+ * 若 tile.openstreetmap.de 失效，把上面 TILE_SOURCES[0] 換成 TILE_SOURCES[1] 即可。
  */
