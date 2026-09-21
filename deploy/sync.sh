@@ -39,14 +39,30 @@ vps() { timeout "${2:-900}" ssh -o BatchMode=yes -o ConnectTimeout=20 "$VPS" "$1
 # 线上冒烟：只测三个必须 200 的路径。真正的结构验证（死链、版本记录）
 # 已在 vps-deploy.sh 里跑过，这里只确认发布后的站点确实可访问。
 smoke() {
-  echo "▶ 线上冒烟"
-  local a b c
+  echo "▶ 線上冒煙"
+  local a b c slug
   a=$(curl -s -o /dev/null -m 25 -w '%{http_code}' "$SITE/")
   b=$(curl -s -o /dev/null -m 25 -w '%{http_code}' "$SITE/showing/")
-  c=$(curl -s -o /dev/null -m 25 -w '%{http_code}' "$SITE/movie/the-odyssey-emperor-6228584009b6/")
-  echo "  首页=$a  /showing=$b  奧德賽=$c"
-  [ "$a$b$c" = "200200200" ] || { echo "✖ 冒烟未通过，检查服务器构建日志"; exit 1; }
-  echo "✅ 已发布"
+
+  # 第三項的 slug **不能寫死**。
+  #
+  # 原先是硬編碼《奧德賽》的 slug，而該片已下映、頁面不再生成 ——
+  # 於是每次部署都會在「奧德賽=404」上失敗，把一次完全正常的發布
+  # 報成失敗（2026-09-21 實際踩到）。冒煙測試的目的是驗「站點活著」，
+  # 而不是驗「某一部片還在線」，因此改為**從實際產物裡取一個 slug**：
+  # 先問伺服器上最新的 movie 目錄名，再請求它。
+  #
+  # 取不到（例如站點剛建、還沒任何電影）時略過此項，不把未知當失敗。
+  slug=$(vps "ls $SITE_DIR/movie 2>/dev/null | head -1" | tr -d '\r')
+  if [ -n "$slug" ]; then
+    c=$(curl -s -o /dev/null -m 25 -w '%{http_code}' "$SITE/movie/$slug/")
+    echo "  首頁=$a  /showing=$b  抽檢電影頁($slug)=$c"
+    [ "$a$b$c" = "200200200" ] || { echo "✖ 冒煙未通過，檢查伺服器構建日誌"; exit 1; }
+  else
+    echo "  首頁=$a  /showing=$b  （產物裡尚無電影頁，跳過抽檢）"
+    [ "$ab" = "200200" ] || { echo "✖ 冒煙未通過，檢查伺服器構建日誌"; exit 1; }
+  fi
+  echo "✅ 已發布"
 }
 
 # ---------- 回滚 / 切换版本：不碰本机存档，也不推送 ----------
