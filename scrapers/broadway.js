@@ -230,6 +230,8 @@ async function scrapeTicketing() {
   const showsRaw = sliceArray(rsc, 'shows');
   if (!showsRaw) throw new Error('未找到 shows 数组 — 页面结构可能已变更');
   const shows = JSON.parse(showsRaw);
+  // Flight 文本记录表：movies 数组里的 `*_lang` 也可能是 "$N" 引用
+  const records = buildRecordMap(rsc);
 
   // ★ 同页还有一个 movies 数组（含全部格式版本：IMAX/4DX/全景声…）
   //   仅靠 shows 反推影片会漏掉无场次的版本，导致详情页版本分类不全
@@ -272,7 +274,7 @@ async function scrapeTicketing() {
       language: null,
       bookingUrl: `${BASE}/hk/show/${s.id}`,
       source: SOURCE,
-    })), movies };
+    })), movies, records };
 }
 
 // ---------- 即将上映 ----------
@@ -502,7 +504,7 @@ export async function scrapeBroadway({ withDetails = true, concurrency = 3 } = {
   //   只在中文缺失时才多打一次请求，且并发受限 —— 平时增量几乎为 0。
   const upcoming = await backfillUpcomingDesc(upcomingRaw, { concurrency });
 
-  const { shows, movies: rawMovies } = ticketing;
+  const { shows, movies: rawMovies, records: ticketingRecords } = ticketing;
 
   // ★ 关键：两个来源必须合并
   //   - movies 数组：含全部格式版本（IMAX/4DX/全景聲…），但可能不含所有有场次的影片
@@ -548,13 +550,13 @@ export async function scrapeBroadway({ withDetails = true, concurrency = 3 } = {
         // 详情更全，但片名以列表为准（列表名含格式标记）
         return {
           ...detail,
-          nameZh: parseLang(m?.name_lang).zh_hk || detail.nameZh,
-          nameEn: parseLang(m?.name_lang).en || detail.nameEn,
+          nameZh: langField(ticketingRecords, m?.name_lang).zh_hk || detail.nameZh,
+          nameEn: langField(ticketingRecords, m?.name_lang).en || detail.nameEn,
           openingDate: hktDate(m?.openingDate) || detail.openingDate,
         };
       }
       // 详情抓取失败或该影片不在 movies 数组里：用最小信息
-      const lang = parseLang(m?.name_lang);
+      const lang = langField(ticketingRecords, m?.name_lang);
       return {
         id: `${SOURCE}-${mid}`,
         slug: slugify(lang.zh_hk, lang.en, mid),
@@ -565,10 +567,10 @@ export async function scrapeBroadway({ withDetails = true, concurrency = 3 } = {
         category: m?.category ?? null,
         dialect: m?.dialect ?? null,
         subtitle: m?.subtitle ?? null,
-        genres: (m?.movieTypes || []).map((t) => parseLang(t.name_lang).zh_hk || t.name),
-        director: parseLang(m?.director_lang).zh_hk || m?.director || null,
-        cast: parseLang(m?.cast_lang).zh_hk || m?.cast || null,
-        description: stripHtml(m?.description || ''),
+        genres: (m?.movieTypes || []).map((t) => langField(ticketingRecords, t.name_lang).zh_hk || t.name),
+        director: langField(ticketingRecords, m?.director_lang).zh_hk || m?.director || null,
+        cast: langField(ticketingRecords, m?.cast_lang).zh_hk || m?.cast || null,
+        description: stripHtml(langField(ticketingRecords, m?.description_lang).zh_hk || m?.description || ''),
         poster: m?.images?.[0] ? `https://media.grabticks.com/${m.images[0]}` : null,
         trailer: m?.trailer || null,
         detailUrl: `${BASE}/hk/movie/${mid}`,
@@ -580,7 +582,7 @@ export async function scrapeBroadway({ withDetails = true, concurrency = 3 } = {
     const rawById = new Map(rawMovies.map((m) => [m.id, m]));
     showing = allIds.map((mid) => {
       const m = rawById.get(mid);
-      const lang = parseLang(m?.name_lang);
+      const lang = langField(ticketingRecords, m?.name_lang);
       return {
         id: `${SOURCE}-${mid}`,
         slug: slugify(lang.zh_hk, lang.en, mid),
@@ -591,10 +593,10 @@ export async function scrapeBroadway({ withDetails = true, concurrency = 3 } = {
         category: m?.category ?? null,
         dialect: m?.dialect ?? null,
         subtitle: m?.subtitle ?? null,
-        genres: (m?.movieTypes || []).map((t) => parseLang(t.name_lang).zh_hk || t.name),
-        director: parseLang(m?.director_lang).zh_hk || m?.director || null,
-        cast: parseLang(m?.cast_lang).zh_hk || m?.cast || null,
-        description: stripHtml(m?.description || ''),
+        genres: (m?.movieTypes || []).map((t) => langField(ticketingRecords, t.name_lang).zh_hk || t.name),
+        director: langField(ticketingRecords, m?.director_lang).zh_hk || m?.director || null,
+        cast: langField(ticketingRecords, m?.cast_lang).zh_hk || m?.cast || null,
+        description: stripHtml(langField(ticketingRecords, m?.description_lang).zh_hk || m?.description || ''),
         poster: m?.images?.[0] ? `https://media.grabticks.com/${m.images[0]}` : null,
         trailer: m?.trailer || null,
         detailUrl: `${BASE}/hk/movie/${mid}`,
