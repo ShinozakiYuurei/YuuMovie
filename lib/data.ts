@@ -20,6 +20,8 @@ import { inferGeo, districtOrder, REGION_ORDER } from './region';
 import { hallSpecsOf, sortSpecs, HALL_SPECS, specLabel, SPEC_GROUP_LABEL } from './cinema-specs';
 import { bookingFeeOf } from './booking-fee';
 import type { BookingFee } from './booking-fee';
+// 已開映場次的判定：與客戶端（components/CinemaShowtimes.tsx 等）共用同一份規則
+import { isLiveShow } from './live';
 import { CINEMA_DISPLAY_NAME } from './cinema-names';
 import type { Region } from './types';
 // 紧凑传输格式的编解码在同目录的 compact.ts（零依赖，客户端组件也要用）
@@ -569,12 +571,11 @@ function load() {
   //
   // 注意：只过滤场次，不过滤电影 —— 今天已散场的电影仍应出现在列表中，
   // 只是场次归零（首页会自然排到最后）。
-  const liveShows = shows.filter((s) => {
-    if (!s.startAt) return false;
-    const t = Date.parse(s.startAt);
-    if (!Number.isFinite(t)) return true; // 时间异常时保留，宁可多显示
-    return t >= now;
-  });
+  //
+  // ★ 2026-09-22：規則抽到 lib/live.ts 的 isLiveShow()，與客戶端共用。
+  //   這裡仍是**構建時**的過濾（構建後才開映的場次它管不到）——
+  //   真正的實時剔除由客戶端組件負責，見 lib/live.ts 的完整說明。
+  const liveShows = shows.filter((s) => isLiveShow(s.startAt, now));
 
   _cache = { movies, shows: liveShows, cinemas, meta, enrich, at: now };
   return _cache;
@@ -1343,6 +1344,103 @@ export function getShowsByCinema(cinemaId: string): Show[] {
   return load()
     .shows.filter((s) => s.cinemaId === cinemaId)
     .sort((a, b) => a.startAt.localeCompare(b.startAt));
+}
+
+// ============================================================
+// 戲院頁的場次列表（展平給客戶端組件）
+// ============================================================
+
+/** 戲院頁裡單條場次 */
+export interface CinemaShowtimeShow {
+  id: string;
+  /** ISO(+08:00)，客戶端據此實時判定是否已開映 */
+  startAt: string;
+  houseName: string;
+  price: number | null;
+  seats: number | null;
+  bookingUrl: string;
+}
+
+/** 戲院頁裡某一天的某部影片 */
+export interface CinemaShowtimeMovie {
+  movieId: string;
+  /** 展示片名（已取組的 displayName，去掉了 IMAX / 特典場 等格式後綴） */
+  label: string;
+  /**
+   * 電影詳情頁的 slug；null 表示無可歸屬的組
+   *
+   * ★ 必須是「組」的 slug，不能用 movie.slug：詳情頁只按組生成
+   *   （dynamicParams = false），非代表條目的 slug 沒有頁面，鏈過去就是 404。
+   *   null 時客戶端渲染純文字（不鏈 404）。
+   */
+  slug: string | null;
+  /** 已解析好的縮略圖路徑（構建期確認存在，缺失時為 null） */
+  poster: string | null;
+  shows: CinemaShowtimeShow[];
+}
+
+/** 戲院頁的一天 */
+export interface CinemaShowtimeDay {
+  date: string;
+  movies: CinemaShowtimeMovie[];
+}
+
+/**
+ * 戲院頁的場次：按「日期 → 影片」分組後展平給客戶端
+ *
+ * ===== 為什麼要搬到客戶端 =====
+ *
+ * 戲院頁是 SSG，整份 HTML 在構建時定稿，而場次時間在持續流逝 ——
+ * 構建後才開映的場次會一直留在頁面上，直到下一次定時重建（3 小時）。
+ * 只有瀏覽器裡的 JS 能貼著時鐘走，故把渲染交給
+ * components/CinemaShowtimes.tsx，由它按當前時間實時剔除。
+ *
+ * 這裡只做「取數 + 分組 + 解析好顯示所需的欄位」——
+ * 圖海報縮圖（posterThumbPath 要讀檔案系統）與組的 slug 都必須在服務端算完，
+ * 客戶端拿到的必須是可直接渲染的純數據。
+ */
+export function getCinemaShowtimeDays(cinemaId: string): CinemaShowtimeDay[] {
+  const byDate = new Map<string, Map<string, Show[]>>();
+
+  // getShowsByCinema 已按 startAt 升序，故影片分組內的場次天然有序
+  for (const s of getShowsByCinema(cinemaId)) {
+    if (!s.movieId) continue;
+    let byMovie = byDate.get(s.date);
+    if (!byMovie) byDate.set(s.date, (byMovie = new Map()));
+    const bucket = byMovie.get(s.movieId);
+    if (bucket) bucket.push(s);
+    else byMovie.set(s.movieId, [s]);
+  }
+
+  return [...byDate.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([date, byMovie]) => ({
+      date,
+      movies: [...byMovie.entries()].map(([movieId, list]) => {
+        const movie = getMovieById(movieId);
+        const group = getGroupForMovieId(movieId);
+        // 海報優先取組的 displayPoster（已按清晰度挑過，見 pickDisplayPoster）
+        const poster = group?.displayPoster || movie?.poster || null;
+        return {
+          movieId,
+          label:
+            group?.displayName?.trim() ||
+            movie?.nameZh?.trim() ||
+            movie?.nameEn?.trim() ||
+            `影片 #${movieId}`,
+          slug: group?.slug ?? null,
+          poster: poster ? posterThumbPath(poster) : null,
+          shows: list.map((s) => ({
+            id: s.id,
+            startAt: s.startAt,
+            houseName: s.houseName || '',
+            price: s.price,
+            seats: s.seats ?? null,
+            bookingUrl: s.bookingUrl,
+          })),
+        };
+      }),
+    }));
 }
 
 /**

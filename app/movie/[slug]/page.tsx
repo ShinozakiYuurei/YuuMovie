@@ -11,7 +11,7 @@ import {
 import { buildIntro } from '@/lib/intro';
 import { MovieJsonLd } from '@/components/MovieJsonLd';
 import { MovieIntro } from '@/components/MovieIntro';
-import { ShowtimeExplorer } from '@/components/ShowtimeExplorer';
+import { MovieShowtimes } from '@/components/MovieShowtimes';
 import { formatDuration } from '@/lib/format';
 
 // 静态导出：预先列出所有电影 slug。
@@ -79,7 +79,6 @@ export default async function MoviePage({ params }: { params: Promise<{ slug: st
   const totalShows = rows.length;
   // 紧凑字典化：单行 619 → 114 字节（详见 lib/data.ts 的 CompactRows 注释）
   const compact = toCompact(rows);
-
   return (
     <article>
       <MovieJsonLd
@@ -117,33 +116,23 @@ export default async function MoviePage({ params }: { params: Promise<{ slug: st
       {/*
        * 場次：多維篩選 + 多鍵排序 + 餘座顏色標記
        *
-       * scroll-mt：锚点跳转时给顶栏留出空间。
-       *   ★ 2026-09-19 改为引用变量：原先写死 scroll-mt-20（80px），
-       *     而顶栏实际高度是 56px —— 两者无关联，改任一边都会错位。
-       *     现用 calc(var(--hkm-header-h) + 1rem)：顶栏高度 + 1rem 呼吸间距。
-       *     calc 写在内联 style 里而不是 Tailwind 类，因为 Tailwind 的
-       *     scroll-mt-* 不支持 CSS 变量运算。
+       * ★ 2026-09-22：整區（含「共 N 場」標題與 section#versions）搬進
+       *   components/MovieShowtimes.tsx（客戶端）。
+       *
+       *   原因：本站是 SSG，HTML 在構建時定稿 —— 原先這裡的 totalShows 與
+       *   場次列表都是構建時算的，構建後才開映的場次會一直留在頁面上，
+       *   直到下一次定時重建（每 3 小時）。用戶回報的「電影到時間上映後
+       *   不剔除場次」正是這個。
+       *
+       *   現在由該組件用瀏覽器時鐘實時剔除，且標題數字與列表同源
+       *   （見該文件關於「為什麼要有這一層」的說明）。
        */}
       {totalShows > 0 && (
-        <section
-          id="versions"
-          className="mt-8"
-          style={{ scrollMarginTop: 'calc(var(--hkm-header-h) + 1rem)' }}
-        >
-          <div className="mb-4 flex flex-wrap items-baseline gap-3">
-            <h2 className="text-2xl font-bold tracking-tight">場次及購票</h2>
-            <span className="hkm-chip">
-              共 {totalShows} 場
-            </span>
-            {a.duration && <span className="hkm-chip">片長 {formatDuration(a.duration)}</span>}
-          </div>
-
-          <ShowtimeExplorer compact={compact} facets={facets} />
-
-          <p className="mt-3 text-[11px] text-fg-dim">
-            點擊場次將前往院線官方購票頁面（另開新視窗）。場次及票價以院線官方公佈為準。
-          </p>
-        </section>
+        <MovieShowtimes
+          compact={compact}
+          facets={facets}
+          durationText={a.duration ? formatDuration(a.duration) : null}
+        />
       )}
     </article>
   );

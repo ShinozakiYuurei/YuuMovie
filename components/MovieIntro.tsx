@@ -160,14 +160,14 @@ export function MovieIntro({ group }: { group: MovieGroup }) {
             </span>
           </div>
 
-          {/* 评分（豆瓣 + IMDb）*/}
-          {a.ratings.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {a.ratings.map((r) => (
-                <RatingCard key={r.source} r={r} />
-              ))}
-            </div>
-          )}
+          {/* 评分（豆瓣 + IMDb）
+              ★ 2026-09-22 始终显示两张卡，保持布局一致。
+              无分时显示「— 暫無評分」，不整块隐藏。 */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            {a.ratings.map((r) => (
+              <RatingCard key={r.source} r={r} />
+            ))}
+          </div>
 
           {/* 版本標籤（IMAX / 4DX …）*/}
           {group.allFormats.length > 0 && (

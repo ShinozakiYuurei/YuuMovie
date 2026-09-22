@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { formatDate, formatDateShort, relativeDay, weekdayShort } from '@/lib/format';
 import { seatLevel, SEAT_STYLE } from '@/lib/seat';
 import { fromCompact } from '@/lib/compact';
+import { isLiveShow } from '@/lib/live';
 import { FeeLine } from './FeeLine';
 import type { CompactRows } from '@/lib/compact';
 import type { Facets, ShowRow } from '@/lib/data';
@@ -208,12 +209,46 @@ function ShowtimeCard({ row }: { row: ShowRow }) {
 export function ShowtimeExplorer({
   compact,
   facets,
+  now,
 }: {
   compact: CompactRows;
   facets: Facets;
+  /**
+   * 「當前時間」（epoch ms）；null = 尚未掛載（一律保留，保證 hydration 一致）
+   *
+   * ★ 為什麼由父層傳入而不是自己 useLiveNow()：
+   *   同一屏裡「共 N 場」的標題 chip 與本組件的場次列表必須是同一個數字。
+   *   若各自維護一份時鐘，兩個定時器相位不同，最多會有 60 秒對不上
+   *   （標題說 131、列表剩 130）—— 那正是用戶以前專門要求修過的問題。
+   *   故由 components/MovieShowtimes.tsx 統一算一次往下傳。
+   *
+   *   原本寫成可選 props（不傳就自建一個 hook），但本組件唯一的調用方
+   *   MovieShowtimes 一定會傳 —— 那個「兼容分支」永遠不會走到，
+   *   卻會白跑一個每分鐘的定時器。改成必填，少一個定時器也少一層猜測。
+   */
+  now: number | null;
 }) {
-  // 紧凑字典 → 完整行（一次性，纯数组映射）
-  const rows = useMemo(() => fromCompact(compact), [compact]);
+  /**
+   * 緊湊字典 → 完整行（純數組映射），並**按當前時間剔除已開映場次**
+   *
+   * ★ 2026-09-22 修復用戶回報的 bug：「電影到時間上映後，場次不會被剔除」。
+   *
+   * 原因：本站是 SSG（output: 'export'），HTML 在構建那一刻定稿。
+   * lib/data.ts 的 load() 確實會按當前時間過濾，但那是**構建時間**；
+   * 定時重建每 3 小時才跑一次，期間開映的場次會一直留在頁面上
+   * （實測：22:19 訪問時仍能看到當天 20:50 的場次）。
+   *
+   * 修法：數據本就已內聯進客戶端（compact），在這裡用瀏覽器的時鐘再過濾一次，
+   * 並由 useLiveNow 每分鐘重算 —— 場次一過點就消失，不必等重建。
+   *
+   * now 為 null（尚未掛載）時 isLiveShow 一律保留，
+   * 這樣首次渲染與構建產物逐字一致，不會有 hydration mismatch。
+   * 詳見 lib/live.ts 與 lib/use-live-now.ts 的說明。
+   */
+  const rows = useMemo(
+    () => fromCompact(compact).filter((r) => isLiveShow(r.startAt, now)),
+    [compact, now]
+  );
 
   /**
    * 目前開啟地圖彈層的戲院 id（null = 未開啟）
@@ -427,8 +462,17 @@ export function ShowtimeExplorer({
       </div>
 
       {sorted.length === 0 ? (
+        /*
+         * 空狀態分兩種，不能混為一談：
+         *   rows 空      → 這部片已經沒有未開映的場次（全部開映了）
+         *   sorted 空    → 有場次，但用戶的篩選條件把它們全篩掉了
+         *
+         * ★ 2026-09-22 隨實時剔除一起補上。此前只有「沒有符合篩選條件的場次」
+         *   一種文案，但實時剔除讓 rows 也可能變空 —— 那時說「不符合篩選條件」
+         *   是錯的（用戶根本沒篩），會讓人以為是自己點錯了什麼。
+         */
         <p className="hkm-panel mt-6 rounded-2xl py-16 text-center text-base text-fg-soft">
-          沒有符合篩選條件的場次
+          {rows.length === 0 ? '暫無場次資料' : '沒有符合篩選條件的場次'}
         </p>
       ) : (
         <>

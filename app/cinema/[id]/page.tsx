@@ -1,21 +1,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import Image from 'next/image';
 import { notFound } from 'next/navigation';
-import {
-  getCinemaById,
-  getShowsByCinema,
-  getMovieById,
-  getGroupForMovieId,
-  posterThumbPath,
-  SOURCE_LABEL,
-} from '@/lib/data';
+import { getCinemaById, getCinemaShowtimeDays, SOURCE_LABEL } from '@/lib/data';
 import { getCinemas } from '@/lib/data';
 import { FeeLine } from '@/components/FeeLine';
 import { CinemaMapButton } from '@/components/CinemaMapButton';
+import { CinemaShowtimes } from '@/components/CinemaShowtimes';
 import { bookingFeeOf } from '@/lib/booking-fee';
 import { cinemaCoord } from '@/lib/cinema-geo';
-import { formatDate, formatTime } from '@/lib/format';
 
 // 静态导出：预先列出所有戏院 id，让每间戏院的详情页都被生成出来。
 // 不写这个的话，out/ 里只会有 /cinema 列表页，详情页全部 404。
@@ -44,25 +36,26 @@ export default async function CinemaPage({ params }: { params: Promise<{ id: str
   const cinema = getCinemaById(id);
   if (!cinema) notFound();
 
-  const shows = getShowsByCinema(cinema.id);
+  /*
+   * 場次按「日期 → 影片」分組後交給客戶端組件渲染
+   *
+   * ★ 2026-09-22：原本這裡是**純服務端渲染**，直接 map 出日期與場次膠囊。
+   *   但本站是 SSG（output: 'export'），HTML 在構建時定稿 ——
+   *   構建後才開映的場次會一直留在頁面上，直到下一次定時重建（每 3 小時）。
+   *   用戶回報的「電影到時間上映後不剔除場次」正是這個（實測 22:19 仍顯示
+   *   當天 20:50 的場次）。現改由 components/CinemaShowtimes.tsx 按瀏覽器
+   *   時鐘實時剔除，詳細取捨見該文件與 lib/live.ts。
+   *
+   *   取數、分組、海報縮圖解析仍在服務端完成（讀檔案系統的事客戶端做不了）。
+   */
+  const days = getCinemaShowtimeDays(cinema.id);
   // 網上手續費（每張票）；規則與出處見 lib/booking-fee.ts
   const fee = bookingFeeOf(cinema.id, cinema.source);
-
-  // 按日期 → 影片分组
-  const byDate = new Map<string, Map<string, typeof shows>>();
-  for (const s of shows) {
-    if (!s.movieId) continue;
-    if (!byDate.has(s.date)) byDate.set(s.date, new Map());
-    const byMovie = byDate.get(s.date)!;
-    if (!byMovie.has(s.movieId)) byMovie.set(s.movieId, []);
-    byMovie.get(s.movieId)!.push(s);
-  }
-  const dates = [...byDate.keys()].sort();
 
   return (
     <>
       <nav className="mb-4 text-xs text-fg-dim">
-        <Link href="/cinema" className="hover:text-fg">
+        <Link href="/cinema" className="text-fg-dim hover:text-fg">
           戲院
         </Link>
         <span className="mx-1">/</span>
@@ -126,87 +119,7 @@ export default async function CinemaPage({ params }: { params: Promise<{ id: str
         )}
       </header>
 
-      {dates.length === 0 && <p className="py-16 text-center text-fg-dim">暫無場次資料</p>}
-
-      {dates.map((date) => {
-        const byMovie = byDate.get(date)!;
-        return (
-          <section key={date} className="mb-9">
-            <h2 className="mb-3.5 flex items-baseline gap-2 border-b border-hairline pb-2.5 text-lg font-semibold tracking-tight">
-              {formatDate(date)}
-            </h2>
-            <div className="space-y-3.5">
-              {[...byMovie.entries()].map(([movieId, list]) => {
-                const movie = getMovieById(movieId);
-                // ★ 必须链到「电影组」的 slug，不能用 movie.slug：
-                //   详情页只按组生成（dynamicParams = false），同一部片在多家院线的
-                //   非代表条目 slug 根本没页面，链过去就是 404（修复前占影院页链接的 57%）。
-                //   片名也取组的 displayName（已去 IMAX / 特典場 等格式后缀）。
-                const group = getGroupForMovieId(movieId);
-                const label =
-                  group?.displayName?.trim() ||
-                  movie?.nameZh?.trim() ||
-                  movie?.nameEn?.trim() ||
-                  `影片 #${movieId}`;
-                return (
-                  <div key={movieId} className="hkm-panel rounded-2xl p-3.5">
-                    <div className="mb-2.5 flex items-center gap-2.5">
-                      {(group?.displayPoster || movie?.poster) && (
-                        /*
-                         * ★ 用 64w 缩略图，不用主图。
-                         *
-                         * 这里只渲染 32×48px，却曾引用主图：
-                         * 实测单页 52 张 × 28KB ≈ 1.43MB，缩略图只要 ~1KB。
-                         * posterThumbPath 在构建期已确认文件存在，
-                         * 缺失时原样返回主图路径，不会 404。
-                         */
-                        <Image
-                          src={posterThumbPath(group?.displayPoster || movie!.poster!)!}
-                          alt=""
-                          width={32}
-                          height={48}
-                          className="h-12 w-8 rounded-md object-cover"
-                        />
-                      )}
-                      {group ? (
-                        <Link
-                          href={`/movie/${group.slug}`}
-                          className="text-sm font-semibold text-fg transition hover:text-accent"
-                        >
-                          {label}
-                        </Link>
-                      ) : (
-                        // 无可归属的组（院线未回片名的脏条目）：给纯文本，不链 404
-                        <span className="text-sm font-semibold text-fg-muted">{label}</span>
-                      )}
-                      <span className="ml-auto text-[11px] text-fg-dim">{list.length} 場</span>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {list.map((s) => (
-                        <a
-                          key={s.id}
-                          href={s.bookingUrl}
-                          target="_blank"
-                          rel="noopener noreferrer nofollow"
-                          title={`${s.houseName} $${s.price ?? '?'}${s.seats != null ? ` · 餘 ${s.seats}` : ''}`}
-                          className="rounded-xl border border-hairline bg-veil px-2.5 py-1 text-center transition hover:border-accent/60 hover:bg-accent/12"
-                        >
-                          <span className="text-sm font-bold text-fg">
-                            {formatTime(s.startAt)}
-                          </span>
-                          <span className="ml-2 text-[10px] text-fg-muted">
-                            {s.houseName || '—'} · ${s.price ?? '—'}
-                          </span>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        );
-      })}
+      <CinemaShowtimes days={days} />
     </>
   );
 }

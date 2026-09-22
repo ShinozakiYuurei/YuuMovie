@@ -60,34 +60,31 @@ export function buildIntro(group: MovieGroup): MovieIntro {
   const i = e?.imdb && !e.imdb.notFound ? e.imdb : null;
   const man = e?.manual || null;
   // ---------- 评分 ----------
-  // 「匹到条目但尚未出分」也展示（新片常见），只有完全查不到才整块不出现。
-  // 顺序：IMDb 在前、豆瓣在后（用户 2026-09-19 指定）。
+  // ★ 2026-09-22 用户要求：两张评分卡始终同时显示，保持布局一致。
+  //   没有分时显示「— 暫無評分」，而不是整块不渲染。
+  //   顺序：IMDb 在前、豆瓣在后。
   const ratings: IntroRating[] = [];
 
   const rating = man?.rating ?? i?.rating ?? null;
-  if (i || man?.rating != null) {
-    ratings.push({
-      source: 'imdb',
-      label: 'IMDb',
-      value: rating,
-      votes: man?.votes ?? i?.votes ?? null,
-      url: i?.imdbUrl || (i?.imdbId ? `https://www.imdb.com/title/${i.imdbId}/` : null),
-    });
-  }
+  // IMDb 卡始终显示（有分显分数，无分显「— 暫無評分」）
+  ratings.push({
+    source: 'imdb',
+    label: 'IMDb',
+    value: rating,
+    votes: man?.votes ?? i?.votes ?? null,
+    url: i?.imdbUrl || (i?.imdbId ? `https://www.imdb.com/title/${i.imdbId}/` : null),
+  });
 
   const d = e?.douban && !e.douban.notFound ? e.douban : null;
-  // 豆瓣卡片**不返回评分人数**（card_subtitle 里只有分数），
-  // 所以 votes 恒为 null；没人数就不写人数，不拿 IMDb 的凑。
+  // 豆瓣卡始终显示（有分显分数，无分显「— 暫無評分」）
   // 页面侧也不渲染人数（IMDb 卡片同样只留分数，两张卡视觉对齐）。
-  if (d && d.ratingState !== 'unreleased') {
-    ratings.push({
-      source: 'douban',
-      label: '豆瓣',
-      value: d.rating ?? null,
-      votes: null,
-      url: d.doubanUrl || null,
-    });
-  }
+  ratings.push({
+    source: 'douban',
+    label: '豆瓣',
+    value: d && d.ratingState !== 'unreleased' ? (d.rating ?? null) : null,
+    votes: null,
+    url: d?.doubanUrl || null,
+  });
 
   // ---------- 级别 ----------
   // 只认港英分级；emperor 的 8.0 之类是媒体评分，不是分级（见 data.ts 注释）。

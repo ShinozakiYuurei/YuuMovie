@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "scrape": "node scrape.js",
-    "posters": "node scripts/fetch-posters.mjs"
+    "posters": "node scripts/fetch-posters.mjs",
+    "test:live": "node scripts/test-live-filter.cjs",
+    "test:hydrate": "node scripts/test-hydration.cjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
