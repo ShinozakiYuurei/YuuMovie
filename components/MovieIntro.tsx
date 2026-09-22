@@ -57,26 +57,50 @@ const RATING_STYLE: Record<IntroRating['source'], { bg: string; fg: string; mark
  *
  *   为什么不用 whitespace-nowrap 兜底：那只是把「换行」换成「溢出」，
  *   文字会盖到圆角边框上。宽度给够才是真修。
+ *
+ * ★ 2026-09-22 三次调整：字眼放大（用户：「IMDb評分/豆瓣評分 字眼可以大點、更協調點」）。
+ *
+ *   原层级是 標籤10 < 徽章11 < 分數16 —— 標籤比徽章字還小，主次顛倒。
+ *   標籤是這張卡在講「這是誰家的評分」，是標題級信息，不该比
+ *   僅作裝飾的徽章還弱。現把標籤提到 12px 與徽章同級，分數 16→18。
+ *
+ *   各字號與卡片寬都是量出來的，不是估的（1280px 視口，線上 digger-1072）：
+ *
+ *     方案                標籤自然寬  值行自然寬  文字需求  最小卡寬
+ *     舊 10/10/16 徽11        63         63        63       141
+ *     新 12/12/18 徽12        73         73        73       151   ← 採用
+ *     13/13/19 徽13@48        79         79        79       161   （偏大，高度也漲）
+ *
+ *   文字需求 = max(標籤, 值行) 的**自然寬**（用 nowrap 量，避免被容器截斷
+ *   而量到容器寬 —— 这一点踩过，量出来恒等于 clientWidth）。
+ *
+ *   卡片定宽 155px = 24(px-3) + 44(徽章) + 10(gap-2.5) + 73(文字) + 4(余量)。
+ *   余量保留 4px 吸收字体差异（Windows 的 Microsoft JhengHei 比
+ *   macOS 的 PingFang HK 略宽），与上次修换行 bug 同一个口径。
+ *
+ *   徽章仍维持 44px 定宽：IMDb 在 12px 下自然宽约 34px，看似可窄，
+ *   但两卡**徽章等宽**才能让文字区起点严格对齐 —— 那正是上一版
+ *   修「IMDb 換行」时定下的规矩，不能为了省 10px 退回参差。
  */
 function RatingCard({ r }: { r: IntroRating }) {
   const st = RATING_STYLE[r.source];
   const body = (
     <div
-      className={`flex w-[144px] items-center gap-2.5 rounded-xl border border-hairline px-3 py-2 ${st.bg}`}
+      className={`flex w-[155px] items-center gap-2.5 rounded-xl border border-hairline px-3 py-2 ${st.bg}`}
     >
       <span
-        className={`flex h-7 w-11 shrink-0 items-center justify-center rounded-md text-[11px] font-bold leading-none ${st.markBg} ${r.source === 'imdb' ? 'text-canvas' : 'text-white'}`}
+        className={`flex h-7 w-11 shrink-0 items-center justify-center rounded-md text-[12px] font-bold leading-none ${st.markBg} ${r.source === 'imdb' ? 'text-canvas' : 'text-white'}`}
       >
         {st.mark}
       </span>
       <span className="min-w-0">
-        <span className="block text-[10px] leading-none text-fg-dim">{r.label}評分</span>
+        <span className="block text-[12px] leading-none text-fg-dim">{r.label}評分</span>
         <span className="mt-1 flex items-baseline gap-1.5">
-          <span className={`text-base font-semibold leading-none ${st.fg}`}>
+          <span className={`text-lg font-semibold leading-none ${st.fg}`}>
             {r.value != null ? r.value.toFixed(1) : '—'}
           </span>
           {r.value == null && (
-            <span className="text-[10px] leading-none text-fg-dim">暫無評分</span>
+            <span className="text-[12px] leading-none text-fg-dim">暫無評分</span>
           )}
         </span>
       </span>
