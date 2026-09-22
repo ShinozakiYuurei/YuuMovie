@@ -12,10 +12,16 @@ import { formatLabel, type MovieGroup } from '@/lib/data';
  * 全服务端渲染，无客户端 JS —— 静态导出下这块是纯 HTML。
  */
 
-/** 评分来源的视觉标识（豆瓣绿 / IMDb 琥珀，与各自官方一致） */
-const RATING_STYLE: Record<IntroRating['source'], { bg: string; fg: string; markBg: string; mark: string }> = {
-  douban: { bg: 'bg-[rgb(46_150_61/0.14)]', fg: 'text-[#7bd48f]', markBg: 'bg-[#2e963d]', mark: '豆瓣' },
-  imdb: { bg: 'bg-[rgb(245_197_24/0.12)]', fg: 'text-[#f0c040]', markBg: 'bg-[#f0c040]', mark: 'IMDb' },
+/** 评分来源的视觉标识（豆瓣绿 / IMDb 琥珀，与各自官方一致）
+ *
+ * markSize：徽章字号。两个来源**故意不同**，理由见 RatingCard 的注释
+ * （拉丁字母与汉字的墨迹尺寸差得很远，同字号并不等于同视觉大小）。 */
+const RATING_STYLE: Record<
+  IntroRating['source'],
+  { bg: string; fg: string; markBg: string; mark: string; markSize: number }
+> = {
+  douban: { bg: 'bg-[rgb(46_150_61/0.14)]', fg: 'text-[#7bd48f]', markBg: 'bg-[#2e963d]', mark: '豆瓣', markSize: 12.5 },
+  imdb: { bg: 'bg-[rgb(245_197_24/0.12)]', fg: 'text-[#f0c040]', markBg: 'bg-[#f0c040]', mark: 'IMDb', markSize: 11.5 },
 };
 
 /**
@@ -81,6 +87,38 @@ const RATING_STYLE: Record<IntroRating['source'], { bg: string; fg: string; mark
  *   徽章仍维持 44px 定宽：IMDb 在 12px 下自然宽约 34px，看似可窄，
  *   但两卡**徽章等宽**才能让文字区起点严格对齐 —— 那正是上一版
  *   修「IMDb 換行」时定下的规矩，不能为了省 10px 退回参差。
+ *
+ * ★ 2026-09-23 四次调整：徽章里两个 logo 的**视觉大小**对齐
+ *   （用户：「这里的 IMDb 和豆瓣的 logo 大小不一致」）。
+ *
+ *   前三次都在调「卡片」尺寸，这次的问题出在卡片**内部**：
+ *   药丸是固定 44×28，但里面塞的是两种文字系统，同 12px 下墨迹差很多：
+ *
+ *     徽章    墨迹宽×高    占药丸宽   左右留白
+ *     IMDb   32.5 × 10.0    74%       各 5.8px   ← 又大又挤
+ *     豆瓣   24.0 × 11.8    55%       各 10px    ← 又小又松
+ *
+ *   根因：拉丁字母**字宽大、x-height 小**（IMDb 四个字母里 I 很窄但 M/D/b 宽，
+ *   整体高度只有小写字母那么高），汉字是**方块**（宽高都吃满 em）。
+ *   所以「同字号」既不等于同宽、也不等于同高 —— 谁大谁小取决于你量哪个维度。
+ *
+ *   实测各配对（墨迹包围盒，dpr=4 截屏解码后算，见 probe/rating-logo-ink.cjs）：
+ *
+ *     IMDb/豆瓣   墨跡面積比   幾何均比   高比
+ *     12 / 12      1.15        1.07      0.85   ← 现状，IMDb 明显偏大
+ *     11 / 12      0.95        0.97      0.77
+ *     11.5 / 12.5  0.97        0.98      0.78   ← 採用
+ *     12 / 13      0.98        0.99      0.78
+ *     12 / 10      1.24        1.11      1.00   （只等高，面积差更多）
+ *
+ *   採用「等幾何均」11.5 / 12.5：墨跡面積比 0.97、幾何均比 0.98，
+ *   兩個維度同時最接近 1.0。單看某一維都有更好的解，但會讓另一維明顯失配：
+ *   「等墨跡高 12/10」高比是 1.00，可面積比反而 1.24，豆瓣看着更小。
+ *   字號差 1px 是**故意的**，不是笔误 —— 对齐的是视觉大小，不是 font-size。
+ *
+ *   药丸宽度仍固定 44px：字号变小后 IMDb 墨迹 31.3px，留白从 5.8 涨到 6.4px，
+ *   与豆瓣的 9px 仍不等，但**药丸本身**是等大的，并排看是整齐的。
+ *   卡片 155px 也不用改 —— 徽章定宽，文字区需求与字号无关。
  */
 function RatingCard({ r }: { r: IntroRating }) {
   const st = RATING_STYLE[r.source];
@@ -89,7 +127,8 @@ function RatingCard({ r }: { r: IntroRating }) {
       className={`flex w-[155px] items-center gap-2.5 rounded-xl border border-hairline px-3 py-2 ${st.bg}`}
     >
       <span
-        className={`flex h-7 w-11 shrink-0 items-center justify-center rounded-md text-[12px] font-bold leading-none ${st.markBg} ${r.source === 'imdb' ? 'text-canvas' : 'text-white'}`}
+        className={`flex h-7 w-11 shrink-0 items-center justify-center rounded-md font-bold leading-none ${st.markBg} ${r.source === 'imdb' ? 'text-canvas' : 'text-white'}`}
+        style={{ fontSize: `${st.markSize}px` }}
       >
         {st.mark}
       </span>
