@@ -901,8 +901,56 @@ export function getMovieGroups(status?: 'showing' | 'upcoming'): MovieGroup[] {
   if (hit && now - hit.at < CACHE_TTL_MS) return hit.groups;
 
   const groups = buildMovieGroups(status);
+
+  // ★ slug 必须与「全量池」一致，否则卡片链接会指向不存在的静态页。
+  //
+  // 背景：`slug: primary.slug`，而 primary 是**在当前过滤池内**选出来的
+  //   （isBaseVersion 优先，再比场次数）。同一部片若同时有 showing 与 upcoming
+  //   条目，两个池选出的 primary 不同 —— 全量池 slug ≠ 待映池 slug。
+  //   而 generateStaticParams 只取 getMovieGroups()（全量池）的 slug，
+  //   于是待映页的卡片链接指向未生成的页面（dynamicParams = false，必然 404）。
+  //
+  //   2026-09-22 实际踩到：
+  //     《善男信女》 broadway-1341(showing, 4 場) + broadway-1086(upcoming)
+  //       全量池 → we-are-born-good-bc30-1341 ｜ 待映池 → we-are-born-good-1086
+  //     《怎麼可能我家的祖先是你家的鬼》 cinemacity/bestar(showing) + broadway-1380(upcoming)
+  //       全量池 → ...-cinemacity-ce259d270695 ｜ 待映池 → ...-1380
+  //   共 3 条死链（首页 1 + 待映页 2），被 probe/check-published-links.mjs 拦下。
+  //
+  // 为什么只改 slug 而不整体复用全量池的组：池内其余字段（status、versions、
+  //   totalShows、displayOpeningDate…）按设计就该反映**当前池**的数据
+  //   —— 待映页要显示「上映日期」角标靠的就是 status === 'upcoming'。
+  //   只有 slug 是「页面身份」，全站必须唯一。
+  if (status) {
+    const canon = canonicalSlugById();
+    for (const g of groups) {
+      const s = canon.get(g.primary.id);
+      // 兜底：查不到就保留池内 slug。正常情况下 canonicalSlugById 覆盖
+      // 全部 showing ∪ upcoming 条目，取不到说明分组逻辑有洞，
+      // 那时宁可留下旧行为也不要静默改成空字符串（会让链接变成 /movie/undefined）。
+      if (s) g.slug = s;
+    }
+  }
+
   _groupsCache.set(ck, { at: now, groups });
   return groups;
+}
+
+/**
+ * 条目 id → 该组在「全量池」里的 slug
+ *
+ * 全量池是 slug 的唯一权威：generateStaticParams、sitemap 都用它，
+ * 所有卡片链接也必须收敛到它（见 getMovieGroups 的说明）。
+ *
+ * 这里直接调 getMovieGroups()（无参）而不是复用 groupIndex()：
+ * groupIndex 的 slug 来自 showing/upcoming 两个池，正是要修掉的那个不一致。
+ */
+function canonicalSlugById(): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const g of getMovieGroups()) {
+    for (const v of g.versions) for (const id of v.movieIds) map.set(id, g.slug);
+  }
+  return map;
 }
 
 const _groupsCache = new Map<string, { at: number; groups: MovieGroup[] }>();

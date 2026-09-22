@@ -112,6 +112,11 @@ else
   # 戲院影廳規格：推断了错了页面照样 200，只是「有 IMAX 的戲院」
   # 静默少几家 / 多几家 —— 用户筛 IMAX 看不到 K11 也只会以为它没有。
   "$TSX" probe/check-cinema-specs.mts
+  # 卡片链接 → 静态页的覆盖面：movie 页是 dynamicParams=false 的静态导出，
+  # 链接 slug 与 generateStaticParams 的 slug 一旦分叉就是线上 404。
+  # 这个 bug 本地构建不报错、类型不报错，只在服务器部署后才被死链检查拦下 ——
+  # 代价是一整次服务器构建 + 必须回滚才能恢复发布（2026-09-22 实际踩到）。
+  "$TSX" probe/check-slug-coverage.mts
 fi
 
 # ---------- 2 存档 ----------
