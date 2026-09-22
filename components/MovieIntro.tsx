@@ -15,13 +15,31 @@ import { formatLabel, type MovieGroup } from '@/lib/data';
 /** 评分来源的视觉标识（豆瓣绿 / IMDb 琥珀，与各自官方一致）
  *
  * markSize：徽章字号。两个来源**故意不同**，理由见 RatingCard 的注释
- * （拉丁字母与汉字的墨迹尺寸差得很远，同字号并不等于同视觉大小）。 */
+ * （拉丁字母与汉字的墨迹尺寸差得很远，同字号并不等于同视觉大小）。
+ *
+ * ★ 2026-09-24 底色由**半透明**改为**不透明**：
+ *   原先写的是 rgb(245 197 24 / 0.12) 这种「品牌色 + 低透明度」，
+ *   它压在卡片背景上，而卡片背景又压着主色层 —— 三层叠出来的颜色
+ *   随海报而变。实测《生化危機》（红色主色）那张：
+ *     卡面叠成 rgb(73,44,36)，而卡上的「IMDb評分」标签是 #90909A，
+ *     对比度只剩 3.98:1，**不达 AA**。
+ *   即：标签的可读性本不该取决于身后是什么海报。
+ *
+ *   修法：预先算好「品牌色混一点暗底」的不透明值，写死。
+ *   暗底取 #18181B（卡片基色），混色比例与原来的 0.12/0.14 视觉接近：
+ *     IMDb   0.12 × #F5C518 + 0.88 × #18181B ≈ rgb(46 40 20)
+ *     豆瓣   0.14 × #2E963D + 0.86 × #18181B ≈ rgb(34 41 25)
+ *   实测（probe/rating-bg.cjs）三张片最差：
+ *     半透明（原）.. IMDb 3.82:1 / 豆瓣 3.87:1   ✗
+ *     不透明（新）.. IMDb 4.65:1 / 豆瓣 4.75:1   ✓
+ *   观感上仍是「黄底 / 绿底」，只是不再受身后主色干扰。
+ */
 const RATING_STYLE: Record<
   IntroRating['source'],
   { bg: string; fg: string; markBg: string; mark: string; markSize: number }
 > = {
-  douban: { bg: 'bg-[rgb(46_150_61/0.14)]', fg: 'text-[#7bd48f]', markBg: 'bg-[#2e963d]', mark: '豆瓣', markSize: 12.5 },
-  imdb: { bg: 'bg-[rgb(245_197_24/0.12)]', fg: 'text-[#f0c040]', markBg: 'bg-[#f0c040]', mark: 'IMDb', markSize: 11.5 },
+  douban: { bg: 'bg-[rgb(34_41_25)]', fg: 'text-[#7bd48f]', markBg: 'bg-[#2e963d]', mark: '豆瓣', markSize: 12.5 },
+  imdb: { bg: 'bg-[rgb(46_40_20)]', fg: 'text-[#f0c040]', markBg: 'bg-[#f0c040]', mark: 'IMDb', markSize: 11.5 },
 };
 
 /**

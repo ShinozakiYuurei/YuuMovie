@@ -45,6 +45,7 @@ data.local-test/
 #   - check-genres.mts 由 deploy/sync.sh 在本地自检阶段跑（挡类型标签重复/简繁混用）
 #   - check-poster-pick.mts 由 deploy/sync.sh 在本地自检阶段跑（挡选错海报）
 #   - check-poster-color.mts 由 deploy/sync.sh 在本地自检阶段跑（挡主色取错：黑白片染色/亮色压字）
+#   - check-contrast.mts 由 deploy/sync.sh 在本地自检阶段跑（挡文字对比度令牌被改坏）
 #   - check-version-text.mts 由 deploy/sync.sh 在本地自检阶段跑（挡场次卡片版本·语言写错）
 #   - check-cinema-specs.mts 由 deploy/sync.sh 在本地自检阶段跑（挡戲院影廳規格推断错）
 #   - check-slug-coverage.mts 由 deploy/sync.sh 在本地自检阶段跑（挡卡片链接指向未生成的 movie 页）
@@ -66,6 +67,7 @@ probe/*
 !probe/check-genres.mts
 !probe/check-poster-pick.mts
 !probe/check-poster-color.mts
+!probe/check-contrast.mts
 !probe/check-version-text.mts
 !probe/check-cinema-specs.mts
 !probe/check-slug-coverage.mts

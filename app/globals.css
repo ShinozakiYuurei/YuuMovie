@@ -50,7 +50,7 @@
    *   fg     #F4F4F5 → 画布 18.00:1 / 卡片 16.12:1
    *   soft   #D4D4D8 → 画布 13.38:1 / 卡片 11.99:1
    *   muted  #A1A1AA → 画布  7.72:1 / 卡片  6.91:1   ← 用户指定的次级文字
-   *   dim    #8A8A94 → 画布  5.79:1 / 卡片  5.18:1   ← 两者均过 AA 正文
+   *   dim    #90909A → 画布  6.24:1 / 卡片  5.58:1   ← 两者均过 AA 正文
    *   faint  #5A5A63 → 画布  2.99:1                    ← ⚠️ 仅限装饰
    *
    * ⚠️ faint 为什么只能用于装饰：它不达 AA（低于 4.5:1），
@@ -58,11 +58,31 @@
    *   它只用于卡片信息行里的分隔符「·」这类**纯装饰**字符 ——
    *   这类字符不承载信息（去掉也不影响理解），低对比才合理。
    *   任何真正要读的文字都走 dim 及以上。
+   *
+   * ★★ 2026-09-24 dim 由 #8A8A94 提亮到 #90909A ★★
+   *
+   *   上面那组数字（「卡片 5.18:1」）算的是**实心卡片 #18181B**，
+   *   而卡片早就改成半透明玻璃了 —— 身后有极光，那个前提不再成立。
+   *   实测（probe/verify-real.cjs，真实产物）：玻璃上的 dim 最差只有
+   *   4.32:1，落在 AA 线下（多张片子在 4.3~4.5 之间反复擦线）。
+   *
+   *   为什么不继续调玻璃/主色：那两处已经标定到「刚好过 AA」（见
+   *   .hkm-panel 与 .hkm-accent-panel 的注释），再压就要牺牲玻璃质感
+   *   与「按海报取色」的观感。而 dim 这个令牌本身是**按旧前提定的值**，
+   *   提亮它才是从根上修 —— 也符合本文件「令牌是单一事实源」的原则：
+   *   改一处，全站所有用 text-fg-dim 的地方（资料表标签、面包屑、脚注…）
+   *   一起生效。
+   *
+   *   取值依据（probe/token.cjs，5 部片含主色最亮的，取最差）：
+   *     #8A8A94（原）.. 4.32:1  ✗
+   *     #90909A ...... 4.67:1  ✓  ← 采用（刚好过 AA，改动最小）
+   *     #96969F ...... 5.03:1  ✓
+   *   只提亮 6/255：肉眼几乎看不出差别，但把最差处从 4.32 抬到 4.67。
    */
   --hkm-fg: #f4f4f5; /* 主文字 */
   --hkm-fg-soft: #d4d4d8; /* 强调次级（小字号正文） */
   --hkm-fg-muted: #a1a1aa; /* 次级文字 */
-  --hkm-fg-dim: #8a8a94; /* 辅助说明 / 面包屑 / 脚注（过 AA） */
+  --hkm-fg-dim: #90909a; /* 辅助说明 / 面包屑 / 脚注（过 AA） */
   --hkm-fg-faint: #5a5a63; /* 装饰性分隔符专用（不达 AA，勿用于正文） */
 
   /* ---- 发丝边框（保留给分隔线等非玻璃元素） ---- */
@@ -424,37 +444,58 @@ a {
 /*
  * 玻璃的公共骨架
  *
- * ★ 渐变描边用「双层背景 + background-clip」而不是伪元素遮罩：
- *   第一版我用了 mask-composite: exclude 把渐变挖成一圈边，效果没问题，
- *   但它要求元素 position: relative 来给伪元素定位 —— 而 .hkm-panel-sticky
- *   带 Tailwind 的 sm:sticky，一个全局的 position: relative
- *   会把 sticky **整个盖掉**，筛选条就不再吸附了（静默失效，很难查）。
- *   双层背景方案零伪元素、零定位依赖，同一视觉效果但不会和 sticky 打架。
+ * ★★ 2026-09-24 重构：**去掉白色 tint，边环改用真实 border** ★★
  *
- *   第一层 padding-box：玻璃内部底色（半透明 → backdrop-filter 能透出身后）
- *   第二层 border-box：只有 1px 的边框区域会露出来 → 就是那圈棱边反光
- *   颜色层（background-color）垫在最下面，被第一层半透明渐变覆盖
+ *   起因：用户要求「次级文字对比度一起修，玻璃别那么透」。
+ *   实测（probe/isolate.cjs 等，同一张《生化危機》详情卡，次级文字 #8A8A94）
+ *   把「谁在把背景抬亮」逐层拆开：
+ *
+ *     现状 ............................................. 2.99:1
+ *     ├─ 第一层 tint 白雾（145deg）.................... 去掉 +0.50
+ *     ├─ 第二层棱边高光（135deg）...................... 去掉 +0.48
+ *     ├─ 主色层 .hkm-accent-panel .................... 去掉 +0.90
+ *     ├─ backdrop-filter 的 brightness(1.1) .......... 去掉 +0.07
+ *     └─ 极光透上来（底色半透明）....................... 关掉 +0.53
+ *     全去掉 ........................................... 4.57:1
+ *
+ *   两个与直觉相反的结论：
+ *
+ *   ① **白色 tint 是主因，而且它正是「糊一层白雾」的那个东西。**
+ *      本文件上方原注释早就写着「白高光在 #0A0A0C 上却是糊一层白雾」，
+ *      当时只把透明度从 0.8~0.9 收到 0.10~0.30 —— 方向没变，雾还是雾。
+ *      要过 AA 就得把方向换掉：**暗色玻璃不该靠加白来显形**，
+ *      该靠「比画布略亮一档 + backdrop-filter 折射身后的极光」。
+ *
+ *   ② **第二层原本不是「只有 1px 边框」—— 它整片漏出来了。**
+ *      原设计意图是第一层 padding-box 盖住内部、第二层 border-box
+ *      只在边框区露出。但第一层本身只有 0.07 的白、是**半透明**的，
+ *      根本盖不住 —— 第二层从底下整片透出来铺满卡片。
+ *      实测证据：只把第一层置 0（第二层保留）时，卡片平均亮度
+ *      从 0.0176 涨到 0.0273（+55%），证明第二层确实在整片区域生效。
+ *      所以边环改用**真实的 border** 表达，不再靠两层背景叠加假装。
+ *
+ *   保留的玻璃质感（去掉白雾不等于不要玻璃）：
+ *     · 1px 半透明边框 —— 棱边反光，改用真 border 后行为可预测
+ *     · backdrop-filter 的模糊 + 饱和 + 提亮 —— 折射身后的极光
+ *     · 比画布亮一档（实测 2.3×，落在原注释定的 1.8~2.2 附近）
+ *
+ *   底色不透明度 0.36 → 0.72（用户要的「别那么透」）：
+ *     实测（probe/balance.cjs）过 AA 后 alpha 是**自由变量**，
+ *     0.60~0.90 全部达标（次级文字 4.67~5.08:1），因为白雾一去掉，
+ *     底色本身几乎不再影响文字对比度。既然自由，就按用户的要求取实一点。
  */
 .hkm-glass,
 .hkm-panel,
 .hkm-panel-sticky {
-  border: 1px solid transparent;
-  background-image:
-    linear-gradient(
-      145deg,
-      var(--hkm-glass-tint-hi) 0%,
-      var(--hkm-glass-tint) 38%,
-      var(--hkm-glass-tint-dim) 100%
-    ),
-    linear-gradient(
-      135deg,
-      var(--hkm-glass-edge) 0%,
-      rgb(255 255 255 / 0.07) 30%,
-      rgb(255 255 255 / 0.03) 55%,
-      var(--hkm-glass-edge-dim) 100%
-    );
-  background-clip: padding-box, border-box;
-  background-origin: border-box;
+  /*
+   * 边框即棱边：1px 半透明白，直接表达「玻璃的边缘」。
+   * 用 border 而不是 background 叠加，是为了让「只在边缘」这件事
+   * 由布局保证，而不是靠 background-clip 的计算结果 —— 后者正是
+   * 上面第②条踩坑的根源。
+   */
+  border: 1px solid rgb(255 255 255 / 0.13);
+  /* 没有背景图了：白色 tint 与棱边渐变全部移除（见上方注释） */
+  background-image: none;
   /* 玻璃必须知道自己叠在谁上面，否则混合/合成会穿到更远的层 */
   isolation: isolate;
 }
@@ -467,28 +508,19 @@ a {
  *   菜单项自己会 hover，如果整个菜单也跟着动，鼠标在菜单里移动时
  *   菜单本体就跟着飘，体验很怪。
  *
- * ★ 为什么不透明度比卡片高（0.62）：
+ * ★ 为什么不透明度比卡片高（0.82）：
  *   菜单直接盖在**文字**上（院线名、场次数），而不像卡片盖在背景光斑上。
  *   像顶栏一样，身后是文字时以可读性优先。
+ *
+ * ★ 2026-09-24：白色渐变一并移除（与卡片同理，见上方公共骨架的注释）。
+ *   这里原本还有一层 160deg 的白（0.09→0.03），在暗色画布上同样是白雾；
+ *   菜单盖的是文字，比卡片更经不起糊。棱边改用真实 border。
  */
 .hkm-glass-pop {
   --hkm-glass-blur: 26px;
-  background-color: rgb(20 20 24 / 0.62);
-  background-image:
-    linear-gradient(
-      160deg,
-      rgb(255 255 255 / 0.09) 0%,
-      rgb(255 255 255 / 0.03) 100%
-    ),
-    linear-gradient(
-      135deg,
-      var(--hkm-glass-edge) 0%,
-      rgb(255 255 255 / 0.07) 40%,
-      var(--hkm-glass-edge-dim) 100%
-    );
-  border: 1px solid transparent;
-  background-origin: border-box;
-  background-clip: padding-box, border-box;
+  background-color: rgb(20 20 24 / 0.82);
+  background-image: none;
+  border: 1px solid rgb(255 255 255 / 0.13);
   -webkit-backdrop-filter: blur(var(--hkm-glass-blur)) saturate(var(--hkm-glass-sat));
   backdrop-filter: blur(var(--hkm-glass-blur)) saturate(var(--hkm-glass-sat));
   box-shadow:
@@ -513,7 +545,8 @@ a {
      代价：会裁掉溢出的子元素。本站 .hkm-glass 里没有需要外溢的内容
      （卡片本来就自己裁），且自身 box-shadow 不受 overflow 影响。 */
   overflow: hidden;
-  background-color: rgb(24 24 27 / 0.38);
+  /* 0.38 → 0.72（用户要的「别那么透」）；过 AA 后 alpha 是自由变量，见公共骨架注释 */
+  background-color: rgb(24 24 27 / 0.72);
   -webkit-backdrop-filter: blur(var(--hkm-glass-blur)) saturate(var(--hkm-glass-sat))
     brightness(var(--hkm-glass-lift));
   backdrop-filter: blur(var(--hkm-glass-blur)) saturate(var(--hkm-glass-sat))
@@ -597,7 +630,8 @@ a {
 
 /* ---- 面板：静态玻璃，无 hover 位移 ---- */
 .hkm-panel {
-  background-color: rgb(24 24 27 / 0.36);
+  /* 0.36 → 0.72（同 .hkm-glass） */
+  background-color: rgb(24 24 27 / 0.72);
   -webkit-backdrop-filter: blur(var(--hkm-glass-blur)) saturate(var(--hkm-glass-sat))
     brightness(var(--hkm-glass-lift));
   backdrop-filter: blur(var(--hkm-glass-blur)) saturate(var(--hkm-glass-sat))
@@ -623,7 +657,13 @@ a {
  */
 .hkm-panel-sticky {
   --hkm-glass-blur: 30px;
-  background-color: rgb(20 20 24 / 0.55);
+  /*
+   * 0.55 → 0.86：它 sticky 悬浮在滚动的场次列表之上，身后是**文字**。
+   * 比卡片更实，理由与悬浮菜单一致（身后是文字时以可读性优先）。
+   * 顺带把原本那层白色渐变移除（它会让身后文字变成一片灰雾）。
+   */
+  background-color: rgb(20 20 24 / 0.86);
+  background-image: none;
   -webkit-backdrop-filter: blur(var(--hkm-glass-blur)) saturate(var(--hkm-glass-sat))
     brightness(var(--hkm-glass-lift));
   backdrop-filter: blur(var(--hkm-glass-blur)) saturate(var(--hkm-glass-sat))
@@ -777,6 +817,27 @@ a {
      wash 提到 0.30 后标准差降到 8°，颜色忠实度（与主色的色相偏差）
      从 12~20° 降到 6~8°。
      主光斑仍保留，因为它提供「颜色从封面那侧溢出」的方向感。
+
+   ★★ 2026-09-24 收窄半径 130% → 60%，并降低 wash ★★
+
+     起因：用户要求「次级文字对比度一起修」。实测发现主色层是**最大**的
+     加亮源（去掉它 +0.90，见公共骨架的逐层拆解）。
+
+     关键观察（probe/spatial.cjs 的对比度热力图）：失败是**均匀**的 ——
+     整卡 2.69~3.95，而不是只在海报那一侧。说明 130% 的半径
+     已经把主色摊到了整个文字区，文字落在哪里都吃亏。
+
+     所以正确解法不是「把主色整体调弱」（那会连海报旁边的氛围感一起牺牲），
+     而是**收窄它的覆盖范围**：颜色集中在海报侧，文字区少沾。
+
+     实测（probe/alt.cjs 热力图逐格对比）：
+       半径 130%（原）... 最差 4.13:1，左上角一片不达标
+       半径  52% ....... 最差 4.98:1，全卡达标
+     且收窄后卡片亮度比仍在 2.3×（原注释定的「比画布亮一档」区间内）。
+
+     取 60% 而不是实测最优的 52%：留余量给主色更亮的那些海报
+     （HKLGFF 系的黄褐 #6e5709、Queen Budapest 的金 #615a08），
+     它们的主色比生化危機的红亮得多。
    ============================================================ */
 .hkm-accent-panel {
   position: absolute;
@@ -786,24 +847,39 @@ a {
   border-radius: inherit;
   background-image:
     /*
-     * 主光斑：贴着左上角（桌面端海报所在的那一侧），
-     * 向右下衰减 —— 这就是「颜色从封面溢出到卡片」的方向感。
+     * 主光斑：贴着左上角（桌面端海报所在的那一侧），向右下衰减。
+     * 半径 60%：刚好盖住海报区与卡片左侧，不再摊到右侧文字区。
      */
     radial-gradient(
-      120% 115% at 0% 0%,
-      rgb(var(--hkm-accent-rgb) / 0.2) 0%,
-      rgb(var(--hkm-accent-rgb) / 0.08) 40%,
-      rgb(var(--hkm-accent-rgb) / 0) 72%
+      60% 120% at 0% 0%,
+      rgb(var(--hkm-accent-rgb) / 0.34) 0%,
+      rgb(var(--hkm-accent-rgb) / 0.1) 55%,
+      rgb(var(--hkm-accent-rgb) / 0) 100%
     ),
     /*
-     * 整卡洗色：让整块卡是**同一个颜色**（网易云那种观感的关键）。
+     * 整卡洗色：让整块卡有同一个色调倾向（网易云那种观感的来源）。
+     *
+     * ★ 2026-09-24 先降到 0.10/0.07/0.04（减半），后又回调到 0.22/0.154/0.088：
+     *   它是唯一会**均匀抬高文字区**的一层 —— 收窄光斑对它无效
+     *   （实测半径 60%→32% 只从 4.26 走到 4.35，因为限制来自这条
+     *   均匀的 linear-gradient，不是光斑）。所以压对比度时先动它。
+     *   但压到 0.5× 后主色明显变弱（海报侧色差 27 → 17），
+     *   等于把用户要的「按海报取色」做没了。
+     *
+     *   而 dim 令牌提亮到 #90909A（见文字层级注释）之后有了余量，
+     *   于是可以把它加回来。实测（probe/restore-accent.cjs，4 部片取最差）：
+     *     wash 0.5× ....... 次级 4.87:1  海报侧色差 17  （主色太弱）
+     *     wash 1.1× ....... 次级 4.54:1  海报侧色差 27  ← 采用（≈原强度）
+     *     wash 1.4× ....... 次级 4.32:1  海报侧色差 33  ✗ 不达 AA
+     *   即 1.1× 是「刚好仍过 AA」的最大值，而且它恰好等于原来的视觉强度。
+     *
      * 未端不降到 0：降到 0 会让卡片右下发灰，又变回「只有角上有颜色」。
      */
     linear-gradient(
       158deg,
-      rgb(var(--hkm-accent-rgb) / 0.3) 0%,
-      rgb(var(--hkm-accent-rgb) / 0.24) 60%,
-      rgb(var(--hkm-accent-rgb) / 0.15) 100%
+      rgb(var(--hkm-accent-rgb) / 0.22) 0%,
+      rgb(var(--hkm-accent-rgb) / 0.154) 60%,
+      rgb(var(--hkm-accent-rgb) / 0.088) 100%
     );
 }
 
