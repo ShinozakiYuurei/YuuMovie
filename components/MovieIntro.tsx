@@ -31,19 +31,41 @@ const RATING_STYLE: Record<IntroRating['source'], { bg: string; fg: string; mark
  * 三处宽度都不同，并排看参差不齐。现改为**固定宽度**：
  *   两张卡恒定同宽，不随内容（分数位数 / 有无分）变化。
  *
- * 宽度 138px 的来由：最宽的组合是「豆瓣評分 — 暫無評分」（实测 133.3px），
- *   留 ~4px 余量吸收不同系统字体的字宽差异（Windows 的 Microsoft JhengHei
- *   比 macOS 的 PingFang HK 略宽）。固定宽比 min-w 更好 —— min-w 只保证
- *   下限，内容短的卡仍会比长的窄，还是不一样宽。
+ * ★ 2026-09-22 二次修复：上面那个 138px 仍然不够，IMDb 无分时又换行了。
+ *
+ *   实测（1280px 视口，线上 digger-1072）：
+ *     IMDb  138×58   「IMDb評分 / — 暫無評分」 ← 换行，比豆瓣高 10px
+ *     豆瓣  138×48   「豆瓣評分 / — 暫無評分」
+ *   两卡同宽却不等高，并排看更明显 —— 因为换行把高度撑起来了。
+ *
+ *   根因有两层，138px 只解决了其中一层：
+ *     1. **徽章宽度不固定**：IMDb 是 4 个拉丁字母（43px），豆瓣是 2 个汉字
+ *        （34px），差 9px。留白余量只按「豆瓣」算，IMDb 就少了 9px。
+ *     2. 卡片总宽按内容算，没覆盖「徽章 + 暫無評分」这个最宽组合。
+ *
+ *   实测四组合所需宽度（含 padding 24 + gap 10）：
+ *     IMDb 有分 124 / IMDb 无分 140  ← 140 才是上限
+ *     豆瓣 有分 108 / 豆瓣 无分 131
+ *   138px 比上限少 2px，于是只有 IMDb 无分这一种组合换行。
+ *
+ *   修法：
+ *     - 徽章改**固定宽**（w-11 = 44px，居中）—— 两个来源的徽章同宽，
+ *       文字区起点对齐，卡片也就不再因徽章长短而差 9px。
+ *     - 卡片定宽 144px = 24 + 44 + 10 + 63（文字需求实测恒为 63px，
+ *       换过 Microsoft JhengHei / PingFang HK / Noto Sans TC / Arial
+ *       都量到 63）+ 3px 余量。
+ *
+ *   为什么不用 whitespace-nowrap 兜底：那只是把「换行」换成「溢出」，
+ *   文字会盖到圆角边框上。宽度给够才是真修。
  */
 function RatingCard({ r }: { r: IntroRating }) {
   const st = RATING_STYLE[r.source];
   const body = (
     <div
-      className={`flex w-[138px] items-center gap-2.5 rounded-xl border border-hairline px-3 py-2 ${st.bg}`}
+      className={`flex w-[144px] items-center gap-2.5 rounded-xl border border-hairline px-3 py-2 ${st.bg}`}
     >
       <span
-        className={`flex h-7 items-center rounded-md px-1.5 text-[11px] font-bold leading-none ${st.markBg} ${r.source === 'imdb' ? 'text-canvas' : 'text-white'}`}
+        className={`flex h-7 w-11 shrink-0 items-center justify-center rounded-md text-[11px] font-bold leading-none ${st.markBg} ${r.source === 'imdb' ? 'text-canvas' : 'text-white'}`}
       >
         {st.mark}
       </span>
