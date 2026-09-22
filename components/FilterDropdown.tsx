@@ -226,7 +226,7 @@ export function FilterDropdown({
           <div
             ref={menuRef}
             style={{ top: pos.top, left: pos.left, width: pos.width, maxHeight: pos.maxH }}
-            className="fixed z-[60] overflow-y-auto overscroll-contain rounded-xl border border-hairline-strong bg-surface-hover p-1.5 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.95)]"
+            className="hkm-glass-pop fixed z-[60] overflow-y-auto overscroll-contain rounded-xl p-1.5"
           >
             {options.length === 0 && <p className="px-3 py-2 text-sm text-fg-muted">無可選項</p>}
 

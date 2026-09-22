@@ -32,8 +32,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="zh-HK" className={cn("font-sans", geist.variable)}>
       <body className="min-h-screen">
-        {/* 环境光层：固定定位，不参与滚动 */}
-        <div className="hkm-aurora" aria-hidden />
+        {/* 环境光层：固定定位，不参与滚动。
+         *
+         * ★ 2026-09-23 从「两个伪元素」改为「三个真实元素」：
+         *   卡片改成液态玻璃后，身后必须有**可折射的光源**，
+         *   否则 blur() 采样到的是一片纯色，玻璃看上去就是普通色块。
+         *   三团光分别服务：顶栏（a1）、右侧补光（a2）、
+         *   第二屏以后的卡片（a3）。伪元素只有两个名额，故改用真实元素。 */}
+        <div className="hkm-aurora" aria-hidden>
+          <i className="a1" />
+          <i className="a2" />
+          <i className="a3" />
+        </div>
 
         {/* 顶栏：真毛玻璃（固定元素，模糊开销可控）
          *
