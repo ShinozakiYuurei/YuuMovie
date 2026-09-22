@@ -357,7 +357,38 @@ export function dominantColor(data, channels = 3) {
   }
 
   const pick = best || relaxed || fallback;
-  return pick ? normalizeAccent(pick.r, pick.g, pick.b) : null;
+  if (!pick) return null;
+
+  /*
+   * ★★ 最后一道门：整图到底有没有颜色（覆盖率门槛）★★
+   *
+   *   只靠上面「选中那一桶的饱和度」不够 —— 它会把**黑白片 + 一个小彩色 logo**
+   *   判成有颜色，然后拿那个小 logo 的颜色铺满整张卡。
+   *   实测（probe/gate.mjs，覆盖率为「整图饱和度 ≥0.25 的像素占比」）：
+   *     · 新世紀福音戰士劇場版：白底黑白海报，只有一个小紫 logo，覆盖 0.1%
+   *     · 愛很硬 / 處女機器（KINO）：黑白剧照，只有一个绿 logo，覆盖 2.5% / 2.9%
+   *     · 蜘蛛俠：真正彩色（红蓝主视觉），覆盖 5.3%
+   *   0.1%~2.9% 与 5.3% 之间有一段天然空隙，3% 刚好落在里面。
+   *
+   *   所以覆盖率低于 3% 就诚实地返回 null —— 宁可回到中性玻璃，
+   *   也不拿一个 logo 的颜色去代表整张海报。
+   *   这与「灰色不铺色」是同一条原则：**不编造海报里并不存在的主色**。
+   *
+   *   注意覆盖率要**重新算一遍全图**，不能用上面那些桶的数据：
+   *   上面的桶已经按亮度/饱和度过滤过，算出来的占比不是全图占比。
+   */
+  const COLOR_FRACTION_MIN = 0.03;
+  let colored = 0;
+  let total = 0;
+  for (let i = 0; i + channels - 1 < data.length; i += channels) {
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    total++;
+    if (max > 0 && (max - min) / max >= MIN_SAT) colored++;
+  }
+  if (!total || colored / total < COLOR_FRACTION_MIN) return null;
+
+  return normalizeAccent(pick.r, pick.g, pick.b);
 }
 
 /* ---------------------------------------------------------------
