@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { formatDate, formatDateShort, relativeDay, weekdayShort } from '@/lib/format';
-import { seatLevel, SEAT_STYLE, SEAT_THRESHOLDS } from '@/lib/seat';
+import { seatLevel, SEAT_STYLE } from '@/lib/seat';
 import { fromCompact } from '@/lib/compact';
 import { FeeLine } from './FeeLine';
 import type { CompactRows } from '@/lib/compact';
@@ -128,12 +128,8 @@ function SeatLegend() {
           {SEAT_STYLE[lv].label}
         </span>
       ))}
-      <span className="tabular-nums text-fg-dim">
-        綠 ≥{Math.round(SEAT_THRESHOLDS.plenty * 100)}% ・ 橙{' '}
-        {Math.round(SEAT_THRESHOLDS.limited * 100)}–
-        {Math.round(SEAT_THRESHOLDS.plenty * 100) - 1}% ・ 紅 &lt;
-        {Math.round(SEAT_THRESHOLDS.limited * 100)}%
-      </span>
+      {/* ★ 2026-09-21 用户要求删除右侧的阈值文字（綠 ≥50% ・ 橙 20–49% ・ 紅 <20%）：
+          四个色卡 + 文字标签本身已经说明了分档含义，阈值数字是解释性噪音。 */}
     </div>
   );
 }
