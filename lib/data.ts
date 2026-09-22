@@ -948,6 +948,36 @@ export function getMovieGroups(status?: 'showing' | 'upcoming'): MovieGroup[] {
 
   const groups = buildMovieGroups(status);
 
+  // ★ 「在映優先」：同一部片只要有任一條目在映，整組就歸 showing，
+  //   不再出現在 /upcoming/（用戶 2026-09-23 指定）。
+  //
+  // 背景：status 過濾發生在 buildMovieGroups 的**第一步**（按片名分組之前），
+  //   所以 upcoming 池只看得到該片的 upcoming 條目，看不到同片的 showing 條目，
+  //   於是把它當成一部獨立待映片建組。緊接著的 canonicalSlugById() 又把 slug
+  //   改寫成全量池的 slug —— 兩個池撞到同一個 slug，詳情頁（取全量池的
+  //   status=showing）與 /upcoming/ 列表（upcoming 池）互相矛盾。
+  //
+  //   2026-09-23 實際踩到（probe/check-nav-category.mjs 在部署時攔下）：
+  //     《善男信女》 broadway-1341(showing, 4 場) + broadway-1086(upcoming, 0 場)
+  //     《怎麼可能我家的祖先是你家的鬼》 cinemacity/bestar(showing, 6 場)
+  //                                       + broadway-1380(upcoming, 0 場)
+  //   兩部片都同時出現在 /upcoming/ 與 /showing/，詳情頁卻只標 showing。
+  //
+  // 為什麼用「全量池的 status」而不是「本池條目有無場次」：
+  //   全量池是 slug 的唯一權威（見下方 canonicalSlugById），詳情頁也是按
+  //   全量池的組渲染的。要讓列表與詳情頁一致，判據必須同源，否則又是兩套邏輯。
+  if (status === 'upcoming') {
+    const showingIds = new Set<string>();
+    for (const g of getMovieGroups()) {
+      if (g.status !== 'showing') continue;
+      for (const v of g.versions) for (const id of v.movieIds) showingIds.add(id);
+    }
+    for (let i = groups.length - 1; i >= 0; i--) {
+      const ids = groups[i].versions.flatMap((v) => v.movieIds);
+      if (ids.some((id) => showingIds.has(id))) groups.splice(i, 1);
+    }
+  }
+
   // ★ slug 必须与「全量池」一致，否则卡片链接会指向不存在的静态页。
   //
   // 背景：`slug: primary.slug`，而 primary 是**在当前过滤池内**选出来的
