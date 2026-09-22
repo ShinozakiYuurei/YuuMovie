@@ -90,6 +90,22 @@ verify_site() {
   else
     log "⚠️ 缺 probe/check-published-links.mjs，本次未做死链检查"
   fi
+
+  # 詳情頁歸屬（用戶 2026-09-23 回報：待映片詳情頁被標成現正上映，頂欄色塊也亮錯）。
+  # 放在**伺服器**而不是本地自檢：它要掃的是構建產物（HTML + 打包後的 CSS），
+  # 本機在 `next build` 之前根本沒有 out/ 可掃。
+  # 為什麼不能只靠人眼：這個 bug 編譯過、構建過、頁面 200，只有文案不對。
+  if [ -f probe/check-nav-category.mjs ]; then
+    rc=0
+    node probe/check-nav-category.mjs "$SITE_DIR" || rc=$?
+    if [ "$rc" = "1" ]; then
+      die "詳情頁歸屬與列表不一致，判定發布不健康"
+    elif [ "$rc" != "0" ]; then
+      die "詳情頁歸屬檢查未能執行（exit $rc），不能當作通過"
+    fi
+  else
+    log "⚠️ 缺 probe/check-nav-category.mjs，本次未做詳情頁歸屬檢查"
+  fi
 }
 
 # ---------- 0 首次收编：把服务器目录变成仓库 ----------

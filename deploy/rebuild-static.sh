@@ -89,8 +89,13 @@ echo "  数据校验通过：${SHOWS} 场次"
 #   重下失败时保留上一版记录（继续用旧文件），不会变成裂图。
 # POSTERS=0 可跳过。
 if [ "${POSTERS:-1}" = "1" ]; then
-  echo "▶ 海报本地化..."
+  echo "▶ 海报本地化 + 主色提取..."
   T_POSTER=$(date +%s)
+  # ★ 2026-09-24：主色提取已挂在 fetch-posters.mjs 末尾（见该脚本注释）。
+  #   之所以不单独跑一步：主色只依赖**已落盘的主图**，而主图刚好在
+  #   fetch-posters 结束时全部就绪（含新下载与旧缓存），放一起就不会出现
+  #   「图新了色没新」。取色也是增量的，日常重建只算新片（实测全量 4 秒、
+  #   增量接近 0）。若确实要单独重算：node scripts/poster-colors.mjs --force
   if node scripts/fetch-posters.mjs; then
     echo "  海报耗时 $(( $(date +%s) - T_POSTER ))s"
   else

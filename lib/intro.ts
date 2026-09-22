@@ -18,6 +18,21 @@ import { formatDuration } from './format';
 /** 香港官方分级（与 lib/data.ts 的 HK_RATINGS 同步） */
 const HK_RATINGS = new Set(['I', 'IIA', 'IIB', 'III']);
 
+/**
+ * `#rrggbb` → `"r g b"`（CSS 里 rgb(var(--x) / a) 要的通道写法）
+ *
+ * 容忍 `#rgb` 短写法与大小写；入参不是合法颜色时返回 null ——
+ * 宁可让卡片退回中性玻璃，也不要把一个坏值写进 style 属性
+ * （写坏了 CSS 变量整条声明会失效，而且是静默的）。
+ */
+function hexToRgbChannels(hex: string | null | undefined): string | null {
+  if (!hex) return null;
+  let h = hex.trim().replace(/^#/, '');
+  if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return null;
+  return `${parseInt(h.slice(0, 2), 16)} ${parseInt(h.slice(2, 4), 16)} ${parseInt(h.slice(4, 6), 16)}`;
+}
+
 export interface IntroRating {
   /** 来源标识，用于配色与外链 */
   source: 'douban' | 'imdb';
@@ -31,6 +46,24 @@ export interface MovieIntro {
   title: string;
   subtitle: string | null;
   poster: string | null;
+  /**
+   * 海报主色（`#rrggbb`），取不到为 null
+   *
+   * 详情页卡片的背景填充用它（见 components/MovieIntro.tsx）。
+   * 为 null 时组件回退到「模糊海报光晕」那层旧背景。
+   */
+  accent: string | null;
+  /**
+   * 主色的 **RGB 通道**写法（`"27 46 126"`），供 CSS 逐档控制透明度
+   *
+   * ★ 为什么要多一个字段而不是让组件自己转：
+   *   CSS 里要写 rgb(var(--x) / 0.34) 这种**带 alpha 的主色**，
+   *   而 hex 做不到 —— 只能靠 color-mix()，它在旧引擎上没有回退，
+   *   一旦不支持整块背景就全丢。
+   *   转换放在这里（服务端、每页一次）而不是 CSS 里，
+   *   是因为 CSS 无法把 #rrggbb 拆成三个通道值。
+   */
+  accentRgb: string | null;
 
   openingDate: string | null;
   duration: number | null;
@@ -94,6 +127,8 @@ export function buildIntro(group: MovieGroup): MovieIntro {
     title: group.displayName,
     subtitle: group.primary.nameEn && group.primary.nameEn !== group.displayName ? group.primary.nameEn : null,
     poster: group.displayPoster,
+    accent: group.displayAccent,
+    accentRgb: hexToRgbChannels(group.displayAccent),
     openingDate: group.displayOpeningDate,
     duration: group.displayDuration,
     durationText: formatDuration(group.displayDuration),

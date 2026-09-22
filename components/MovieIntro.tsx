@@ -172,20 +172,60 @@ export function MovieIntro({ group }: { group: MovieGroup }) {
     : null;
 
   return (
-    <header className="hkm-panel hkm-enter relative overflow-hidden rounded-2xl p-4 sm:p-6">
+    <header
+      className="hkm-panel hkm-enter relative overflow-hidden rounded-2xl p-4 sm:p-6"
+      /*
+       * ★ 2026-09-24 用户要求：卡片背景改成「像网易云那样按海报主题色填充」。
+       *
+       * 做法：把主色的 **RGB 通道**写成 CSS 变量，由 .hkm-accent-panel
+       *   （见 globals.css）用它拼出「主色 → 透明」的渐变，铺在玻璃面板最底层。
+       *
+       * 为什么在 HTML 上写 style 而不是构建期生成 288 个 CSS 类：
+       *   静态导出下每页只用到**一个**主色，288 个类里 287 个是死代码，
+       *   而且会随新片无限增长。一个内联变量既是最小产物，也天然按片变化。
+       *
+       * 为什么传「27 46 126」而不是「#1b2e7e」：
+       *   CSS 侧要写 rgb(var(--x) / 0.34) 这种**带 alpha 的主色**，
+       *   hex 做不到（只能靠 color-mix()，它在旧引擎上没回退，
+       *   一旦不支持整块背景就全丢）。通道写法则到处都能用。
+       *
+       * 未取到主色（黑白片 / 老照片，见 scripts/poster-colors.mjs）时不写
+       *   这个变量、也不渲染主色层 —— 卡片回到中性玻璃，
+       *   下方那层模糊海报光晕照旧。
+       */
+      style={
+        a.accentRgb ? ({ '--hkm-accent-rgb': a.accentRgb } as React.CSSProperties) : undefined
+      }
+    >
       {/*
-       * 海报主色氛围光：把同一张海报模糊后铺在顶部背景。
+       * 背景填充：海报主色
+       *
+       * ★ 为什么这层放在 .hkm-poster-glow **下面**：
+       *   主色是「纯色渐变」，模糊光晕是「海报本身的色块」。
+       *   两者同时存在时，光晕在上层会把主色稀释成一片混沌
+       *   （又回到改之前那个「看不出是什么颜色」的观感）。
+       *   所以主色优先、光晕兜底：有主色时只看主色，
+       *   没有主色时才让光晕显形。
+       *
+       * aria-hidden：纯装饰。
+       */}
+      {a.accentRgb && <div className="hkm-accent-panel" aria-hidden />}
+
+      {/*
+       * 海报光晕（兜底）：主色取不到时才有视觉意义。
        *
        * ★ 用户 2026-09-21：「提取左侧海报的主色调，在顶部大背景区域做
        *   一层极淡的高斯模糊（Glassmorphism）」。
-       *   用海报本身而不是构建期提取的色值 —— 同一 URL 命中浏览器缓存，
-       *   不产生额外请求，且色调与海报 100% 一致。
+       *   2026-09-24 起主色版成为默认，这层降级为兜底 —— 但**不能删**：
+       *   黑白片 / 老照片没有可取的颜色（取色脚本刻意返回 null），
+       *   新片的海报也可能还没跑过取色脚本，那时卡片必须有东西撑住背景，
+       *   否则会显得比改之前还素。
+       *   用海报本身而不是另一张图：同一 URL 命中浏览器缓存，不产生额外请求。
        *
-       * aria-hidden：纯装饰。
        * 用原生 <img> 而不是 next/image：这里不需要尺寸优化（原图已在本
        *   地且会被模糊掉），而 next/image 在 unoptimized 下会多包一层。
        */}
-      {a.poster && (
+      {!a.accentRgb && a.poster && (
         <div className="hkm-poster-glow" aria-hidden>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={a.poster} alt="" />

@@ -373,6 +373,23 @@ async function main() {
   }
   if (thumbMade > 0) console.log(`   ↻ 补齐缩略图 ${thumbMade} 张（从本地主图生成，未产生网络请求）`);
 
+  // ---------- 海报主色（详情页卡片背景填充用）----------
+  //
+  // ★ 为什么挂在这里而不是单独一个构建步骤：主色只依赖**已落盘的主图**，
+  //   而主图刚好在这一步全部就绪（含新下载与旧缓存）。放一起意味着
+  //   调用方只需记住「跑过抓图就有主色」，不会出现「图新了色没新」。
+  //
+  // 非致命：取色失败只影响详情页背景的观感，页面会回退到模糊光晕。
+  //   取色本身也是增量的（见 scripts/poster-colors.mjs），日常重建
+  //   只算新片，实测 288 张全量 4 秒、增量接近 0。
+  try {
+    const { backfillColors } = await import('./poster-colors.mjs');
+    const c = await backfillColors({ log: console.log });
+    if (c.made > 0) console.log(`   ↻ 提取海报主色 ${c.made} 张（共 ${c.total} 条记录）`);
+  } catch (e) {
+    console.warn(`   ⚠️ 海报主色提取失败（不影响发布）：${e.message}`);
+  }
+
   const mb = (n) => (n / 1048576).toFixed(1);
 
   // ---------- 清理：删掉不再被引用的旧宽度文件 ----------

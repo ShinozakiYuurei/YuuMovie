@@ -54,7 +54,17 @@ export default async function CinemaPage({ params }: { params: Promise<{ id: str
 
   return (
     <>
-      <nav className="mb-4 text-xs text-fg-dim">
+      {/*
+       * data-page-nav="cinema"：告訴頂欄「本頁屬於戲院這一類」。
+       *
+       * ★ 為什麼需要（2026-09-23 發現）：頂欄的「戲院」在 /cinema/<id> 上
+       *   從不點亮 —— 它只認 pathname === '/cinema' 的精確匹配，而詳情頁的
+       *   路徑是 /cinema/<id>。這與用戶回報的「待映片詳情頁被標成現正上映」
+       *   是**同一個機制問題**：詳情頁的子路徑與列表路徑不同，
+       *   而頂欄在 layout 裡拿不到子頁面的歸屬。
+       *   詳見 components/NavLinks.tsx 與 globals.css 的說明。
+       */}
+      <nav className="mb-4 text-xs text-fg-dim" data-crumb data-page-nav="cinema">
         <Link href="/cinema" className="text-fg-dim hover:text-fg">
           戲院
         </Link>

@@ -501,6 +501,18 @@ a {
   /* ★ position 只在卡片上声明：它需要一个定位上下文来放 hover 扫光。
      卡片从不 sticky，所以安全；筛选条那种 sticky 元素刻意排除在外。 */
   position: relative;
+  /* ★ overflow 必须在共享类里裁，不能指望调用方自己加 overflow-hidden。
+     扫光 ::after 靠 translateX(-60% → 60%) 扫过整个盒子，全程有相当
+     一部分时间在盒子之外 —— 不裁就会有一条白影甩到框外。
+     2026-09-23 首页区块标题栏与「查看全部」按钮实际踩到：悬停时标题栏
+     右边缘外 116px 处出现亮斑（= 0.6 × 栏宽），按钮因为 hover 会连带
+     触发父级标题栏，一起中招。
+     海报卡一直没暴露，只是因为 MovieGroupCard 自己带了 Tailwind 的
+     overflow-hidden —— 于是「裁不裁」变成了调用方的责任，任何新加的
+     .hkm-glass 忘了写就复发。收进共享类，这个坑才真正消失。
+     代价：会裁掉溢出的子元素。本站 .hkm-glass 里没有需要外溢的内容
+     （卡片本来就自己裁），且自身 box-shadow 不受 overflow 影响。 */
+  overflow: hidden;
   background-color: rgb(24 24 27 / 0.38);
   -webkit-backdrop-filter: blur(var(--hkm-glass-blur)) saturate(var(--hkm-glass-sat))
     brightness(var(--hkm-glass-lift));
@@ -683,6 +695,15 @@ a {
   .hkm-glass::after {
     display: none;
   }
+  /*
+   * 主色填充也一并收一档：该开关是为「半透明层叠导致无法阅读」的用户设的，
+   * 而主色层同样会抬高背景亮度（实测次级文字对比度降约 15%）。
+   * 不整个关掉是因为它是**实色**、不是透明度效果，留着才能保住
+   * 「背景跟着海报变色」这个功能；只把强度减半，两侧都照顾到。
+   */
+  .hkm-accent-panel {
+    opacity: 0.5;
+  }
 }
 
 /* ============================================================
@@ -712,11 +733,114 @@ a {
 }
 
 /* ============================================================
-   海报主色氛围光（Atmosphere）
+   海报主色填充（Accent fill）—— 卡片背景按海报主题色着色
+
+   ★ 2026-09-24 用户要求（附网易云播放页截图）：
+     「改下这个卡片里的背景颜色填充，改成像网易云那边识别海报的主题色」
+
+   网易云那套的要点不是「背景是模糊的封面」，而是
+   **背景是一块从封面里取出来的颜色** —— 封面上是什么颜色，
+   整块背景就是什么颜色，文字浮在这块颜色上。这里照此实现。
+
+   ★ 与上一版（.hkm-poster-glow，模糊海报本身）的区别：
+     模糊海报保留的是「画面的多色块」，人脸/白字/渐变天空糊在一起是一片
+     混沌的灰蓝，看不出「这张海报是什么颜色」；
+     主色是一块干净的单色，观感与参考图一致。
+     两者只能留一个 —— 主色版成为默认，模糊光晕降级为**兜底**
+     （取色脚本没跑过的新片），见 components/MovieIntro.tsx。
+
+   ★ 为什么颜色用变量传进来：
+     --hkm-accent-rgb 由 <header> 的内联 style 按片写入（值形如 "27 46 126"）。
+     用空格分隔的 RGB 通道而不是 hex，是因为 CSS 侧要**逐档控制透明度**
+     （rgb(var(--x) / 0.52)）；用 hex 就得引 color-mix()，
+     而它在旧浏览器上没有回退，一旦不支持整块背景就全丢。
+
+   ★ 为什么渐变末端写 rgb(... / 0) 而不是 transparent：
+     写法等价、观感也等价，但 transparent 是 rgba(0,0,0,0)，
+     在**非预乘插值**的老引擎上会让渐变中途发黑（灰雾）。
+     同色零透明没有这个歧义，代价为零。
+
+   ★ 透明度是**标定**出来的，不是估的（probe/sweep-accent2.cjs + probe/final-accent-check.cjs）：
+     约束是「#8A8A94 次级文字 / #A1A1AA 元信息 / #F4F4F5 白字在着色后都别掉太多」，
+     而黄色系主色（#5a5307 这类）是压力最大的一档 —— 它比蓝紫亮得多。
+     实测 6 部片（含 2 部黄色海报）定稿参数下的最差值：
+       次级   2.77:1（改前 2.91，退步 0.14）
+       元信息 3.69:1（改前 3.89，退步 0.19）
+       白字   8.61:1（改前 9.06）
+     而蓝色系海报（占大多数）是**变好**的：次级 +0.43~+0.65，
+     因为深色主色比身后的青绿极光暗，等于给文字垫了一层更深的底。
+
+   ★ 为什么 wash（整卡均匀洗色）比 hot（左上光斑）大：
+     网易云那种观感的关键是「整块是同一个颜色」。
+     第一版只有左上光斑（wash 0），实测整卡色相标准差 16°
+     （左上蓝、右下青绿），像一块渐变玻璃而不是「跟着封面变色」。
+     wash 提到 0.30 后标准差降到 8°，颜色忠实度（与主色的色相偏差）
+     从 12~20° 降到 6~8°。
+     主光斑仍保留，因为它提供「颜色从封面那侧溢出」的方向感。
+   ============================================================ */
+.hkm-accent-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background-image:
+    /*
+     * 主光斑：贴着左上角（桌面端海报所在的那一侧），
+     * 向右下衰减 —— 这就是「颜色从封面溢出到卡片」的方向感。
+     */
+    radial-gradient(
+      120% 115% at 0% 0%,
+      rgb(var(--hkm-accent-rgb) / 0.2) 0%,
+      rgb(var(--hkm-accent-rgb) / 0.08) 40%,
+      rgb(var(--hkm-accent-rgb) / 0) 72%
+    ),
+    /*
+     * 整卡洗色：让整块卡是**同一个颜色**（网易云那种观感的关键）。
+     * 未端不降到 0：降到 0 会让卡片右下发灰，又变回「只有角上有颜色」。
+     */
+    linear-gradient(
+      158deg,
+      rgb(var(--hkm-accent-rgb) / 0.3) 0%,
+      rgb(var(--hkm-accent-rgb) / 0.24) 60%,
+      rgb(var(--hkm-accent-rgb) / 0.15) 100%
+    );
+}
+
+/*
+ * 手机上光斑收窄：屏幕窄，同样的 120% 会把整张卡都染成主色，
+ * 标题与正文全部落在浓色区（实测次级文字对比度掉到 3.9:1）。
+ * 收窄后热点只盖住海报那一块，文字区回到中性。
+ */
+@media (max-width: 640px) {
+  .hkm-accent-panel {
+    background-image:
+      radial-gradient(
+        95% 78% at 50% 0%,
+        rgb(var(--hkm-accent-rgb) / 0.26) 0%,
+        rgb(var(--hkm-accent-rgb) / 0.1) 40%,
+        rgb(var(--hkm-accent-rgb) / 0) 72%
+      ),
+      linear-gradient(
+        172deg,
+        rgb(var(--hkm-accent-rgb) / 0.26) 0%,
+        rgb(var(--hkm-accent-rgb) / 0.2) 60%,
+        rgb(var(--hkm-accent-rgb) / 0.12) 100%
+      );
+  }
+}
+
+/* ============================================================
+   海报主色氛围光（Atmosphere）—— 主色取不到时的兜底层
 
    ★ 2026-09-21 用户要求：
      「提取左侧海报的主色调，在顶部大背景区域做一层极淡的高斯模糊
       （Glassmorphism），瞬间拉满影院级大片氛围」
+
+   ★ 2026-09-24 起降级为兜底：主色版（.hkm-accent-panel）成为默认，
+     这一层只在**取色缺失**时渲染 —— 新片的海报刚抓下来、
+     取色脚本还没跑过（见 scripts/poster-colors.mjs 的增量说明）。
+     不能直接删：那时卡片会没有背景，比改之前还素。
 
    ★ 为什么用「海报本身模糊」而不是构建期提取主色：
      - 构建期提取要改 fetch-posters.mjs 写一张颜色表、lib/data.ts 读它、
@@ -1159,4 +1283,60 @@ details > summary::-webkit-details-marker {
 .hkm-rating-card:hover {
   border-color: var(--hkm-hairline-strong);
   transform: translateY(-1px);
+}
+
+/* ============================================================
+   頂欄導航的高亮（含詳情頁）
+
+   ★ 2026-09-23 用戶回報：「即将上映的电影，点进去子目录显示在現正上映；
+     而且顶上的色块也标在现正上映上」。
+
+   詳情頁的路由是 /movie/<slug>，**同一個前綴裝著上映中與待映兩種片**
+   （《BLUE LOCK 藍色監獄》就是待映，卻被標成現正上映）。
+   頂欄在 layout 裡，對所有頁面共用，拿不到當前詳情頁的 group.status ——
+   所以先前只能拿路徑前綴硬猜，一猜就錯。
+
+   現在改為：詳情頁自己在 <article data-page-nav="showing|upcoming|cinema">
+   （或戲院詳情頁的 <nav data-page-nav="cinema">）上寫下歸屬 ——
+   它手上有 group.status / cinema.id，是唯一知道答案的一層；
+   頂欄這裡只負責把它讀出來。麵包屑與頂欄因此共用同一個事實來源。
+
+   ★ 為什麼屬性名叫 data-page-nav 而不是 data-movie-nav：
+     戲院詳情頁 /cinema/<id> 有**完全相同**的毛病（頂欄「戲院」從不點亮，
+     因為它只認精確匹配 pathname === '/cinema'）。兩者共用一個機制、
+     一組選擇器，比分別寫兩套更不容易漏。
+
+   ★ 為什麼用 CSS :has() 而不是 React state：
+     本站是靜態導出，HTML 在構建時定稿。state 要等 JS 跑起來才生效，
+     首屏會先亮錯（或先不亮），用戶看到一次高亮跳動；
+     而 :has() 寫在構建產物裡，首屏即正確，禁用 JS 也成立。
+     本站已在用 :has()（shadcn 的 button 樣式有 has-data-[…]），
+     瀏覽器基線早已覆蓋。
+
+   ★ 為什麼選擇器要寫得這麼長：
+     必須同時限定「本頁是哪一類」與「要點亮哪一項」。
+     若只寫 body:has([data-page-nav=showing]) a[data-nav=showing]，
+     它在 /showing、/upcoming 等**沒有** [data-page-nav] 的頁面上
+     不會命中（那些頁面靠 NavLinks 的 pathname 精確匹配點亮），
+     兩套規則互不干擾、也不會同時亮兩項。
+
+   ★ 為什麼三類都寫全（含 cinema）：
+     漏掉 cinema 的話，戲院詳情頁的頂欄就不亮 —— 那正是修這個 bug 時
+     順帶發現的同類問題，一起收掉比留一半好。
+
+   高亮樣式與 NavLinks.tsx 裡 active 的那串必須保持一致
+   （bg-veil-strong + font-medium + text-fg）。CSS 改不動 Tailwind 的
+   工具類，所以這裡用等價聲明寫一遍 —— 改一處務必改另一處。
+
+   ★ :not(:hover) 不是裝飾：本規則的權重（0,2,2）高於 Tailwind 的
+     .hover\:bg-veil-strong:hover（0,2,0），不加這一條的話，
+     在詳情頁 hover「即將上映」就不會有任何背景反饋 ——
+     高亮是「你現在在這裡」，hover 是「點下去會去哪裡」，兩者都要成立。
+   ============================================================ */
+body:has([data-page-nav='showing']) a[data-nav='showing']:not(:hover),
+body:has([data-page-nav='upcoming']) a[data-nav='upcoming']:not(:hover),
+body:has([data-page-nav='cinema']) a[data-nav='cinema']:not(:hover) {
+  background-color: var(--hkm-veil-strong);
+  color: var(--hkm-fg);
+  font-weight: 500;
 }

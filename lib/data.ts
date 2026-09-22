@@ -210,6 +210,39 @@ export function posterThumbPath(poster: string | null | undefined): string | nul
   return _posterThumbSet?.has(thumb) ? thumb : poster;
 }
 
+/**
+ * 海报主色表：本地海报文件名 → #rrggbb
+ *
+ * ★ 由 scripts/poster-colors.mjs 在构建前生成（见该脚本的注释）。
+ *   键是**主图文件名**而不是原始 URL：读取层手里拿到的是已本地化的
+ *   /posters/xxx.webp（见 slimPoster），从路径反推文件名是纯字符串操作，
+ *   不必再反查一张 URL 表。
+ *
+ * 惰性读取 + 缺文件降级为空表：主色只是「锦上添花」的视觉信息，
+ *   取色脚本没跑过（首次部署）时页面必须照常渲染，
+ *   因此这里 quiet 读、缺失即返回 null，由组件决定回退。
+ */
+let _posterColors: Record<string, string> | null = null;
+
+function posterColors(): Record<string, string> {
+  if (_posterColors) return _posterColors;
+  _posterColors = readJson<Record<string, string>>('poster-colors.json', {}, true);
+  return _posterColors;
+}
+
+/**
+ * 取本地海报的主色（`#rrggbb`），取不到返回 null。
+ *
+ * 入参是**已本地化**的海报路径（/posters/xxx.webp 或图片子域的同名路径）。
+ * 远端 URL、无主色记录、主色文件缺失一律返回 null —— 调用方
+ * （components/MovieIntro.tsx）据此回退到模糊光晕背景，无需自己分支。
+ */
+export function posterAccent(poster: string | null | undefined): string | null {
+  if (!poster || !isLocalPoster(poster)) return null;
+  const name = poster.replace(/^.*\/posters\//, '');
+  return posterColors()[name] ?? null;
+}
+
 function slimPoster(url: string | null, width: number): string | null {
   if (!url) return null;
 
@@ -812,6 +845,18 @@ export interface MovieGroup {
    * 百老汇 / 英皇有 800×1125。卡片、详情页大图、JSON-LD 都应读这个字段。
    */
   displayPoster: string | null;
+  /**
+   * 展示海报的主色（`#rrggbb`），取不到为 null
+   *
+   * ★ 2026-09-24 用户要求「卡片背景填充改成网易云那样按海报取主题色」。
+   *   由 scripts/poster-colors.mjs 在构建前算好（见 lib/data.ts 的
+   *   posterAccent 注释），这里只做一次查表。
+   *
+   * 为什么挂在组上而不是让组件自己查：displayPoster 是**组级**决策
+   *   （pickDisplayPoster 会在多个版本里挑），主色必须跟着那张被选中的图，
+   *   组件层拿到的只是路径字符串，自己查会多一次路径→文件名的转换。
+   */
+  displayAccent: string | null;
   /** 全部版本 */
   versions: MovieVersion[];
   /** 总场次数 */
@@ -1102,6 +1147,7 @@ function buildMovieGroups(status?: 'showing' | 'upcoming'): MovieGroup[] {
       primary,
       displayName: stripFormats(primary.nameZh || primary.nameEn),
       displayPoster: pickDisplayPoster(list, primary),
+      displayAccent: posterAccent(pickDisplayPoster(list, primary)),
       versions,
       totalShows,
       minPrice: prices.length ? Math.min(...prices) : null,

@@ -44,10 +44,15 @@ data.local-test/
 #   - check-danger.mts 由 deploy/sync.sh 在本地自检阶段跑（挡错合并）
 #   - check-genres.mts 由 deploy/sync.sh 在本地自检阶段跑（挡类型标签重复/简繁混用）
 #   - check-poster-pick.mts 由 deploy/sync.sh 在本地自检阶段跑（挡选错海报）
+#   - check-poster-color.mts 由 deploy/sync.sh 在本地自检阶段跑（挡主色取错：黑白片染色/亮色压字）
 #   - check-version-text.mts 由 deploy/sync.sh 在本地自检阶段跑（挡场次卡片版本·语言写错）
 #   - check-cinema-specs.mts 由 deploy/sync.sh 在本地自检阶段跑（挡戲院影廳規格推断错）
 #   - check-slug-coverage.mts 由 deploy/sync.sh 在本地自检阶段跑（挡卡片链接指向未生成的 movie 页）
 #   - check-published-links.mjs 由 deploy/vps-deploy.sh 在服务器上跑（挡死链）
+#   - check-nav-category.mjs 由 deploy/vps-deploy.sh 在服务器上跑
+#     （挡详情页被归错类：待映片标成现正上映，面包屑与顶栏色块都错）
+#     放在服务器而非本地自检：它要扫的是构建产物（HTML + 打包后的 CSS），
+#     本机在 next build 之前没有 out/ 可扫。
 # 其余是抓包、逆向签名、基准测试等一次性调试现场（含 52MB HTML 转储），
 # 留在本机不进仓库。
 #
@@ -60,7 +65,9 @@ probe/*
 !probe/check-danger.mts
 !probe/check-genres.mts
 !probe/check-poster-pick.mts
+!probe/check-poster-color.mts
 !probe/check-version-text.mts
 !probe/check-cinema-specs.mts
 !probe/check-slug-coverage.mts
 !probe/check-published-links.mjs
+!probe/check-nav-category.mjs

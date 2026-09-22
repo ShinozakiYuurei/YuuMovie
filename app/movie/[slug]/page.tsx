@@ -69,6 +69,29 @@ export default async function MoviePage({ params }: { params: Promise<{ slug: st
 
   const a = buildIntro(group);
 
+  /*
+   * 本片屬於哪一類（現正上映 / 即將上映）
+   *
+   * ★ 2026-09-23 修復：先前這裡的麵包屑**寫死**「現正上映 → /showing」，
+   *   於是即將上映的片（用戶回報的《BLUE LOCK 藍色監獄》，開畫日 2026-09-30，
+   *   列在 /upcoming）點進來，麵包屑卻寫著現正上映，與來源列表自相矛盾。
+   *
+   *   現在兩處（麵包屑、頂欄高亮）都只由 group.status 推導，不再硬編碼：
+   *   - 麵包屑直接用下面的 crumb
+   *   - 頂欄高亮靠 <article data-page-nav>，由 globals.css 的 body:has() 讀取
+   *     （詳見該處說明：layout 對所有頁面共用，拿不到本頁狀態，
+   *      而本頁也無法把狀態回傳給 layout）
+   *
+   *   ★ 屬性名叫 data-page-nav（「本頁屬於哪一類」）而不是 data-movie-nav：
+   *     戲院詳情頁 /cinema/<id> 有**完全相同**的毛病（頂欄「戲院」從不點亮），
+   *     那是同一個機制在管，共用一個屬性名才能一並修好，
+   *     也讓 globals.css 只需一組選擇器。
+   */
+  const crumb =
+    group.status === 'upcoming'
+      ? ({ nav: 'upcoming', href: '/upcoming', label: '即將上映' } as const)
+      : ({ nav: 'showing', href: '/showing', label: '現正上映' } as const);
+
   // ★ 场次展平 + 筛选候选项
   //
   // 原先按「版本 → 日期 → 影院」三层嵌套服务端渲染，
@@ -80,7 +103,7 @@ export default async function MoviePage({ params }: { params: Promise<{ slug: st
   // 紧凑字典化：单行 619 → 114 字节（详见 lib/data.ts 的 CompactRows 注释）
   const compact = toCompact(rows);
   return (
-    <article>
+    <article data-page-nav={crumb.nav}>
       <MovieJsonLd
         movie={group.primary}
         image={group.displayPoster}
@@ -102,10 +125,15 @@ export default async function MoviePage({ params }: { params: Promise<{ slug: st
         }}
       />
 
-      <nav className="mb-4 text-xs text-fg-dim">
-        {/* 面包屑与顶栏同一落点：/ 是导流首页，列表在 /showing */}
-        <Link href="/showing" className="hover:text-fg">
-          現正上映
+      <nav className="mb-4 text-xs text-fg-dim" data-crumb>
+        {/* 麵包屑與頂欄同一落點：都指向本片真正所屬的列表（見上方 crumb）
+         *
+         * data-crumb：穩定的識別鈎子，供 probe/check-nav-category.mjs 掃產物時
+         *   定位這一塊。不用 class 當鈎子 —— class 是會變的樣式細節，
+         *   換個 class 就讓守卫靜默失效（或假報「找不到麵包屑」）。
+         */}
+        <Link href={crumb.href} className="hover:text-fg">
+          {crumb.label}
         </Link>
         <span className="mx-1">/</span>
         <span className="text-fg-muted">{a.title}</span>
