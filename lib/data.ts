@@ -596,7 +596,9 @@ function load() {
 
   const movies = readJson<Movie[]>('movies.json', []);
   const shows = readJson<Show[]>('shows.json', []);
-  const cinemas = readJson<Cinema[]>('cinemas.json', []);
+  // 英皇 API 把灣仔總部辦公室（57001）列作「影院」，實際沒有放映廳或場次。
+  // 讀取時排除，避免戲院列表及靜態戲院頁把辦公地址誤當無標籤戲院。
+  const cinemas = readJson<Cinema[]>('cinemas.json', []).filter((c) => c.id !== 'emperor-57001');
 
   // ★ 戲院地理归属：读取时推断（见 lib/region.ts 的说明）
   //

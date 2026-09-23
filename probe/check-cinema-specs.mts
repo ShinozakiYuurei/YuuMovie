@@ -232,6 +232,7 @@ const cinemaCentre = getCinemaRows().find((cinema) => cinema.id === 'broadway-8'
 eq('戲院頁實際標籤：百老匯電影中心有 SR 與 SRD', cinemaCentre?.specs.map((spec) => spec.key), ['sr', 'srd']);
 const palaceIfc = getCinemaRows().find((cinema) => cinema.id === 'broadway-4');
 eq('戲院頁實際標籤：PALACE ifc 有 DTS:X', palaceIfc?.specs.map((spec) => spec.key), ['dtsx']);
+eq('英皇總部辦公地址不列為放映戲院', getCinemaRows().some((cinema) => cinema.id === 'emperor-57001'), false);
 
 // ============================================================
 // 7. 表格自身的完整性
