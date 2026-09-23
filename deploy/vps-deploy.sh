@@ -156,7 +156,7 @@ CUR=$(git rev-parse -q --verify HEAD 2>/dev/null || echo "")
 # ---------- 1 工作区护栏 ----------
 if [ -z "$CUR" ]; then
   take_over
-elif [ "$CUR" = "$TARGET" ] && [ -z "$(dirty_paths)" ]; then
+elif [ "$CUR" = "$TARGET" ] && [ -z "$(dirty_paths)" ] && [ "${SCRAPE:-0}" != "1" ] && [ -z "${ONLY:-}" ]; then
   log "服务器已是目标版本，不重建（仍复核站点）"
   verify_site
   exit 0
