@@ -76,6 +76,7 @@ const SPEC_RULES: SpecRule[] = [
   { key: 'cgs', label: 'CGS', group: 'format', re: /\bcgs\b/i, fields: ['house', 'version', 'title'] },
   { key: 'screenx', label: 'ScreenX', group: 'format', re: /screenx/i, fields: ['house', 'version', 'title'] },
   { key: 'cinity', label: 'Cinity', group: 'format', re: /cinity/i, fields: ['house', 'version', 'title'] },
+  { key: 'dtsx', label: 'DTS:X', group: 'format', re: /dts\s*:?\s*x/i, fields: ['house', 'version', 'title'] },
   // Broadway Cinema Centre officially identifies Hall 1 as SR and Halls 2–4 as SRD.
   // These are not included in show metadata, so cinema-level evidence is added in data.ts.
   { key: 'sr', label: 'SR', group: 'format', re: /^sr$/i, fields: ['house'] },

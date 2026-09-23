@@ -49,6 +49,7 @@ eq(
   ],
   [['sr'], ['srd']]
 );
+eq('官方 DTS:X 厅名命中，格式符号可选', hallSpecsOf({ houseName: 'DTS:X' }), ['dtsx']);
 eq(
   '普通厅名称含 SRD 子串不可误判为 SR 规格',
   hallSpecsOf({ houseName: '3院 SRD 特別場' }),
@@ -229,6 +230,8 @@ eq('實際院線資料中沒有未識別的特色影廳名稱', [...unknownHalls
 
 const cinemaCentre = getCinemaRows().find((cinema) => cinema.id === 'broadway-8');
 eq('戲院頁實際標籤：百老匯電影中心有 SR 與 SRD', cinemaCentre?.specs.map((spec) => spec.key), ['sr', 'srd']);
+const palaceIfc = getCinemaRows().find((cinema) => cinema.id === 'broadway-4');
+eq('戲院頁實際標籤：PALACE ifc 有 DTS:X', palaceIfc?.specs.map((spec) => spec.key), ['dtsx']);
 
 // ============================================================
 // 7. 表格自身的完整性
@@ -236,8 +239,8 @@ eq('戲院頁實際標籤：百老匯電影中心有 SR 與 SRD', cinemaCentre?.
 
 const keys = HALL_SPECS.map((s) => s.key);
 eq('规格 key 无重复', new Set(keys).size, keys.length);
-if (HALL_SPECS.length !== 25) {
-  console.log(`✗ 规格条数变了（${HALL_SPECS.length} ≠ 25）—— 增删规格请同步本测试的期望值`);
+if (HALL_SPECS.length !== 26) {
+  console.log(`✗ 规格条数变了（${HALL_SPECS.length} ≠ 26）—— 增删规格请同步本测试的期望值`);
   bad++;
 }
 // 每个规格都要有 label，且不能出现空 label（空 label 会在下拉里留一个空白行）
