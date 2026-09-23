@@ -116,6 +116,7 @@ else
   "$TSX" probe/check-danger.mts
   # MCL 官方详情从数字 ID 抓取；片名不符要拒绝，且分类/片长/简介须进组级资料卡。
   "$TSX" probe/check-mcl-details.mts
+  "$TSX" probe/check-group-slug-status.mts
   # 选海报的规则全是取舍，错了不会报错、只会静默换封面（2026-09-21 就踩过），
   # 所以跟错合并一样在发布前钉死。不读 data/、不联网，服务器上也能跑。
   "$TSX" probe/check-poster-pick.mts

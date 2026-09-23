@@ -1347,15 +1347,12 @@ export function getUpcomingGroupsByMonth(): { month: string; groups: MovieGroup[
 /**
  * 根据 slug 取回电影组（详情页用，支持任一版本的 slug）
  *
- * ⚠️ 必须同时查 showing 与 upcoming 两组：
- *   首页/列表页用的是 getMovieGroups('showing')，其候选集不含 upcoming 条目；
- *   而 getMovieGroups()（无参）会把 upcoming 也纳入。
- *   一部电影若同时有 showing 和 upcoming 条目，两种调用选出的
- *   primary（进而 slug）会不同 —— 结果就是列表页给出的链接点进去 404。
- *   （线上曾因此出现首页 2/3 卡片指向 404）
+ * 先查全量池：它是静态详情页的唯一权威，决定 canonical slug 与详情页状态。
+ * 过滤池只作兼容回退。否则同一片的 showing/upcoming 版本可能共享 canonical
+ * slug，先命中 showing 子集会让待映列表链接打开一张「现正上映」详情页。
  */
 export function getGroupBySlug(slug: string): MovieGroup | undefined {
-  const pools = [getMovieGroups('showing'), getMovieGroups('upcoming')];
+  const pools = [getMovieGroups(), getMovieGroups('showing'), getMovieGroups('upcoming')];
   for (const all of pools) {
     const hit = all.find(
       (g: MovieGroup) =>
