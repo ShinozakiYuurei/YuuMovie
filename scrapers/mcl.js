@@ -46,6 +46,23 @@ const DETAIL_TTL_MS = 86400_000; // 完整资料每天刷新一次
 const INCOMPLETE_DETAIL_TTL_MS = 2 * 3600_000; // 缺级别/片长等时下轮排片重查
 const HK_CATEGORIES = new Set(['I', 'IIA', 'IIB', 'III']);
 
+/**
+ * MCL 偶尔只提供低分辨率缩图。已核对《誤闖遺忘島》的 MCL 图只有 290×390，
+ * 百老匯 CDN 上同一张官方主视觉有 800×1126；MCL 卡片也复用清晰版本，
+ * 避免列表因选中 MCL 场次而显示模糊海报。按片名匹配，因此谢票场等后缀不影响。
+ */
+const VERIFIED_HIGH_RES_POSTERS = new Map([
+  ['誤闖遺忘島', 'https://media.grabticks.com/programju_8cbe9730-63a8-4ef1-8451-98ae75b25c97.jpg'],
+]);
+
+function posterForMovie(name, fallback) {
+  const title = String(name || '').normalize('NFKC');
+  for (const [knownTitle, poster] of VERIFIED_HIGH_RES_POSTERS) {
+    if (title.includes(knownTitle)) return poster;
+  }
+  return fallback;
+}
+
 /** 与 scrape.js 的 ASCII slug 算法一致，但 MCL 固定从中文原片名生成。
  *  新补英文名不应改掉已经发布的 /movie/movie-mcl-14743 等旧链接。 */
 function mclSlug(title, id) {
@@ -296,7 +313,7 @@ export async function scrapeMcl({ proxy, request = getJson, detailCacheFile = DE
       slug: mclSlug(info.name, mv.id),
       nameZh: info.name,
       nameEn: detail?.nameEn || '',
-      poster: info.poster,
+      poster: posterForMovie(info.name, info.poster),
       duration: detail?.duration ?? null,
       category: detail?.category ?? null,
       dialect: detail?.dialect || singleLanguage,
