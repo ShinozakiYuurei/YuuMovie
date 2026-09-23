@@ -232,8 +232,24 @@ fi
 #   回滚办法是显式传 POSTER_ORIGIN= （空）来强制同源。
 POSTER_ORIGIN="${POSTER_ORIGIN-https://imgmove.yuurei.de}"
 log "重建静态站（SCRAPE=${SCRAPE:-0} ENRICH=${ENRICH:-0} POSTER_ORIGIN=${POSTER_ORIGIN:-<同源>}）"
+# ★ 2026-09-25 修复：rebuild-static.sh 在「另一个重建正在进行」时会 **exit 0**
+#   （flock 抢不到就放弃，见该脚本第 0 节）—— 它什么都没构建，但退出码是成功。
+#   原先这里直接往下走到 verify_site，于是：
+#     - 站点目录里还是**上一个版本**的产物，
+#     - 新加的守卫却已经在拿它当真检验（实测被误报成「新代码有 bug」），
+#     - 而且整条链路以「✅ 已发布」结束 —— 代码切了、页面没换，最坏的一种结果。
+#   现在把「跳过了」当成部署失败：明确要求重跑，而不是把未知当成功。
+REBUILD_OUT=$(mktemp)
+trap 'rm -f "$REBUILD_OUT"' EXIT
+set +e
 SCRAPE="${SCRAPE:-0}" ENRICH="${ENRICH:-0}" POSTER_ORIGIN="$POSTER_ORIGIN" \
-  eval "${REBUILD:-bash deploy/rebuild-static.sh}"
+  eval "${REBUILD:-bash deploy/rebuild-static.sh}" 2>&1 | tee "$REBUILD_OUT"
+REBUILD_RC=${PIPESTATUS[0]}
+set -e
+[ "$REBUILD_RC" = "0" ] || die "重建失败（exit $REBUILD_RC），未发布"
+if grep -q '另一個重建正在進行' "$REBUILD_OUT"; then
+  die "重建被跳過（定時器正在重建，flock 未拿到）—— 代码已切到 ${TARGET:0:8} 但站点仍是上一版。\n   等定時器跑完再重跑一次 deploy/sync.sh 即可（工作區已乾淨，會直接走部署）。"
+fi
 
 # ---------- 5 自检 + 记录线上版本 ----------
 verify_site
