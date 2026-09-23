@@ -22,7 +22,7 @@
  */
 import { hallSpecsOf, HALL_SPECS, sortSpecs, specLabel } from '../lib/cinema-specs.ts';
 import { readFileSync } from 'node:fs';
-import { getCinemaRows } from '../lib/data.ts';
+import { getCinemaRows, getMeta } from '../lib/data.ts';
 
 let bad = 0;
 
@@ -233,6 +233,7 @@ eq('戲院頁實際標籤：百老匯電影中心有 SR 與 SRD', cinemaCentre?.
 const palaceIfc = getCinemaRows().find((cinema) => cinema.id === 'broadway-4');
 eq('戲院頁實際標籤：PALACE ifc 有 DTS:X', palaceIfc?.specs.map((spec) => spec.key), ['dtsx']);
 eq('英皇總部辦公地址不列為放映戲院', getCinemaRows().some((cinema) => cinema.id === 'emperor-57001'), false);
+eq('首頁和頁尾的戲院總數與戲院列表一致', getMeta().counts.cinemas, getCinemaRows().length);
 
 // ============================================================
 // 7. 表格自身的完整性

@@ -1,8 +1,7 @@
 import type { MetadataRoute } from 'next';
 import {
   getAllCinemas,
-  getShowingGroups,
-  getUpcomingGroups,
+  getMovieGroups,
 } from '@/lib/data';
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
@@ -19,13 +18,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${SITE}/showing`, lastModified: now, changeFrequency: 'daily', priority: 0.95 },
     { url: `${SITE}/upcoming`, lastModified: now, changeFrequency: 'daily', priority: 0.9 },
     { url: `${SITE}/cinema`, lastModified: now, changeFrequency: 'weekly', priority: 0.7 },
-    // 只输出「电影组」的 slug（primary）。
-    // getAllMovies() 含同片不同版本/院线的重复条目，它们的 slug 不是组的入口，
-    // 直接放进来会让 sitemap 里出现大量 404。
-    ...[...getShowingGroups(), ...getUpcomingGroups()]
-      .filter((g, i, arr) => arr.findIndex((x) => x.slug === g.slug) === i)
-      .map((g) => ({
-        url: `${SITE}/movie/${g.slug}`,
+    // 與 /movie/[slug] 的 generateStaticParams 同源：所有已生成的電影組詳情頁。
+    // getShowingGroups() 會剔除暫無未開映場次的電影，不能拿它作 sitemap，
+    // 否則有效的靜態詳情頁會漏收錄；getAllMovies() 則含非入口的版本 slug。
+    ...[...new Set(getMovieGroups().map((g) => g.slug))]
+      .map((slug) => ({
+        url: `${SITE}/movie/${slug}`,
         lastModified: now,
         changeFrequency: 'daily' as const,
         priority: 0.8,

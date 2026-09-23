@@ -15,6 +15,7 @@
 // 2026-09-22 实际踩到：《善男信女》《怎麼可能我家的祖先是你家的鬼》
 // 各有 showing + upcoming 两个条目，两个池选出的 primary 不同 → 3 条死链。
 import { getMovieGroups, getShowingGroups, getUpcomingGroups } from '../lib/data.ts';
+import sitemap from '../app/sitemap.ts';
 
 const pages = new Set(getMovieGroups().map((g) => g.slug));
 const linked = new Map<string, string>();
@@ -32,3 +33,14 @@ if (dead.length) {
   process.exit(1);
 }
 console.log('✓ 卡片链接全部有对应页面');
+
+const sitemapSlugs = sitemap()
+  .map((entry) => new URL(entry.url).pathname.match(/^\/movie\/([^/]+)$/)?.[1])
+  .filter((slug): slug is string => !!slug);
+const missingFromSitemap = [...pages].filter((slug) => !sitemapSlugs.includes(slug));
+const sitemapOnly = sitemapSlugs.filter((slug) => !pages.has(slug));
+if (missingFromSitemap.length || sitemapOnly.length || sitemapSlugs.length !== pages.size) {
+  console.error('✗ sitemap 電影 slug 與靜態詳情頁不一致', { missingFromSitemap, sitemapOnly });
+  process.exit(1);
+}
+console.log(`✓ sitemap 與 ${pages.size} 個靜態電影詳情頁完全一致`);

@@ -712,16 +712,18 @@ function load() {
 /**
  * 站点元数据
  *
+ * counts.cinemas 以已剔除非放映地址的戲院清單為準，避免首頁及頁尾
+ * 沿用抓取時包含英皇總部的原始數字。
  * 注意 counts.shows 会被改写为「当前有效（未开映）场次数」。
  * 抓取写入的 meta.counts.shows 是当时抓到的总数，
  * 而页面展示的场次已按当前时间剔除过期项，
  * 不修正的话页脚数字会和实际看到的场次数对不上。
  */
 export function getMeta(): Meta {
-  const { meta, shows } = load();
+  const { meta, shows, cinemas } = load();
   return {
     ...meta,
-    counts: { ...meta.counts, shows: shows.length },
+    counts: { ...meta.counts, shows: shows.length, cinemas: cinemas.length },
   };
 }
 
