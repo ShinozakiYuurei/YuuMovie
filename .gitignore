@@ -54,6 +54,10 @@ data.local-test/
 #     （挡详情页被归错类：待映片标成现正上映，面包屑与顶栏色块都错）
 #     放在服务器而非本地自检：它要扫的是构建产物（HTML + 打包后的 CSS），
 #     本机在 next build 之前没有 out/ 可扫。
+#   - check-rating-badge.mjs 由 deploy/vps-deploy.sh 在服务器上跑
+#     （挡详情页「級別」两种状态长得不一样：待映片的 TBC 曾是裸灰字，
+#       与已定级那枚灰底药丸不同壳；顺带钉住 JSON-LD contentRating 与徽章同源）
+#     同样必须扫产物，理由同上。
 # 其余是抓包、逆向签名、基准测试等一次性调试现场（含 52MB HTML 转储），
 # 留在本机不进仓库。
 #
@@ -73,3 +77,4 @@ probe/*
 !probe/check-slug-coverage.mts
 !probe/check-published-links.mjs
 !probe/check-nav-category.mjs
+!probe/check-rating-badge.mjs

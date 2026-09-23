@@ -107,6 +107,10 @@ export default async function MoviePage({ params }: { params: Promise<{ slug: st
       <MovieJsonLd
         movie={group.primary}
         image={group.displayPoster}
+        /* 分级与页面上那枚徽章同源（buildIntro）：否则同一页里
+         * 徽章写「IIB」、结构化数据写 emperor 的「8.0」媒体评分。
+         * 未定级传 null → 结构化数据里整项省略（TBC 不是有效评级）。 */
+        contentRating={a.category}
         extra={{
           // 外部评分：只有拿到分数才写进结构化数据，
           // aggregateRating 缺数时宁可省略（写 0 会误导搜索摘要）。

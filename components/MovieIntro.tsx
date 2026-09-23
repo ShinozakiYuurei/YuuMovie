@@ -305,16 +305,42 @@ export function MovieIntro({ group }: { group: MovieGroup }) {
                 片長: <span className="text-fg-soft">{a.duration} 分鐘</span>
               </span>
             )}
+            {/*
+             * 級別：**永遠**是一枚藥丸徽章，已定級與未定級（TBC）走同一個殼
+             *
+             * ★ 2026-09-25 用戶回報：「統一即將上映電影的分級顯示，
+             *   效果要跟圖一正在上映的一致」。
+             *   圖一（現正上映《狂野雄心》）級別是一枚灰底藥丸「IIA」，
+             *   圖二（即將上映《Air/真心為你》）卻只剩一行灰字「TBC」——
+             *   同一塊資料卡、同一個字段，兩種長相。
+             *
+             *   根因是這裡的三元把「有分級」與「沒分級」畫成了兩種東西：
+             *   前者是徽章（bg-veil-strong + px-1.5 + py-0.5 + 11px + 600），
+             *   後者是一段裸文字，連藥丸外框都沒有。
+             *   實測（probe/measure-rating-badge.cjs，1280px 視口）：
+             *     已定級 IIA  27.7×20.5  bg rgba(9,9,11,.07)  font 11px
+             *     未定級 TBC  24.3×19.5  bg 透明              font 13px
+             *   即：TBC 反而比真分級**大 2px**、還沒底沒形。
+             *   而全站 191 個詳情頁裡只有 1 頁是 TBC —— 所以這個不一致
+             *   平時看不出來，只有待映片才會踩到，正是用戶這次碰上的那條。
+             *
+             *   修法：外框照抄不變，只把**裡面的字**換成 TBC。
+             *   於是兩種狀態同寬（都由同一個 padding / 字號 / 字重決定），
+             *   也就順帶解決了「TBC 是拉丁字母、比 IIA 窄」這個次生問題 ——
+             *   元信息行裡它後面沒有東西，寬度差幾個 px 不影響任何排版。
+             *
+             *   TBC 的字色刻意**比照已定級**（text-fg 而非 text-fg-dim）：
+             *   「未定級」是一個有效結論（香港送審後未評級就是這樣寫），
+             *   不是缺資料。用灰字會讓人以為這一格沒取到值，
+             *   而 hkmovie6 的待映片也把 TBC 寫成亮色白字（見 probe/hk6-movie.html
+             *   的 bg-neutral-800 + text-white），兩邊一致。
+             */}
             <span className="flex items-center gap-3">
               <span className="h-3 w-px bg-hairline-strong" />
               級別:{' '}
-              {a.category ? (
-                <span className="ml-1 rounded bg-veil-strong px-1.5 py-0.5 text-[11px] font-semibold text-fg">
-                  {a.category}
-                </span>
-              ) : (
-                <span className="text-fg-dim">TBC</span>
-              )}
+              <span className="ml-1 rounded bg-veil-strong px-1.5 py-0.5 text-[11px] font-semibold text-fg">
+                {a.category || 'TBC'}
+              </span>
             </span>
           </div>
 

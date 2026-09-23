@@ -106,6 +106,23 @@ verify_site() {
   else
     log "⚠️ 缺 probe/check-nav-category.mjs，本次未做詳情頁歸屬檢查"
   fi
+
+  # 詳情頁「級別」的長相（用戶 2026-09-25 回報：待映片的 TBC 是一行裸灰字，
+  # 與現正上映那枚灰底藥丸不同殼）。同一類 bug 的第三例：編譯過、構建過、
+  # 頁面 200，只是兩種分級狀態長得不一樣，只有肉眼看得出來。
+  # 一並釘住第二個坑：JSON-LD 的 contentRating 必須與徽章同源
+  #   （原先讀 group.primary.category，emperor 來源的片徽章寫 IIB、結構化數據寫「8.0」）。
+  if [ -f probe/check-rating-badge.mjs ]; then
+    rc=0
+    node probe/check-rating-badge.mjs "$SITE_DIR" || rc=$?
+    if [ "$rc" = "1" ]; then
+      die "詳情頁級別顯示不一致（或與 JSON-LD 不符），判定發布不健康"
+    elif [ "$rc" != "0" ]; then
+      die "級別顯示檢查未能執行（exit $rc），不能當作通過"
+    fi
+  else
+    log "⚠️ 缺 probe/check-rating-badge.mjs，本次未做級別顯示檢查"
+  fi
 }
 
 # ---------- 0 首次收编：把服务器目录变成仓库 ----------
