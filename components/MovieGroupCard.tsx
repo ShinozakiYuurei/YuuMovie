@@ -101,7 +101,7 @@ export function MovieGroupCard({
 
         <div className="mt-auto flex flex-wrap items-baseline gap-x-2 gap-y-1 pt-2">
           {group.status === 'upcoming' && m.openingDate ? (
-            <p className="min-w-0 text-xs font-medium text-accent">
+            <p className="min-w-0 text-xs font-medium text-fg-soft">
               {relativeDay(m.openingDate)}上映 · {m.openingDate}
             </p>
           ) : (
