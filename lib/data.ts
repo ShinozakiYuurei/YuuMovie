@@ -11,6 +11,7 @@ import {
   hasFormatMarker,
   isBaseVersion,
   stripFormats,
+  stripEnglishTitleNoise,
 } from './versions';
 // key 归一化与 scrapers/enrich.js 共用同一份实现（见该文件头注释）
 import { enrichKey } from './enrich-key.js';
@@ -689,6 +690,79 @@ function pickDisplayLanguage(list: Movie[]): string | null {
 }
 
 /**
+ * 选择组的展示英文片名（详情页中文标题下方那行副标题）
+ *
+ * ★ 2026-09-25 用户要求：「电影详情页的卡片，中文标题下面添加电影英文标题」。
+ *
+ * 页面本来就有一行副标题，但读的是 buildIntro 里
+ *   group.primary.nameEn
+ *   而 primary 是**按场次最多**选出来的代表条目 —— 场次最多的往往不是
+ *   元数据最全的那家。实测两部片直接踩空：
+ *     歡迎來龍餐館     primary = mcl-14858   → MCL 的 nameEn 是空 → 整行不渲染
+ *     復仇者聯盟4       primary = mcl-14863   → 同上
+ *   即「有没有英文副标题」取决于哪家院线场次多，同一部片换个抓取时点
+ *   就可能时有时无（MCL 只给中文名，百老匯/英皇/星達都给英文）。
+ *
+ * 所以英文名必须像 displayPoster / displayCategory 一样做成**组级**决策：
+ * 在组内所有条目里挑一条，而不是继承 primary。
+ *
+ * 挑选规则（按优先级）：
+ *   1. 先洗掉版本 / 活动 / 影展噪声（stripEnglishTitleNoise）——
+ *      「4DX Avengers: Endgame Encore Infinity Vision」洗完才是
+ *      「Avengers: Endgame Encore」，否则副标题会带上放映规格。
+ *   2. 原版条目（无格式标记）优先 —— 与 displayPoster 同一套取舍：
+ *      带标记的条目英文名会被院线自己缀上规格词，洗完也可能残留。
+ *   3. 按**院线可信度**取（broadway > emperor > cinemacity > bestar > mcl）：
+ *      同一部片各家英文写法会差一点（大小写、副标题有无），
+ *      实测「狂野雄心」是 Heart of the Beast / HEART OF THE BEAST 两种，
+ *      挑权威那家的，不要随机撞上哪条就用哪条。
+ *   4. 最后才比长度（短的通常更干净）。
+ *
+ * 与中文名相同 / 洗后为空 / 本身就是中文（bestar 会把中文塞进 nameEn）
+ * 一律返回 null，调用方据此不渲染这一行。
+ */
+const EN_SOURCE_ORDER: Record<Source, number> = {
+  broadway: 0,
+  emperor: 1,
+  cinemacity: 2,
+  bestar: 3,
+  mcl: 4,
+};
+
+function pickDisplayNameEn(list: Movie[]): string | null {
+  const cands = list
+    .map((m) => {
+      const raw = (m.nameEn || '').trim();
+      // ★ 长度下限是 1 而不是 2：单字母英文片名是真实存在的
+      //   （《空槍》的官方英文名就是「V」，《M》就是「M」），
+      //   门槛设 2 会把它们静默丢掉。而「洗完变空」的噪声条目
+      //   （纯「IMAX」之类）自然被下一行的 name.length < 1 挡掉。
+      //
+      // ★ 这里用 CJK_RE 而不是下面那个 hasCJK：hasCJK 定义在本函数之后，
+      //   用它会形成「函数定义早于依赖」的隐式顺序依赖（虽然本函数只在
+      //   buildMovieGroups 里调用、那时模块已初始化完毕，但后人挪动代码
+      //   顺序就会踩到 TDZ）。直接用正则，无顺序负担。
+      if (raw.length < 1 || CJK_RE.test(raw)) return null;
+      const name = stripEnglishTitleNoise(raw);
+      if (name.length < 1) return null;
+      return {
+        name,
+        base: !hasFormatMarker(m.nameZh || m.nameEn),
+        src: EN_SOURCE_ORDER[m.source] ?? 9,
+      };
+    })
+    .filter((c): c is { name: string; base: boolean; src: number } => c !== null);
+
+  if (!cands.length) return null;
+  cands.sort((a, b) => {
+    if (a.base !== b.base) return a.base ? -1 : 1;
+    if (a.src !== b.src) return a.src - b.src;
+    return a.name.length - b.name.length;
+  });
+  return cands[0].name;
+}
+
+/**
  * 选择组的展示时长
  *
  * 时长在各源里差异不大（都是分钟数），优先取原版版本（versions 里 __base__ key 的那条），
@@ -838,6 +912,14 @@ export interface MovieGroup {
   primary: Movie;
   /** 展示用片名（已去除格式标记） */
   displayName: string;
+  /**
+   * 展示用**英文**片名（详情页中文标题下方的副标题）
+   *
+   * 组级决策，与 primary 无关（见 pickDisplayNameEn 注释：
+   * primary 按场次最多选，而场次最多的院线可能压根不给英文名）。
+   * 无可用英文名（或英文名就是中文）时为 null。
+   */
+  displayNameEn: string | null;
   /**
    * 展示用海报：组内**最清晰**的那张（见 pickDisplayPoster 注释）。
    *
@@ -1176,6 +1258,7 @@ function buildMovieGroups(status?: 'showing' | 'upcoming'): MovieGroup[] {
       key,
       primary,
       displayName: stripFormats(primary.nameZh || primary.nameEn),
+      displayNameEn: pickDisplayNameEn(list),
       displayPoster: pickDisplayPoster(list, primary),
       displayAccent: posterAccent(pickDisplayPoster(list, primary)),
       versions,

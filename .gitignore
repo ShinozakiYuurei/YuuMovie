@@ -74,6 +74,7 @@ probe/*
 !probe/check-contrast.mts
 !probe/check-version-text.mts
 !probe/check-cinema-specs.mts
+!probe/check-english-title.mts
 !probe/check-slug-coverage.mts
 !probe/check-published-links.mjs
 !probe/check-nav-category.mjs

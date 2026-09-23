@@ -286,11 +286,34 @@ export function MovieIntro({ group }: { group: MovieGroup }) {
         </div>
 
         <div className="min-w-0 flex-1">
-          {/* 片名 */}
+          {/* 片名（中文主标题 + 英文副标题）
+           *
+           * ★ 2026-09-25 用户要求：「电影详情页的卡片，中文标题下面添加电影英文标题」。
+           *
+           * 这行原先就在，但**时有时无** —— 它读的是 a.subtitle，
+           * 而 a.subtitle 来自 group.primary.nameEn，primary 按场次最多选。
+           * MCL 只提供中文名，于是「MCL 场次最多」的片（《歡迎來龍餐館》
+           * 《復仇者聯盟4》等）英文行整行不渲染 —— 用户截图里缺的正是这行。
+           * 现在 a.subtitle 改成组级字段（见 lib/data.ts 的 pickDisplayNameEn），
+           * 只要**任一**院线给了英文名就会出现。
+           *
+           * 排版参照用户给的参考图：中文标题是大号粗体主行，
+           * 英文标题紧贴其下、字号小两级、颜色降为 fg-muted ——
+           * 一眼能看出主次，但仍属于标题块（与下方的元信息行拉开距离）。
+           *
+           * ★ 去掉 truncate：英文片名普遍比中文长（实测最长
+           *   「It Is Not the Homosexual Who Is Perverse, But the Society
+           *   Which Tolerates It」），单行截断会把副标题切得莫名其妙。
+           *   允许换行，用 leading-snug 收紧行高，两行也不显得松散。
+           */}
           <h1 className="text-2xl font-bold leading-tight tracking-tight text-fg sm:text-3xl">
             {a.title}
           </h1>
-          {a.subtitle && <p className="mt-1.5 truncate text-sm text-fg-muted">{a.subtitle}</p>}
+          {a.subtitle && (
+            <p className="mt-1.5 text-sm leading-snug text-fg-muted sm:text-[15px]">
+              {a.subtitle}
+            </p>
+          )}
 
           {/* 元信息行：hkmovie6 在片名下方直接排「上映日期 · 片長 · 級別」 */}
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px] text-fg-muted">

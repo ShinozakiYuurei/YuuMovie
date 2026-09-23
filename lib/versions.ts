@@ -349,6 +349,151 @@ export function stripFormats(name: string | null | undefined): string {
 }
 
 /**
+ * 英文片名里要剥掉的「版本 / 活动 / 影展」噪声词。
+ *
+ * ★ 为什么中文侧有一整套（FORMAT_TOKENS）而英文侧要另写一份：
+ *   院线的中文名与英文名**各剥各的**，两边词表并不对应。
+ *   例：中文写「(全景聲)」而英文写「(Atmos)」；中文写「加碼重映」
+ *   而英文写「Encore」；中文写「(特典場)」而英文写「Special Screening」。
+ *   只剥中文的话，英文标题会带着「Avengers: Endgame Encore」这种
+ *   在中文侧已经去掉的尾巴，同一行中英不对称。
+ *
+ * ★ 与 FORMAT_TOKENS 的一处**故意不同**：这里多出影展/节目单元词
+ *   （KINO / HKLGFF / NT Live / The Met …）。
+ *   中文侧把这些写在**片名尾部**（「故鄉異客 (KINO)」），英文侧同样
+ *   （「Trial of Hein (KINO)」），不剥就与中文行对不上。
+ */
+const EN_TITLE_NOISE_BRACKETS = [
+  // 场次类型
+  'Seat Cover Special Screening', 'Special Screening', 'Hi Bye Meet & Greet',
+  // 语言版本（院线写法：Version 全拼 / Jap. 缩写 / bestar 的 (日))
+  'Japanese Version', 'Cantonese Version', 'English Version', 'Mandarin Version', 'Korean Version',
+  'Jap. Version', 'Can. Version', 'Cant. Version', 'Eng. Version',
+  'Jap Version', 'Can Version', 'Cant Version', 'Eng Version',
+  'Jap', 'Can', 'Cant', 'Eng', 'Chi', 'Mand',
+  // 放映规格
+  'IMAX with Laser', 'IMAX Laser', 'IMAX', 'MX4D', '4DX', 'CGS', 'LUXE',
+  'Dolby Atmos', 'Dolby Cinema', 'Dolby', 'Atmos', 'ScreenX', 'Onyx', 'D-BOX',
+  'RealD', 'THX', 'CINITY', 'Cinity',
+  '2D', '3D', '35mm Film', '35mm', '70mm', '16mm',
+  // 版本修饰 / 放映轮次
+  '4K Restoration', '4K Restored Version', 'Restoration', 'Restored Version',
+  'LIMITED', 'Limited', 'Live Viewing',
+  //
+  // ★ 这里**故意没有** Encore / 加碼重映。
+  //   中文侧把「加碼重映」当版本标记剥掉（stripFormats），是因为
+  //   中文片名读作「復仇者聯盟4：終局之戰 加碼重映」会把主标题撑得很长；
+  //   但英文侧「Avengers: Endgame Encore」是这次重映的**官方英文名**，
+  //   剥成「Avengers: Endgame」反而与院线物料/搜索结果对不上 ——
+  //   用户给的参考图里写的正是「Avengers: Endgame Encore」。
+  //   故英文侧保留 Encore（用户 2026-09-25 的截图即口径）。
+  // 活动 / 影展 / 节目单元
+  'Infinity Vision', 'bcSunday', 'bc30', 'APAAA', 'Diamond Hill',
+  'KINO', 'GFF', 'HKLGFF', 'InDPanda', 'anifest', 'New Wave',
+  'NT Live', 'The Met', 'The Royal Ballet', 'Paris Opera Ballet',
+];
+
+/**
+ * 允许**裸词**（不在括号里）剥离的噪声词。
+ *
+ * ★ 为什么不能直接用上面那张表：里面有一批「本身就是常用词」的缩写 ——
+ *   Can / Cant / Eng / Jap / Chi / Mand / 2D / 3D / Limited。
+ *   它们在括号里是语言标记（「(Can)」= 粵語版），但裸着出现就是片名的一部分：
+ *     「Can You Ever Forgive Me?」若把开头的 Can 剥掉，片名直接残缺。
+ *   实测这些缩写在数据里**全部**出现在括号内（bestar 的「(日)/(粵)」、
+ *   emperor 的「(Can. Version)」），所以裸词表把它们排除掉，功能不减、风险归零。
+ */
+const EN_TITLE_NOISE_BARE = [
+  'Seat Cover Special Screening', 'Special Screening', 'Hi Bye Meet & Greet',
+  'Japanese Version', 'Cantonese Version', 'English Version', 'Mandarin Version', 'Korean Version',
+  'Jap. Version', 'Can. Version', 'Cant. Version', 'Eng. Version',
+  'IMAX with Laser', 'IMAX Laser', 'IMAX', 'MX4D', '4DX', 'CGS', 'LUXE',
+  'Dolby Atmos', 'Dolby Cinema', 'ScreenX', 'D-BOX', 'RealD', 'CINITY', 'Cinity',
+  '35mm Film', '35mm', '70mm', '16mm',
+  '4K Restoration', '4K Restored Version', 'Live Viewing',
+  'Infinity Vision',
+  // 同上：Encore 是官方英文名的一部分，保留（见括号词表里的说明）
+];
+
+const EN_NOISE_BRACKET_SORTED = [...EN_TITLE_NOISE_BRACKETS].sort((a, b) => b.length - a.length);
+const EN_NOISE_BARE_SORTED = [...EN_TITLE_NOISE_BARE].sort((a, b) => b.length - a.length);
+const EN_NOISE_BRACKET_SET = new Set(EN_TITLE_NOISE_BRACKETS);
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * 括号内容是不是纯噪声（版本 / 活动 / 影展 / 年份 / 罗马序号）
+ *
+ * 用**前缀**匹配而不是全等：院线会在同一个括号里再带年份或场次
+ * （「(HKLGFF 2026)」「(NT Live 2026-27)」「(The Royal Ballet 2026 – 2027)」
+ * 「(bc30 x APAAA)」），全等匹配会全部漏掉。
+ *
+ * 但**保留**片名自带的括号："Evangelion: Death (True)² & Rebirth" 的
+ * (True)、"You Can (Not) Redo" 的 (Not) 都不是元数据 ——
+ * 它们不在词表里，前缀也匹配不上，自然留下。
+ */
+function isEnglishNoiseToken(inner: string): boolean {
+  const t = inner.trim().replace(/[.。·]+$/, '').trim();
+  if (!t) return true;
+  if (EN_NOISE_BRACKET_SET.has(t)) return true;
+  // 年份 / 演出季区间（「(2026)」「(2026-27)」）
+  if (/^\d{4}(\s*[-–—]\s*(\d{2}|\d{4}))?$/.test(t)) return true;
+  // 罗马序号（英皇用「(IV)」标系列第四部）/ 纯数字（「(2)」）
+  if (/^[IVX]{1,4}$/.test(t)) return true;
+  if (/^\d{1,2}$/.test(t)) return true;
+  return EN_NOISE_BRACKET_SORTED.some((n) => new RegExp('^' + escapeRe(n) + '\\b', 'i').test(t));
+}
+
+/**
+ * 英文片名的**展示用**清洗（保留原始大小写与括号，只去元数据）。
+ *
+ * ★ 与 stripFormats 的分工：
+ *   stripFormats 处理中文片名，认的是中文词表（IMAX / 加碼重映 / 特典場…）。
+ *   英文片名走这里 —— 两边词表不同（见 EN_TITLE_NOISE_BRACKETS 说明），
+ *   拿 stripFormats 洗英文会漏掉 Encore / Special Screening / (KINO)。
+ *
+ * ★ 为什么不复用 normalizeTitle：那是**比较**用的（全小写、去标点、去重音），
+ *   洗出来不能给人看（「Evangelion: Death (True)²」会变成
+ *   「evangelion death true 2 rebirth」）。这里要的是给人看的标题。
+ *
+ * 用法上它是「组级展示名」的一半：
+ *   详情页标题下方的英文副标题（components/MovieIntro.tsx）
+ *   与 SEO 摘要（app/movie/[slug]/page.tsx）都读这个结果。
+ */
+export function stripEnglishTitleNoise(raw: string | null | undefined): string {
+  if (!raw) return '';
+  let s = raw.trim();
+  for (let i = 0; i < 6; i++) {
+    const before = s;
+    // 1) 整块剔掉纯噪声的括号（含括号本身）
+    s = s.replace(/[（(\[【]\s*([^)）\]】]*)\s*[)）\]】]/g, (m, inner: string) =>
+      isEnglishNoiseToken(inner) ? ' ' : m
+    );
+    // 2) 剔掉裸着的噪声词（「IMAX The Odyssey」这种前缀写法）
+    for (const n of EN_NOISE_BARE_SORTED) {
+      s = s.replace(new RegExp('(^|\\s)' + escapeRe(n) + '(?=\\s|$)', 'gi'), ' ');
+    }
+    s = s.replace(/\s{2,}/g, ' ').trim();
+    if (s === before) break;
+  }
+  return (
+    s
+      // 全角标点归一（院线英文名里混着全角冒号/逗号）
+      .replace(/：/g, ':')
+      .replace(/，/g, ',')
+      // 冒号两侧留一个空格：「Paw Patrol :The Dino Movie」→「Paw Patrol: The Dino Movie」
+      .replace(/\s*:\s*/g, ': ')
+      // 首尾残留的分隔符：只剩「 - 」的尾巴要收掉，但
+      // 「…The Movie -Rebellion-」这种连字符是片名自带的，不能动
+      .replace(/\s+[-–—]+$/, '')
+      .replace(/^[-–—]+\s+/, '')
+      .replace(/^[\s:·,;]+|[\s:·,;]+$/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+  );
+}
+
+/**
  * 从片名中提取版本标签（用于展示）。
  * 返回去重、归一后的标签数组，如 ['IMAX', '4DX']
  */

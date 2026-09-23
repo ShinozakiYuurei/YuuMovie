@@ -44,6 +44,16 @@ export interface IntroRating {
 
 export interface MovieIntro {
   title: string;
+  /**
+   * 副标题：影片的**英文片名**（详情页中文标题下方那行）
+   *
+   * ★ 2026-09-25 改读 group.displayNameEn，不再读 group.primary.nameEn。
+   *   原先这里读 primary —— 而 primary 是按场次最多选出来的代表条目，
+   *   MCL 只给中文名，于是《歡迎來龍餐館》《復仇者聯盟4》这种
+   *   「MCL 场次最多」的片副标题直接不渲染（用户截图里缺的那行）。
+   *   英文名现在是**组级**字段（见 lib/data.ts 的 pickDisplayNameEn），
+   *   与哪家院线场次多无关。
+   */
   subtitle: string | null;
   poster: string | null;
   /**
@@ -125,7 +135,12 @@ export function buildIntro(group: MovieGroup): MovieIntro {
 
   return {
     title: group.displayName,
-    subtitle: group.primary.nameEn && group.primary.nameEn !== group.displayName ? group.primary.nameEn : null,
+    // 副标题 = 英文片名。与中文名相同（或本身就是英文名）时留空，
+    // 否则会出现「Look Back / Look Back」这种同一行重复两遍。
+    subtitle:
+      group.displayNameEn && group.displayNameEn !== group.displayName
+        ? group.displayNameEn
+        : null,
     poster: group.displayPoster,
     accent: group.displayAccent,
     accentRgb: hexToRgbChannels(group.displayAccent),

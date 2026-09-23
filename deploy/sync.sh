@@ -118,6 +118,11 @@ else
   # 戲院影廳規格：推断了错了页面照样 200，只是「有 IMAX 的戲院」
   # 静默少几家 / 多几家 —— 用户筛 IMAX 看不到 K11 也只会以为它没有。
   "$TSX" probe/check-cinema-specs.mts
+  # 详情页中文标题下的英文副标题：来源（组级而非 primary）与清洗（剥版本/活动/
+  # 影展标记）是两个独立失效点，错了页面照样 200 —— 只是整行不见了，
+  # 或变成「4DX Avengers: Endgame Encore Infinity Vision」。
+  # 用户 2026-09-25 报的就是「整行不见了」那一类。
+  "$TSX" probe/check-english-title.mts
   # 卡片链接 → 静态页的覆盖面：movie 页是 dynamicParams=false 的静态导出，
   # 链接 slug 与 generateStaticParams 的 slug 一旦分叉就是线上 404。
   # 这个 bug 本地构建不报错、类型不报错，只在服务器部署后才被死链检查拦下 ——

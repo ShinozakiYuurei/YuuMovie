@@ -11,6 +11,7 @@ export function MovieJsonLd({
   movie,
   extra,
   image,
+  alternateName,
   contentRating,
 }: {
   movie: Movie;
@@ -24,6 +25,20 @@ export function MovieJsonLd({
    *   （group.displayPoster）。不传则退回 movie.poster，行为不变。
    */
   image?: string | null;
+  /**
+   * 覆盖结构化数据的**英文片名**（alternateName）。
+   *
+   * ★ 与 image / contentRating 同一套理由：不传就是 movie.nameEn，
+   *   而 movie 是 group.primary —— 按场次最多选出来的那条，
+   *   MCL 条目根本没有英文名。
+   *   2026-09-25 详情页的英文副标题已改成**组级**字段
+   *   （group.displayNameEn），若这里不同步，就会出现
+   *   「页面上写着 Once Upon A Time In Middle East、结构化数据里没有英文名」
+   *   的页内矛盾 —— 与 contentRating 那次修的正是同一类问题。
+   *   未传或传 null 都退回 movie.nameEn（「组里没英文名」不等于
+   *   「这条 primary 也没有」）。
+   */
+  alternateName?: string | null;
   /**
    * 覆盖结构化数据的分级（详情页传 buildIntro 的结果，null = 未定级）。
    *
@@ -45,7 +60,7 @@ export function MovieJsonLd({
     '@context': 'https://schema.org',
     '@type': 'Movie',
     name: movie.nameZh,
-    alternateName: movie.nameEn || undefined,
+    alternateName: alternateName || movie.nameEn || undefined,
     image: image || movie.poster || undefined,
     duration: movie.duration ? `PT${movie.duration}M` : undefined,
     contentRating: contentRating || undefined,

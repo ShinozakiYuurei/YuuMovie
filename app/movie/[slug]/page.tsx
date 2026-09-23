@@ -107,6 +107,10 @@ export default async function MoviePage({ params }: { params: Promise<{ slug: st
       <MovieJsonLd
         movie={group.primary}
         image={group.displayPoster}
+        /* 英文片名与页面上那行副标题同源（group.displayNameEn）。
+         * 不传的话这里读 group.primary.nameEn —— 而 primary 按场次最多选，
+         * MCL 条目压根没有英文名，于是页面上显示英文、结构化数据里没有。 */
+        alternateName={a.subtitle}
         /* 分级与页面上那枚徽章同源（buildIntro）：否则同一页里
          * 徽章写「IIB」、结构化数据写 emperor 的「8.0」媒体评分。
          * 未定级传 null → 结构化数据里整项省略（TBC 不是有效评级）。 */
