@@ -180,10 +180,10 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
                    *   對「這間戲院怎麼去」沒幫助，故換成完整地址。
                    *   地址仍可 hover 地圖按鈕查看（下方 mapUrl 連結）。
                    */}
-                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                    <h3 className="font-semibold text-fg">{c.nameZh}</h3>
-                    {c.address && <span className="text-xs text-fg-muted">{c.address}</span>}
-                  </div>
+                  <h3 className="font-semibold text-fg">{c.nameZh}</h3>
+                  {c.address && (
+                    <p className="mt-1 text-xs text-fg-muted">{c.address}</p>
+                  )}
                   {/*
                    * 手續費行（原為地址）
                    *
