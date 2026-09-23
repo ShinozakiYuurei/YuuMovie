@@ -215,6 +215,11 @@ export function CinemaMapDialog({
         const L = (window as unknown as { L: LeafletNS }).L;
         const [lat, lon] = coord;
 
+        // 标记色跟随当前主题（见下方 circleMarker 的注释）
+        const cs = getComputedStyle(document.documentElement);
+        const accent = cs.getPropertyValue('--hkm-accent').trim() || '#8b7cff';
+        const accentSoft = cs.getPropertyValue('--hkm-accent-soft').trim() || '#a78bfa';
+
         const map = L.map(boxRef.current, {
           center: [lat, lon],
           zoom: 16,
@@ -237,9 +242,11 @@ export function CinemaMapDialog({
         // 在暗色地圖上偏亮且要多一次請求；圓點是純 SVG，且用主題色。
         L.circleMarker([lat, lon], {
           radius: 8,
-          color: '#a78bfa',
+          // ★ 颜色从 CSS 变量现读，不写死：标记色应与当前主题的强调色一致
+          //   （浅色主题下 #8b7cff 在亮色地图上偏淡）。变量缺失时回退到原紫。
+          color: accentSoft,
           weight: 3,
-          fillColor: '#8b7cff',
+          fillColor: accent,
           fillOpacity: 0.9,
         }).addTo(map);
 
@@ -265,7 +272,7 @@ export function CinemaMapDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--hkm-scrim)] p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-label={`${name} 地圖`}

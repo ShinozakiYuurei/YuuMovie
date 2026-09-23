@@ -62,7 +62,7 @@ export function MovieGroupCard({
       href={`/movie/${group.slug}`}
       className="hkm-glass group flex h-full flex-col overflow-hidden rounded-2xl"
     >
-      <div className="relative aspect-[2/3] w-full overflow-hidden bg-black">
+      <div className="relative aspect-[2/3] w-full overflow-hidden bg-[var(--hkm-poster-frame)]">
         {poster ? (
           <PosterImage
             src={poster}
@@ -123,10 +123,14 @@ export function MovieGroupCard({
 
           {/* 评分：纯黄文字，无底色、无来源小字。
               来源与算法仍保留在 tooltip（hover 才可见，不占视觉）——
-              卡片上只需要「分高不高」这一个判断。 */}
+              卡片上只需要「分高不高」这一个判断。
+
+              ★ 颜色走 --hkm-score-fg 而不是写死的 #facc15：
+                亮黄在暗底上 11.6:1，在明色玻璃上只剩 1.5:1。
+                详见 app/globals.css 的令牌注释。 */}
           {rating && (
             <span
-              className="ml-auto shrink-0 text-base font-bold leading-none text-[#facc15]"
+              className="ml-auto shrink-0 text-base font-bold leading-none text-[var(--hkm-score-fg)]"
               title={ratingTitle(rating)}
             >
               {rating.value.toFixed(1)}

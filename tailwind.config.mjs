@@ -13,8 +13,17 @@
  *   panel #111318 → surface #18181B（比底层亮一档）
  *   并补上 hairline（1px、8% 白的发丝边框，卡片浮起的关键）。
  * 改 globals.css 时请顺手同步这里，否则两边会静默漂移。
+ * ★ 2026-09-25 新增明／暗双主题：
+ *   本文件里那套**写死的暗色值**已经不完整了 —— 它没有、也无法表达
+ *   「同一个令牌在两套主题下取不同值」。真正的单一事实源是
+ *   globals.css 的 :root（暗）与 html[data-theme='light']（明），
+ *   这里保留的色值仅供仍会读本文件的工具参考，**默认按暗色**。
+ *   若你的工具报出的颜色与页面不符，请先确认页面当前是哪个主题。
  */
 export default {
+  // 主题由 <html data-theme> 控制（见 app/layout.tsx 的启动脚本），
+  // 不是靠 .dark 类切换。
+  darkMode: ['class', '[data-theme="dark"]'],
   content: [
     './app/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -23,6 +32,10 @@ export default {
     extend: {
       colors: {
         // 基础层：与 globals.css 的 --hkm-canvas / --hkm-surface 对齐
+        //
+        // ⚠️ 下面全部是**暗色**取值。明色下这些 key 在页面上的实际颜色
+        //    由 globals.css 的 html[data-theme='light'] 覆盖 ——
+        //    本文件只是镜像，不参与明色主题的计算。
         ink: '#0a0a0c',
         canvas: '#0a0a0c',
         panel: '#18181b',

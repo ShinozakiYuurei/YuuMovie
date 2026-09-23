@@ -21,6 +21,23 @@
  *   只在手工验收时跑）。本检查的作用是**挡住令牌被改坏**这个最常见的退化，
  *   而不是替代实测。
  *
+ * ★★ 2026-09-25：扩成**两套主题各查一遍** ★★
+ *
+ *   加入明色主题时发现这个检查有个致命盲区：它用
+ *     new RegExp(`--${name}\\s*:\\s*(#[0-9a-fA-F]{3,8})`)
+ *   在全文件里找**第一个**匹配 —— 那必然是 :root（暗色）里的那份。
+ *   明色主题的 html[data-theme='light'] 块里那套值，
+ *   它**一条都读不到**。
+ *
+ *   后果不是「检查变弱」而是「检查骗人」：
+ *   明色令牌被改坏时它照样打印 ✓，给出虚假的安全感 ——
+ *   而这份检查存在的全部理由就是「对比度错了不报错、只有肉眼看才发现」。
+ *
+ *   所以改成按块解析：先切出 :root 与 html[data-theme='light'] 两个
+ *   作用域，各自取令牌、各自算、各自判。
+ *   明色的底不能用 #18181B —— 那是暗色的卡片色；
+ *   它要用自己的 --hkm-surface / --hkm-canvas。
+ *
  * 跑法：node_modules/.bin/tsx probe/check-contrast.mts
  */
 import fs from 'node:fs';
@@ -30,11 +47,35 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CSS = fs.readFileSync(path.join(ROOT, 'app', 'globals.css'), 'utf8');
 
-/** 从 CSS 里取一个自定义属性的值（只认 `:root` 里那种 `--x: #hex;` 写法） */
-function token(name: string): string {
+/**
+ * 切出两个主题作用域的 CSS 文本
+ *
+ * ★ 为什么必须切块而不能全文正则找第一个：
+ *   全文找第一个匹配永远是 :root（暗色）那份，明色那套值读不到 ——
+ *   于是明色被改坏时检查仍然通过。详见文件头注释。
+ *
+ * ★ 为什么用「下一个顶层选择器」当结束边界：
+ *   两块的写法都是 `选择器 { … }` 且内部没有嵌套大括号
+ *   （只有 var() 与普通值），所以从 `{` 到下一个 `}` 就是整块。
+ *   用 indexOf('}') 而不是括号配对：这里够用，且不引入解析器的复杂度。
+ */
+function scope(startMarker: string): string {
+  const i = CSS.indexOf(startMarker);
+  if (i < 0) throw new Error(`在 app/globals.css 里找不到作用域 ${startMarker}`);
+  const open = CSS.indexOf('{', i);
+  const close = CSS.indexOf('\n}', open);
+  if (open < 0 || close < 0) throw new Error(`作用域 ${startMarker} 的花括号不配对`);
+  return CSS.slice(open, close);
+}
+
+const DARK_CSS = scope(':root {');
+const LIGHT_CSS = scope("html[data-theme='light'] {");
+
+/** 从给定作用域里取一个自定义属性（只认 `--x: #hex;` 写法） */
+function tokenIn(scopeCss: string, name: string, where: string): string {
   const re = new RegExp(`--${name}\\s*:\\s*(#[0-9a-fA-F]{3,8})`, 'i');
-  const m = CSS.match(re);
-  if (!m) throw new Error(`在 app/globals.css 里找不到 --${name}（检查是否被改名或删掉）`);
+  const m = scopeCss.match(re);
+  if (!m) throw new Error(`在 ${where} 里找不到 --${name}（检查是否被改名或删掉）`);
   return m[1];
 }
 
@@ -58,9 +99,6 @@ function ratio(a: [number, number, number], b: [number, number, number]): number
   return (l1 + 0.05) / (l2 + 0.05);
 }
 
-const surface = hexToRgb(token('hkm-surface'));
-const canvas = hexToRgb(token('hkm-canvas'));
-
 /**
  * 每档文字的 AA 要求。
  *
@@ -68,8 +106,8 @@ const canvas = hexToRgb(token('hkm-canvas'));
  * 场次卡的小字），远低于「大字号」的 18.66px/24px 门槛，
  * 所以**全部按 4.5 要求**，没有可以放宽的档位。
  *
- * faint（#5A5A63）刻意排除：它只用于装饰性分隔符「·」，
- * 不承载信息，文件里也明确标注了「勿用于正文」。
+ * faint 刻意排除：它只用于装饰性分隔符「·」，不承载信息，
+ * 文件里也明确标注了「勿用于正文」。
  */
 const TIERS: { name: string; min: number }[] = [
   { name: 'hkm-fg', min: 4.5 },
@@ -78,41 +116,72 @@ const TIERS: { name: string; min: number }[] = [
   { name: 'hkm-fg-dim', min: 4.5 },
 ];
 
-let bad = 0;
-console.log('  令牌              卡片底(#18181B)   画布(#0A0A0C)   要求');
-for (const t of TIERS) {
-  const c = hexToRgb(token(t.name));
-  const onSurface = ratio(c, surface);
-  const onCanvas = ratio(c, canvas);
-  const ok = onSurface >= t.min && onCanvas >= t.min;
-  if (!ok) bad++;
-  console.log(
-    `  ${t.name.padEnd(18)} ${onSurface.toFixed(2).padStart(6)}:1        ${onCanvas.toFixed(2).padStart(6)}:1      ` +
-      `${t.min}:1  ${ok ? '✓' : '✗'}`,
-  );
-}
-
-/*
- * 装饰色只做「不许被误当成正文」的守卫：它必须**确实**不达 AA。
- * 若哪天有人把它调亮到过 AA，说明有人开始拿它当正文用了 ——
- * 那时要么改用 dim，要么把这条断言改掉并想清楚。
+/**
+ * 逐主题检查
+ *
+ * ★ 明色的底必须用它自己的 --hkm-surface / --hkm-canvas：
+ *   暗色的卡片底是 #18181B、明色是 #FFFFFF，
+ *   拿错底算出来的数字毫无意义（而且会两边都错）。
+ *
+ * ★ 层级方向**两套主题相反**：
+ *   暗色是「越重要的字越亮」（fg 最亮、faint 最暗）
+ *   明色是「越重要的字越暗」（fg 最黑、faint 最浅）
+ *   所以亮度单调性的判定方向也要跟着换。
+ *   第一版忘了这一点，明色会被判「层级颠倒」—— 而它其实完全正确。
  */
-const faint = ratio(hexToRgb(token('hkm-fg-faint')), surface);
-if (faint >= 4.5) {
-  console.log(
-    `\n  ⚠️ --hkm-fg-faint 现在 ${faint.toFixed(2)}:1 已过 AA —— ` +
-      `它本应只做装饰。若确实要拿它当正文用，请改成本检查的 TIERS 里的一项。`,
-  );
-}
+function checkTheme(
+  label: string,
+  scopeCss: string,
+  /** 越重要的字是否应该越亮（暗色 true / 明色 false） */
+  heavierIsBrighter: boolean,
+): number {
+  let bad = 0;
+  const surface = hexToRgb(tokenIn(scopeCss, 'hkm-surface', label));
+  const canvas = hexToRgb(tokenIn(scopeCss, 'hkm-canvas', label));
+  const hex = (n: string) => `#${hexToRgb(tokenIn(scopeCss, n, label)).map((v) => v.toString(16).padStart(2, '0')).join('')}`;
 
-// 层级关系也要成立：越重要的字必须越亮（防止改令牌时把顺序搞乱）
-const order = TIERS.map((t) => ({ name: t.name, l: lum(hexToRgb(token(t.name))) }));
-for (let i = 1; i < order.length; i++) {
-  if (order[i].l >= order[i - 1].l) {
-    console.log(`\n  ✗ 层级颠倒：${order[i].name} 不比 ${order[i - 1].name} 暗`);
-    bad++;
+  console.log(`\n  ── ${label} ──  卡片底 ${hex('hkm-surface')} / 画布 ${hex('hkm-canvas')}`);
+  console.log('  令牌              卡片底        画布        要求');
+  for (const t of TIERS) {
+    const c = hexToRgb(tokenIn(scopeCss, t.name, label));
+    const onSurface = ratio(c, surface);
+    const onCanvas = ratio(c, canvas);
+    const ok = onSurface >= t.min && onCanvas >= t.min;
+    if (!ok) bad++;
+    console.log(
+      `  ${t.name.padEnd(18)} ${onSurface.toFixed(2).padStart(6)}:1    ${onCanvas.toFixed(2).padStart(6)}:1    ` +
+        `${t.min}:1  ${ok ? '✓' : '✗'}`,
+    );
   }
+
+  /*
+   * 装饰色只做「不许被误当成正文」的守卫：它必须**确实**不达 AA。
+   * 若哪天有人把它调到过 AA，说明有人开始拿它当正文用了 ——
+   * 那时要么改用 dim，要么把这条断言改掉并想清楚。
+   */
+  const faint = ratio(hexToRgb(tokenIn(scopeCss, 'hkm-fg-faint', label)), surface);
+  if (faint >= 4.5) {
+    console.log(
+      `  ⚠️ --hkm-fg-faint 现在 ${faint.toFixed(2)}:1 已过 AA —— ` +
+        `它本应只做装饰。若确实要拿它当正文用，请改成本检查的 TIERS 里的一项。`,
+    );
+  }
+
+  // 层级关系也要成立：越重要的字必须越「重」（防止改令牌时把顺序搞乱）
+  const order = TIERS.map((t) => ({ name: t.name, l: lum(hexToRgb(tokenIn(scopeCss, t.name, label))) }));
+  for (let i = 1; i < order.length; i++) {
+    const inverted = heavierIsBrighter ? order[i].l >= order[i - 1].l : order[i].l <= order[i - 1].l;
+    if (inverted) {
+      console.log(`  ✗ 层级颠倒：${order[i].name} 不比 ${order[i - 1].name} ${heavierIsBrighter ? '暗' : '亮'}`);
+      bad++;
+    }
+  }
+  return bad;
 }
 
-console.log(bad === 0 ? '\n✓ 文字对比度令牌全部达 AA（4.5:1）' : `\n${bad} 项不通过`);
+let bad = 0;
+bad += checkTheme('暗色（:root）', DARK_CSS, true);
+bad += checkTheme("明色（html[data-theme='light']）", LIGHT_CSS, false);
+
+console.log(bad === 0 ? '\n✓ 两套主题的文字对比度令牌全部达 AA（4.5:1）' : `\n${bad} 项不通过`);
 if (bad) process.exit(1);

@@ -2,7 +2,22 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+/*
+ * dark: 变体的判定条件
+ *
+ * ★ 2026-09-25 从 `&:is(.dark *)` 扩成两个选择器。
+ *   本站主题切换用的是 <html data-theme="light|dark">（见 components/ThemeToggle.tsx），
+ *   而 Tailwind 的 dark: 变体默认只认 .dark 类 —— 若不扩，
+ *   日后任何人写一个 dark:bg-xxx，它都会在白天模式下**永远生效**
+ *   （因为 .dark 类从没被加上过），而且这种错很难看出是变体判定失配。
+ *
+ *   ★ 为什么不让 JS 同时维护 .dark 类（两种写法都行）而是改这里：
+ *     class 是服务端渲染时就写定的（layout 里的 cn(geist.variable, 'font-sans')），
+ *     而 data-theme 是启动脚本在 hydrate 之前改的。
+ *     两者混用等于让 React 去调和一个它不认识的 class，
+ *     属于不必要的风险。data-theme 是**唯一事实来源**，变体跟着它走最干净。
+ */
+@custom-variant dark (&:is(.dark *, [data-theme='dark'] *));
 
 /* ============================================================
    YuuMovie 暗色设计令牌（2026-09-21 重构）
@@ -117,18 +132,26 @@
      ============================================================ */
 
   /* 玻璃底色：斜向渐变，左上偏亮（光源方向）
+   *
+   * ⚠️ 这一族（tint / tint-dim / tint-hi）已于 2026-09-25 删除，理由见下方注释。
+   *
    * ★ 2026-09-23 实测回调：初版 0.11/0.075/0.025 配上 0.42 的填充透明度，
    *   实测玻璃比画布亮 2.75 倍，看着是一块灰板而不是玻璃。
    *   暗色玻璃的关键是「只比背景亮一点点」（约 1.8~2.2 倍），
    *   亮多了就失去通透感 —— 因为通透感来自「能看见身后」，
-   *   而不是来自「自身很亮」。 */
-  --hkm-glass-tint: rgb(255 255 255 / 0.07);
-  --hkm-glass-tint-dim: rgb(255 255 255 / 0.024);
-  --hkm-glass-tint-hi: rgb(255 255 255 / 0.1);
+   *   而不是来自「自身很亮」。
+   */
 
-  /* 棱边折射高光（对应原 demo 的四条 inset 白光） */
-  --hkm-glass-edge: rgb(255 255 255 / 0.28);
-  --hkm-glass-edge-dim: rgb(255 255 255 / 0.12);
+  /* 棱边折射高光（对应原 demo 的四条 inset 白光）
+   *
+   * ⚠️ 2026-09-25 删除了 --hkm-glass-tint / -tint-dim / -tint-hi 与
+   *    --hkm-glass-edge / -edge-dim 五个令牌。
+   *    它们是 2026-09-23 那版「白 tint 铺满 + 棱边渐变」的遗留 ——
+   *    2026-09-24 的改造（见下方公共骨架注释）已经把 tint 与棱边渐变
+   *    全部移除，改用**真实 border** 表达棱边，这些变量从此没有任何规则引用。
+   *    保留它们的代价不是几个字节，而是误导：下一个人看到「tint」会以为
+   *    玻璃还靠加白显形，于是又把白雾加回去（正是那次改造要消掉的东西）。
+   *    现在棱边高光是 --hkm-glass-edge-1..4（四条 inset 白光）。 */
 
   /* 镜面反光带（对应原 demo 的 ::after 斜向渐变）
    * ★ 0.30 → 0.22：卡片里是海报，扫光叠在海报上会洗掉画面中部，
@@ -143,13 +166,172 @@
   --hkm-glass-sat: 180%;
   --hkm-glass-lift: 1.1;
 
+  /* ============================================================
+     明／暗双主题：外观令牌（2026-09-25 新增）
+
+     ★ 为什么这些值要抽成令牌，而不是像以前那样直接写在 .hkm-glass 里：
+       本站原本只有暗色一套，所以玻璃底色 rgb(24 24 27 / 0.72)、
+       棱边高光 rgb(255 255 255 / 0.22) 这些**逐条写死在规则里**是合理的。
+       一旦要加明色主题，同一批数字必须换一整套 —— 若靠「明色块里再写一遍
+       .hkm-glass」来覆盖，就等于同一个外观有**两份定义**，
+       日后调暗色的棱边高光时必然忘记同步明色那份（本文件顶上那条
+       「改 globals.css 时请顺手同步 tailwind.config.mjs，否则两边会静默漂移」
+       说的正是这种病）。
+       收成令牌后，规则只描述**结构**（哪几层、什么形状），
+       令牌描述**值**，两套主题各自给一组值，改结构不必碰值、改值不必碰结构。
+
+     ★ 暗色这一组**必须与抽取前的字面值逐字相同**：
+       本文件下方的对比度结论（次级文字 4.67:1、卡片比画布亮 2.3× 等）
+       全部是在这些值下实测的。抽取令牌只是搬家，不是调色 ——
+       任何一个数字变了，之前所有 probe 结论都作废。
+     ============================================================ */
+
+  /* 玻璃底色（分「卡片 / 悬浮菜单 / sticky 面板 / 顶栏」四档，见各自注释） */
+  --hkm-glass-border: rgb(255 255 255 / 0.13);
+  --hkm-glass-bg: rgb(24 24 27 / 0.72);
+  --hkm-glass-bg-hover: rgb(30 30 34 / 0.42);
+  --hkm-glass-pop-bg: rgb(20 20 24 / 0.82);
+  --hkm-glass-sticky-bg: rgb(20 20 24 / 0.86);
+  --hkm-glass-bar-bg: rgb(10 10 12 / 0.58);
+
+  /* 顶栏的上下切口反光与底色渐变 */
+  --hkm-bar-sheen-top: rgb(255 255 255 / 0.07);
+  --hkm-bar-sheen-bottom: rgb(255 255 255 / 0.02);
+  --hkm-bar-edge-top: rgb(255 255 255 / 0.16);
+  --hkm-bar-edge-bottom: rgb(255 255 255 / 0.07);
+  --hkm-bar-outer: rgb(0 0 0 / 0.9);
+
+  /* 棱边折射高光：四条 inset 白光，上左最亮、下右次之 */
+  --hkm-glass-edge-1: rgb(255 255 255 / 0.22);
+  --hkm-glass-edge-2: rgb(255 255 255 / 0.16);
+  --hkm-glass-edge-3: rgb(255 255 255 / 0.14);
+  --hkm-glass-edge-4: rgb(255 255 255 / 0.1);
+  --hkm-glass-edge-hover-1: rgb(255 255 255 / 0.34);
+  --hkm-glass-edge-hover-2: rgb(255 255 255 / 0.24);
+  --hkm-glass-edge-hover-3: rgb(255 255 255 / 0.2);
+  --hkm-glass-edge-hover-4: rgb(255 255 255 / 0.16);
+  /* 外投影：把玻璃从画布上抬起来 */
+  --hkm-glass-outer: rgb(0 0 0 / 0.7);
+  --hkm-glass-outer-hover: rgb(0 0 0 / 0.85);
+
+  /* 静态面板 / sticky 面板 / 悬浮菜单各自的棱边与外投影 */
+  --hkm-panel-edge-1: rgb(255 255 255 / 0.18);
+  --hkm-panel-edge-2: rgb(255 255 255 / 0.13);
+  --hkm-panel-outer: rgb(0 0 0 / 0.65);
+  --hkm-sticky-edge-1: rgb(255 255 255 / 0.24);
+  --hkm-sticky-edge-2: rgb(255 255 255 / 0.18);
+  --hkm-sticky-outer: rgb(0 0 0 / 0.9);
+  --hkm-pop-inset: rgb(255 255 255 / 0.16);
+  --hkm-pop-outer: rgb(0 0 0 / 0.9);
+
+  /* 药丸标签 */
+  --hkm-chip-border: rgb(255 255 255 / 0.14);
+  --hkm-chip-bg-1: rgb(255 255 255 / 0.1);
+  --hkm-chip-bg-2: rgb(255 255 255 / 0.04);
+  --hkm-chip-inset-top: rgb(255 255 255 / 0.16);
+  --hkm-chip-inset-bottom: rgb(0 0 0 / 0.3);
+
+  /* 次要按钮（真玻璃那颗） */
+  --hkm-ghost-border: rgb(255 255 255 / 0.16);
+  --hkm-ghost-bg-1: rgb(255 255 255 / 0.12);
+  --hkm-ghost-bg-2: rgb(255 255 255 / 0.05);
+  --hkm-ghost-bg: rgb(24 24 27 / 0.3);
+  --hkm-ghost-inset-top: rgb(255 255 255 / 0.2);
+  --hkm-ghost-inset-bottom: rgb(0 0 0 / 0.28);
+  --hkm-ghost-outer: rgb(0 0 0 / 0.6);
+
+  /* 海报：1px 细边 + 两层投影 */
+  --hkm-poster-border: rgb(255 255 255 / 0.14);
+  --hkm-poster-shadow-1: rgb(0 0 0 / 0.85);
+  --hkm-poster-shadow-2: rgb(0 0 0 / 0.95);
+  /* 海报框底色（图片未加载时露出的那一块） */
+  --hkm-poster-frame: #000;
+
+  /* 骨架微光 */
+  --hkm-skeleton-a: rgb(255 255 255 / 0.04);
+  --hkm-skeleton-b: rgb(255 255 255 / 0.09);
+
+  /* 渐变强调字的第二端（.hkm-grad-text） */
+  --hkm-grad-2: #67e8f9;
+  /* ★ 这里必须留一份：@theme 的 --color-accent2 指向它，
+     而 to-accent2（首页区块标题的渐变端）靠那个 @theme key 生成。
+     明色主题下它被换成 #0e7490（浅青在浅底上只有 1.4:1，等于消失）。 */
+  --hkm-accent2: #67e8f9;
+
+  /* 剧情简介正文（用户 2026-09-21 指定「纯白微调」的那个精确值） */
+  --hkm-summary-fg: rgb(255 255 255 / 0.85);
+
+  /* 地图弹层遮罩 */
+  --hkm-scrim: rgb(0 0 0 / 0.7);
+
+  /* 日期条选中态的投影（当前为「白底黑字」的胶囊，投影也应是白的） */
+  --hkm-active-pill-glow: rgb(255 255 255 / 0.45);
+
+  /* 评分卡底色（不透明，理由见 components/MovieIntro.tsx） */
+  --hkm-rating-douban-bg: rgb(34 41 25);
+  --hkm-rating-douban-fg: #7bd48f;
+  --hkm-rating-imdb-bg: rgb(46 40 20);
+  --hkm-rating-imdb-fg: #f0c040;
+
+  /* 场次卡：余座档位（值取自 lib/seat.ts 的实测结论，此处只是搬进来） */
+  --hkm-seat-plenty-bg: rgb(3 151 4 / 0.16);
+  --hkm-seat-plenty-border: rgb(34 197 94 / 0.42);
+  --hkm-seat-plenty-fg: #86efac;
+  --hkm-seat-plenty-dot: #22c55e;
+  --hkm-seat-limited-bg: rgb(236 126 10 / 0.16);
+  --hkm-seat-limited-border: rgb(245 158 11 / 0.42);
+  --hkm-seat-limited-fg: #fcd34d;
+  --hkm-seat-limited-dot: #f59e0b;
+  --hkm-seat-few-bg: rgb(255 0 0 / 0.15);
+  --hkm-seat-few-border: rgb(239 68 68 / 0.45);
+  --hkm-seat-few-fg: #fca5a5;
+  --hkm-seat-few-dot: #ef4444;
+  --hkm-seat-soldout-bg: rgb(125 9 0 / 0.42);
+  --hkm-seat-soldout-border: rgb(153 27 27 / 0.55);
+  --hkm-seat-soldout-fg: #e8a5a0;
+  --hkm-seat-soldout-dot: #7d0900;
+  /* 无余座数据时的中性卡 */
+  --hkm-seat-none-bg: rgb(255 255 255 / 0.05);
+  --hkm-seat-none-border: rgb(255 255 255 / 0.08);
+  --hkm-seat-none-fg: #e8ebf3;
+
+  /* 环境光（极光层）：底色 + 高频网格 + 三团光 */
+  --hkm-aurora-base:
+    radial-gradient(ellipse 120% 80% at 50% 0%, rgb(30 27 58 / 0.55), transparent 70%),
+    radial-gradient(ellipse 100% 70% at 80% 55%, rgb(16 38 48 / 0.4), transparent 72%),
+    #0a0a0c;
+  --hkm-aurora-grid: rgb(255 255 255 / 0.03);
+  --hkm-aurora-1: rgb(99 102 241 / 0.34);
+  --hkm-aurora-2: rgb(34 211 238 / 0.2);
+  --hkm-aurora-3: rgb(139 124 255 / 0.28);
+
   /* ---- 极淡填充（chip / 次级按钮 / 内嵌块） ---- */
   --hkm-veil: rgb(255 255 255 / 0.04);
   --hkm-veil-strong: rgb(255 255 255 / 0.07);
 
-  /* ---- 品牌强调色 ---- */
+  /* 品牌强调色 ---- */
   --hkm-accent: #8b7cff;
   --hkm-accent-soft: #a78bfa;
+
+  /* 主按钮的渐变两端
+   *
+   * ★ 明色主题下必须换深一档，理由不是「好看」而是可读性：
+   *   按钮上是**白字**，白字压在 #8B7CFF 上只有 3.4:1，不达 AA。
+   *   暗色主题下这个值看着没问题（大面积饱和色块 + 白字，观感上「亮」），
+   *   但它本来就不达 AA —— 明色主题要求把全站过一遍对比度，
+   *   这条是那次扫描顺手拓出来的（不在原改造范围内，但同属「白字要看得清」）。 */
+  --hkm-btn-primary-1: #8b7cff;
+  --hkm-btn-primary-2: #6d5cf0;
+
+  /* 卡片评分文字
+   *
+   * ★ 这个令牌是加明色主题时**必须**补的一类：
+   *   评分原先是写死的 text-[#facc15]（组件里的 Tailwind 任意值）。
+   *   亮黄在暗底上 11.6:1，在明色玻璃 #FAFAFC 上却只有 1.5:1 ——
+   *   整张卡上最醒目的那个数字，到白天模式里会直接消失。
+   *   明色改用 amber-700 #A16207（玻璃 4.76:1，刚好过 AA 正文）。
+   *   仍然避开橙色的场次色（#D97706），两者不会混淆。 */
+  --hkm-score-fg: #facc15;
 
   /*
    * shadcn 默认注入的是**浅色**变量（background 近白），
@@ -191,6 +373,248 @@
   --sidebar-ring: #8b7cff;
 }
 
+/* ============================================================
+   明色主题令牌（2026-09-25 新增，用户要求「白天／深色模式切换」）
+
+   ★★ 明色不是把暗色的值取反 ★★
+
+   最容易想到的做法是把画布改白、文字改黑，然后玻璃底色也从
+   rgb(24 24 27 / 0.72) 换成 rgb(255 255 255 / 0.72) 就完事。
+   实测（probe/theme-contrast.cjs，同一批影片在两种主题下各测一次）
+   会发现这样出来的明色卡**根本没有玻璃感**，原因是「显形机制」变了：
+
+     暗色玻璃靠「比画布亮一档 + 白色棱边」显形（白在暗底上是提亮）；
+     明色画布本身就是亮的，再加白只会白成一团 —— 卡片边界消失。
+
+   所以明色玻璃改用三条**另外**的机制（对应下面三组令牌）：
+
+     ① 底色比画布更白（画布 #F1F2F6 → 玻璃 0.62 白 ≈ #FAFAFC），
+        方向与暗色一致（都比画布亮），但靠的是「更接近纯白」；
+     ② 棱边高光提到 0.9 上下（暗色是 0.22）—— 明色里白光必须
+        **比自身底色更白**才看得见，低透明度的白等于没写；
+     ③ 形状改由「内暗边 + 外投影」定义（--hkm-glass-inner-rim 0.10、
+        --hkm-glass-outer 0.16）—— 这是明色玻璃最关键的差别：
+        暗色用内暗边表达「厚度」，明色还得靠它表达「边界在哪」。
+
+   ★ 明色文字令牌同样不是取反，而是各自标定（WCAG 相对亮度公式，
+     对着**玻璃实测底 #FAFAFC**，而不是画布 —— 正文都在玻璃上）：
+
+     fg     #18181B → 17.0:1   （暗色 18.0:1）
+     soft   #3F3F46 → 10.0:1   （暗色 13.4:1）
+     muted  #52525B →  7.4:1   （暗色  7.7:1）
+     dim    #5A5A63 →  6.6:1   （暗色  4.67:1，明色余量更大）
+     faint  #A8A8B0 →  2.3:1   ← ⚠️ 与暗色的 #5A5A63 一样，仅限装饰
+
+   ★ 强调色必须换（这条最容易漏）：
+     品牌紫 #8B7CFF 在 #F1F2F6 画布上只有 **2.9:1** —— 它在暗底上是
+     合格的高亮色，在明底上却是「浅紫糊在白纸上」，全站所有
+     text-accent（待映日期、按钮 hover、筛选选中态）会一起变得读不清。
+     明色改用同色系的深紫 #6B46E5（画布 5.2:1 / 玻璃 5.6:1）。
+
+   ★ 渐变强调字（.hkm-grad-text）的两端也要一起换：
+     暗色那组 #A78BFA → #67E8F9 在明底上最亮端只有 1.4:1，
+     等于首页大标题里那两个字直接消失。
+     明色改用 #6B46E5 → #0E7490（玻璃 5.6:1 / 5.1:1），
+     保留「紫 → 青」的走向与品牌辨识度。
+
+   ★ 为什么用 html[data-theme='light'] 而不是 .light 类：
+     属性选择器（0,1,1）权重高于本文件顶部的 :root（0,1,0），
+     因此**无论写在文件哪里都能稳定覆盖**，不依赖书写顺序。
+     而 .light 与 :root 同为 (0,1,0)，一旦有人把明色块挪到 :root 之前，
+     覆盖就会静默失效 —— 这类「顺序敏感」的坑本文件已经踩过多次。
+     （同理，下方 .dark 的选择器也补上了 [data-theme='dark']。）
+   ============================================================ */
+html[data-theme='light'] {
+  /* 让浏览器原生控件（滚动条、表单、下拉）也跟着切 */
+  color-scheme: light;
+
+  /* ---- 表面层：画布是「带一点冷调的浅灰」，不是纯白 ----
+   * 与暗色画布 #0A0A0C（带冷蓝倾向、拒绝死黑）同一个思路：
+   * 纯白 #FFFFFF 上玻璃「更白一档」就没有空间了，卡片只能靠阴影硬撑。 */
+  --hkm-canvas: #f1f2f6;
+  --hkm-surface: #ffffff;
+  --hkm-surface-hover: #f7f7fa;
+
+  /* ---- 文字层级（对比度见上方注释） ---- */
+  --hkm-fg: #18181b;
+  --hkm-fg-soft: #3f3f46;
+  --hkm-fg-muted: #52525b;
+  --hkm-fg-dim: #5a5a63;
+  --hkm-fg-faint: #a8a8b0;
+
+  /* ---- 发丝边框：暗色是「白 6/8/14%」，明色换成「黑 6/10/16%」 ---- */
+  --hkm-hairline-soft: rgb(9 9 11 / 0.06);
+  --hkm-hairline: rgb(9 9 11 / 0.1);
+  --hkm-hairline-strong: rgb(9 9 11 / 0.16);
+
+  /* ---- 极淡填充 ---- */
+  --hkm-veil: rgb(9 9 11 / 0.04);
+  --hkm-veil-strong: rgb(9 9 11 / 0.07);
+
+  /* ---- 品牌强调色（明底上换深一档，见上方注释） ---- */
+  --hkm-accent: #6b46e5;
+  --hkm-accent-soft: #6b46e5;
+  --hkm-accent2: #0e7490;
+  --hkm-grad-2: #0e7490;
+
+  /* 主按钮：白字压在 #8B7CFF 上只有 3.4:1，明色下换成深紫 #6B46E5
+     （白字 5.6:1）。暗色主题下那颗按钮的颜色维持原样 —— 改它会牵动
+     全站所有 CTA 的观感，不在本次范围内。 */
+  --hkm-btn-primary-1: #6b46e5;
+  --hkm-btn-primary-2: #5b39d6;
+
+  /* 评分黄：亮黄在浅底上 1.5:1，必须换成深琥珀（见 :root 注释） */
+  --hkm-score-fg: #a16207;
+
+  /* ---- 玻璃（明色三机制，见上方注释） ---- */
+  --hkm-glass-border: rgb(255 255 255 / 0.7);
+  --hkm-glass-bg: rgb(255 255 255 / 0.62);
+  --hkm-glass-bg-hover: rgb(255 255 255 / 0.78);
+  --hkm-glass-pop-bg: rgb(255 255 255 / 0.88);
+  --hkm-glass-sticky-bg: rgb(255 255 255 / 0.9);
+  --hkm-glass-bar-bg: rgb(252 252 253 / 0.78);
+  /* 提亮系数：暗色用 1.1 把暗底抬起来；明色只给 1.03，
+     再高就把身后的浅色内容冲成一片死白（玻璃要透得出东西才叫玻璃） */
+  --hkm-glass-lift: 1.03;
+  /* 内暗边：明色里它同时承担「厚度」与「边界」两件事 */
+  --hkm-glass-inner-rim: rgb(9 9 11 / 0.1);
+
+  /* 棱边高光：明色必须比自身底色更白才看得见，故整体拉到 0.4~0.9 */
+  --hkm-glass-edge-1: rgb(255 255 255 / 0.9);
+  --hkm-glass-edge-2: rgb(255 255 255 / 0.6);
+  --hkm-glass-edge-3: rgb(255 255 255 / 0.55);
+  --hkm-glass-edge-4: rgb(255 255 255 / 0.4);
+  --hkm-glass-edge-hover-1: rgb(255 255 255 / 1);
+  --hkm-glass-edge-hover-2: rgb(255 255 255 / 0.75);
+  --hkm-glass-edge-hover-3: rgb(255 255 255 / 0.7);
+  --hkm-glass-edge-hover-4: rgb(255 255 255 / 0.5);
+
+  /* 外投影：暗色靠它「浮起」，明色还得靠它「画出轮廓」，
+     所以从 0.7 收到 0.16 但**更实**（暗色那层黑在明底上会糊成一团脏灰） */
+  --hkm-glass-outer: rgb(9 9 11 / 0.16);
+  --hkm-glass-outer-hover: rgb(9 9 11 / 0.22);
+
+  --hkm-panel-edge-1: rgb(255 255 255 / 0.85);
+  --hkm-panel-edge-2: rgb(255 255 255 / 0.6);
+  --hkm-panel-outer: rgb(9 9 11 / 0.12);
+  --hkm-sticky-edge-1: rgb(255 255 255 / 0.9);
+  --hkm-sticky-edge-2: rgb(255 255 255 / 0.7);
+  --hkm-sticky-outer: rgb(9 9 11 / 0.16);
+  --hkm-pop-inset: rgb(255 255 255 / 0.9);
+  --hkm-pop-outer: rgb(9 9 11 / 0.18);
+
+  /* 顶栏：身后的渐变在明色里是「白 → 更白」，形同虚设，
+     所以定义轮廓的责任交给**下沿那条发丝线**（--hkm-bar-edge-bottom 改黑） */
+  --hkm-bar-sheen-top: rgb(255 255 255 / 0.6);
+  --hkm-bar-sheen-bottom: rgb(255 255 255 / 0.25);
+  --hkm-bar-edge-top: rgb(255 255 255 / 0.9);
+  --hkm-bar-edge-bottom: rgb(9 9 11 / 0.08);
+  --hkm-bar-outer: rgb(9 9 11 / 0.12);
+
+  /* 镜面扫光：暗色是「暗底上的一道白」，明色要更白才显形
+   * ★ 0.55 → 0.8：明色玻璃本身已接近纯白，低透明度的白扫上去等于没扫。
+   *   它仍有可见度 —— 玻璃底色是**带紫/青调的浅色**（身后是极光层），
+   *   高透明度的白扫过时会把那点色调洗掉，观感上就是一道掠过的反光。 */
+  --hkm-glass-sheen: rgb(255 255 255 / 0.8);
+
+  --hkm-chip-border: rgb(9 9 11 / 0.1);
+  --hkm-chip-bg-1: rgb(255 255 255 / 0.9);
+  --hkm-chip-bg-2: rgb(255 255 255 / 0.5);
+  --hkm-chip-inset-top: rgb(255 255 255 / 0.95);
+  --hkm-chip-inset-bottom: rgb(9 9 11 / 0.06);
+
+  --hkm-ghost-border: rgb(9 9 11 / 0.14);
+  --hkm-ghost-bg-1: rgb(255 255 255 / 0.8);
+  --hkm-ghost-bg-2: rgb(255 255 255 / 0.45);
+  --hkm-ghost-bg: rgb(255 255 255 / 0.5);
+  --hkm-ghost-inset-top: rgb(255 255 255 / 0.9);
+  --hkm-ghost-inset-bottom: rgb(9 9 11 / 0.06);
+  --hkm-ghost-outer: rgb(9 9 11 / 0.12);
+
+  --hkm-poster-border: rgb(9 9 11 / 0.12);
+  --hkm-poster-shadow-1: rgb(9 9 11 / 0.22);
+  --hkm-poster-shadow-2: rgb(9 9 11 / 0.3);
+  --hkm-poster-frame: rgb(9 9 11 / 0.06);
+
+  --hkm-skeleton-a: rgb(9 9 11 / 0.05);
+  --hkm-skeleton-b: rgb(9 9 11 / 0.1);
+
+  --hkm-summary-fg: rgb(24 24 27 / 0.88);
+  --hkm-scrim: rgb(9 9 11 / 0.45);
+  --hkm-active-pill-glow: rgb(9 9 11 / 0.25);
+
+  /* 评分卡：暗色是「深底 + 亮字」，明色换成「浅底 + 深字」，
+     品牌徽章（#2e963d / #f0c040）两套主题保持一致 —— 那是品牌标识，不随主题变。
+     取值依据：豆瓣 #166534 在 #E9F6EC 上 6.4:1、IMDb #92400E 在 #FDF4DC 上 6.4:1。 */
+  --hkm-rating-douban-bg: #e9f6ec;
+  --hkm-rating-douban-fg: #166534;
+  --hkm-rating-imdb-bg: #fdf4dc;
+  --hkm-rating-imdb-fg: #92400e;
+
+  /* 余座档位：色相不变（绿/橙/红/深红，辨识度与暗色一致），
+     但淡彩底改成「浅底 + 深字」—— 暗色那组亮字（#86efac 等）在浅底上只有 1.3:1，
+     等于整张场次卡只剩底色可辨。文字实测：绿 6.4:1、橙 6.5:1、红 5.6:1、深红 8.1:1。 */
+  --hkm-seat-plenty-bg: rgb(3 151 4 / 0.1);
+  --hkm-seat-plenty-border: rgb(22 163 74 / 0.45);
+  --hkm-seat-plenty-fg: #166534;
+  --hkm-seat-plenty-dot: #16a34a;
+  --hkm-seat-limited-bg: rgb(236 126 10 / 0.12);
+  --hkm-seat-limited-border: rgb(217 119 6 / 0.45);
+  --hkm-seat-limited-fg: #92400e;
+  --hkm-seat-limited-dot: #d97706;
+  --hkm-seat-few-bg: rgb(255 0 0 / 0.08);
+  --hkm-seat-few-border: rgb(220 38 38 / 0.45);
+  --hkm-seat-few-fg: #b91c1c;
+  --hkm-seat-few-dot: #dc2626;
+  --hkm-seat-soldout-bg: rgb(153 27 27 / 0.12);
+  --hkm-seat-soldout-border: rgb(153 27 27 / 0.4);
+  --hkm-seat-soldout-fg: #7f1d1d;
+  --hkm-seat-soldout-dot: #7d0900;
+  --hkm-seat-none-bg: rgb(9 9 11 / 0.04);
+  --hkm-seat-none-border: rgb(9 9 11 / 0.1);
+  --hkm-seat-none-fg: #3f3f46;
+
+  /* 极光层：暗色是「暗底上的冷紫/青」，明色换成「浅底上的淡紫/淡青」。
+     ★ 亮度必须卡住：它是玻璃的**输入数据**（身后要有东西可折射），
+       但它同时也抬高了玻璃身后的亮度 —— 峰值处（顶部 0.6 的淡紫）
+       实测次级文字仍有 5.16:1，留有余量。 */
+  --hkm-aurora-base:
+    radial-gradient(ellipse 120% 80% at 50% 0%, rgb(206 208 255 / 0.6), transparent 70%),
+    radial-gradient(ellipse 100% 70% at 80% 55%, rgb(198 240 248 / 0.5), transparent 72%),
+    #f1f2f6;
+  /* 网格线：暗色是白线，明色改黑线（同一手法：低透明度的高频纹理） */
+  --hkm-aurora-grid: rgb(9 9 11 / 0.035);
+  --hkm-aurora-1: rgb(99 102 241 / 0.22);
+  --hkm-aurora-2: rgb(34 211 238 / 0.16);
+  --hkm-aurora-3: rgb(139 124 255 / 0.2);
+
+  /* shadcn 变量同步（理由与 .dark 块相同：两处同源，加不加类都一样） */
+  --background: var(--hkm-canvas);
+  --foreground: var(--hkm-fg);
+  --card: var(--hkm-surface);
+  --card-foreground: var(--hkm-fg);
+  --popover: var(--hkm-surface);
+  --popover-foreground: var(--hkm-fg);
+  --primary: var(--hkm-accent);
+  --primary-foreground: #ffffff;
+  --secondary: var(--hkm-surface-hover);
+  --secondary-foreground: var(--hkm-fg);
+  --muted: var(--hkm-surface-hover);
+  --muted-foreground: var(--hkm-fg-muted);
+  --accent: var(--hkm-accent);
+  --accent-foreground: #ffffff;
+  --border: var(--hkm-hairline);
+  --input: var(--hkm-hairline);
+  --ring: var(--hkm-accent);
+  --sidebar: var(--hkm-surface);
+  --sidebar-foreground: var(--hkm-fg);
+  --sidebar-primary: var(--hkm-accent);
+  --sidebar-accent: var(--hkm-surface-hover);
+  --sidebar-accent-foreground: var(--hkm-fg);
+  --sidebar-border: var(--hkm-hairline);
+  --sidebar-ring: var(--hkm-accent);
+}
+
 /*
  * 画布底色
  *
@@ -214,6 +638,25 @@
  */
 html {
   background: var(--hkm-canvas);
+  /*
+   * 主题切换的过渡
+   *
+   * ★ 只过渡颜色相关属性，不写 transition: all ——
+   *   那会让 hover 的 transform / box-shadow 也被卷进来，
+   *   且一旦有人给某个属性加了新过渡，切换主题时会变成一次拖影。
+   * ★ 为什么挂在 html 上就够：这些属性都是可继承或在子元素上
+   *   各自解析的（var() 求值后逐元素变色），浏览器会把每个元素的
+   *   颜色变化一并做插值。
+   * ★ 尊重 prefers-reduced-motion：主题切换本身不需要动效。
+   */
+  transition: background-color 0.25s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html,
+  body {
+    transition: none;
+  }
 }
 
 body {
@@ -278,11 +721,11 @@ body {
   z-index: -1;
   pointer-events: none;
   overflow: hidden;
-  /* 底色：略高于画布 #0A0A0C，带一点冷紫倾向 */
-  background:
-    radial-gradient(ellipse 120% 80% at 50% 0%, rgb(30 27 58 / 0.55), transparent 70%),
-    radial-gradient(ellipse 100% 70% at 80% 55%, rgb(16 38 48 / 0.4), transparent 72%),
-    #0a0a0c;
+  /* 底色：略高于画布 #0A0A0C，带一点冷紫倾向
+   * ★ 整套值（底色 / 网格 / 三团光）现在是 --hkm-aurora-* 令牌，
+   *   明暗两套各自一份 —— 这一层是玻璃的**输入数据**，
+   *   主题一变它必须跟着变，否则明色主题下玻璃身后是一片暗紫。 */
+  background: var(--hkm-aurora-base);
 }
 
 /*
@@ -309,7 +752,7 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  --grid: rgb(255 255 255 / 0.03);
+  --grid: var(--hkm-aurora-grid);
   background-image:
     linear-gradient(0deg, transparent 24%, var(--grid) 25%, var(--grid) 26%, transparent 27%, transparent 74%, var(--grid) 75%, var(--grid) 76%, transparent 77%),
     linear-gradient(90deg, transparent 24%, var(--grid) 25%, var(--grid) 26%, transparent 27%, transparent 74%, var(--grid) 75%, var(--grid) 76%, transparent 77%);
@@ -336,7 +779,7 @@ body {
   top: -34vh;
   left: 50%;
   margin-left: -47.5vw; /* 代替 translateX(-50%)，把 transform 通道让给动画 */
-  background: radial-gradient(ellipse, rgb(99 102 241 / 0.34), transparent 66%);
+  background: radial-gradient(ellipse, var(--hkm-aurora-1), transparent 66%);
 }
 
 /* 右侧青色补光：打破左右对称，并覆盖右半边的卡片 */
@@ -345,7 +788,7 @@ body {
   height: 85vh;
   top: 12vh;
   right: -18vw;
-  background: radial-gradient(ellipse, rgb(34 211 238 / 0.2), transparent 68%);
+  background: radial-gradient(ellipse, var(--hkm-aurora-2), transparent 68%);
 }
 
 /* 左下紫罗兰补光：覆盖左半边与首屏下半区 */
@@ -354,7 +797,7 @@ body {
   height: 80vh;
   bottom: -30vh;
   left: -18vw;
-  background: radial-gradient(ellipse, rgb(139 124 255 / 0.28), transparent 68%);
+  background: radial-gradient(ellipse, var(--hkm-aurora-3), transparent 68%);
 }
 
 /* 无动效偏好：关闭极光位移 */
@@ -492,8 +935,13 @@ a {
    * 用 border 而不是 background 叠加，是为了让「只在边缘」这件事
    * 由布局保证，而不是靠 background-clip 的计算结果 —— 后者正是
    * 上面第②条踩坑的根源。
+   *
+   * ★ 2026-09-25：值改由 --hkm-glass-border 提供。
+   *   暗色下它仍是 rgb(255 255 255 / 0.13)（逐字未变）；
+   *   明色下换成 0.7 白 —— 明色玻璃的边界必须比自身底色更白，
+   *   否则卡片与画布糊成一片。
    */
-  border: 1px solid rgb(255 255 255 / 0.13);
+  border: 1px solid var(--hkm-glass-border);
   /* 没有背景图了：白色 tint 与棱边渐变全部移除（见上方注释） */
   background-image: none;
   /* 玻璃必须知道自己叠在谁上面，否则混合/合成会穿到更远的层 */
@@ -518,14 +966,14 @@ a {
  */
 .hkm-glass-pop {
   --hkm-glass-blur: 26px;
-  background-color: rgb(20 20 24 / 0.82);
+  background-color: var(--hkm-glass-pop-bg);
   background-image: none;
-  border: 1px solid rgb(255 255 255 / 0.13);
+  border: 1px solid var(--hkm-glass-border);
   -webkit-backdrop-filter: blur(var(--hkm-glass-blur)) saturate(var(--hkm-glass-sat));
   backdrop-filter: blur(var(--hkm-glass-blur)) saturate(var(--hkm-glass-sat));
   box-shadow:
-    inset 0 1px 0 0 rgb(255 255 255 / 0.16),
-    0 18px 50px -12px rgb(0 0 0 / 0.9);
+    inset 0 1px 0 0 var(--hkm-pop-inset),
+    0 18px 50px -12px var(--hkm-pop-outer);
 }
 
 /* ---- 卡片：可交互的玻璃 ---- */
@@ -546,21 +994,21 @@ a {
      （卡片本来就自己裁），且自身 box-shadow 不受 overflow 影响。 */
   overflow: hidden;
   /* 0.38 → 0.72（用户要的「别那么透」）；过 AA 后 alpha 是自由变量，见公共骨架注释 */
-  background-color: rgb(24 24 27 / 0.72);
+  background-color: var(--hkm-glass-bg);
   -webkit-backdrop-filter: blur(var(--hkm-glass-blur)) saturate(var(--hkm-glass-sat))
     brightness(var(--hkm-glass-lift));
   backdrop-filter: blur(var(--hkm-glass-blur)) saturate(var(--hkm-glass-sat))
     brightness(var(--hkm-glass-lift));
   box-shadow:
     /* 棱边折射高光：上左最亮、下右次之（对应原 demo 的四条 inset 白光） */
-    inset 2px -2px 1px -1px rgb(255 255 255 / 0.22),
-    inset -2px 2px 1px -1px rgb(255 255 255 / 0.16),
-    inset 6px -6px 1px -6px rgb(255 255 255 / 0.14),
-    inset -6px 6px 1px -6px rgb(255 255 255 / 0.1),
+    inset 2px -2px 1px -1px var(--hkm-glass-edge-1),
+    inset -2px 2px 1px -1px var(--hkm-glass-edge-2),
+    inset 6px -6px 1px -6px var(--hkm-glass-edge-3),
+    inset -6px 6px 1px -6px var(--hkm-glass-edge-4),
     /* 内暗边：玻璃的厚度 */
     inset 0 0 3px var(--hkm-glass-inner-rim),
     /* 外投影：把玻璃从画布上抬起来 */
-    0 6px 20px -10px rgb(0 0 0 / 0.7);
+    0 6px 20px -10px var(--hkm-glass-outer);
   transition:
     transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
     background-color 0.32s ease,
@@ -568,14 +1016,14 @@ a {
 }
 
 .hkm-glass:hover {
-  background-color: rgb(30 30 34 / 0.42);
+  background-color: var(--hkm-glass-bg-hover);
   box-shadow:
-    inset 2px -2px 1px -1px rgb(255 255 255 / 0.34),
-    inset -2px 2px 1px -1px rgb(255 255 255 / 0.24),
-    inset 6px -6px 1px -6px rgb(255 255 255 / 0.2),
-    inset -6px 6px 1px -6px rgb(255 255 255 / 0.16),
+    inset 2px -2px 1px -1px var(--hkm-glass-edge-hover-1),
+    inset -2px 2px 1px -1px var(--hkm-glass-edge-hover-2),
+    inset 6px -6px 1px -6px var(--hkm-glass-edge-hover-3),
+    inset -6px 6px 1px -6px var(--hkm-glass-edge-hover-4),
     inset 0 0 3px var(--hkm-glass-inner-rim),
-    0 14px 34px -14px rgb(0 0 0 / 0.85);
+    0 14px 34px -14px var(--hkm-glass-outer-hover);
 }
 
 /*
@@ -631,16 +1079,16 @@ a {
 /* ---- 面板：静态玻璃，无 hover 位移 ---- */
 .hkm-panel {
   /* 0.36 → 0.72（同 .hkm-glass） */
-  background-color: rgb(24 24 27 / 0.72);
+  background-color: var(--hkm-glass-bg);
   -webkit-backdrop-filter: blur(var(--hkm-glass-blur)) saturate(var(--hkm-glass-sat))
     brightness(var(--hkm-glass-lift));
   backdrop-filter: blur(var(--hkm-glass-blur)) saturate(var(--hkm-glass-sat))
     brightness(var(--hkm-glass-lift));
   box-shadow:
-    inset 2px -2px 1px -1px rgb(255 255 255 / 0.18),
-    inset -2px 2px 1px -1px rgb(255 255 255 / 0.13),
+    inset 2px -2px 1px -1px var(--hkm-panel-edge-1),
+    inset -2px 2px 1px -1px var(--hkm-panel-edge-2),
     inset 0 0 3px var(--hkm-glass-inner-rim),
-    0 6px 20px -10px rgb(0 0 0 / 0.65);
+    0 6px 20px -10px var(--hkm-panel-outer);
 }
 
 /*
@@ -662,17 +1110,17 @@ a {
    * 比卡片更实，理由与悬浮菜单一致（身后是文字时以可读性优先）。
    * 顺带把原本那层白色渐变移除（它会让身后文字变成一片灰雾）。
    */
-  background-color: rgb(20 20 24 / 0.86);
+  background-color: var(--hkm-glass-sticky-bg);
   background-image: none;
   -webkit-backdrop-filter: blur(var(--hkm-glass-blur)) saturate(var(--hkm-glass-sat))
     brightness(var(--hkm-glass-lift));
   backdrop-filter: blur(var(--hkm-glass-blur)) saturate(var(--hkm-glass-sat))
     brightness(var(--hkm-glass-lift));
   box-shadow:
-    inset 2px -2px 1px -1px rgb(255 255 255 / 0.24),
-    inset -2px 2px 1px -1px rgb(255 255 255 / 0.18),
+    inset 2px -2px 1px -1px var(--hkm-sticky-edge-1),
+    inset -2px 2px 1px -1px var(--hkm-sticky-edge-2),
     inset 0 0 3px var(--hkm-glass-inner-rim),
-    0 12px 32px -14px rgb(0 0 0 / 0.9);
+    0 12px 32px -14px var(--hkm-sticky-outer);
 }
 
 /*
@@ -699,21 +1147,24 @@ a {
 .hkm-glass-bar {
   --hkm-glass-blur: 28px;
   --hkm-glass-lift: 1;
-  background-color: rgb(10 10 12 / 0.58);
+  background-color: var(--hkm-glass-bar-bg);
   background-image: linear-gradient(
     180deg,
-    rgb(255 255 255 / 0.07) 0%,
-    rgb(255 255 255 / 0.02) 100%
+    var(--hkm-bar-sheen-top) 0%,
+    var(--hkm-bar-sheen-bottom) 100%
   );
   -webkit-backdrop-filter: blur(var(--hkm-glass-blur)) saturate(var(--hkm-glass-sat))
     brightness(var(--hkm-glass-lift));
   backdrop-filter: blur(var(--hkm-glass-blur)) saturate(var(--hkm-glass-sat))
     brightness(var(--hkm-glass-lift));
-  /* 底边一条高光线 = 玻璃的切口反光，替代原先的实心发丝边 */
+  /* 底边一条高光线 = 玻璃的切口反光，替代原先的实心发丝边
+   * ★ 明色下 --hkm-bar-edge-bottom 换成黑色 8%：
+   *   顶栏身后是浅色画布，「白光切口」在浅底上看不见，
+   *   得靠一条发丝暗线才分得出顶栏的边界。 */
   box-shadow:
-    inset 0 1px 0 0 rgb(255 255 255 / 0.16),
-    inset 0 -1px 0 0 rgb(255 255 255 / 0.07),
-    0 8px 24px -18px rgb(0 0 0 / 0.9);
+    inset 0 1px 0 0 var(--hkm-bar-edge-top),
+    inset 0 -1px 0 0 var(--hkm-bar-edge-bottom),
+    0 8px 24px -18px var(--hkm-bar-outer);
 }
 
 /*
@@ -766,10 +1217,10 @@ a {
    border 占位在图片外，才能得到干净的一圈。
    ============================================================ */
 .hkm-poster {
-  border: 1px solid rgb(255 255 255 / 0.14);
+  border: 1px solid var(--hkm-poster-border);
   box-shadow:
-    0 8px 24px -8px rgb(0 0 0 / 0.85),
-    0 20px 50px -28px rgb(0 0 0 / 0.95);
+    0 8px 24px -8px var(--hkm-poster-shadow-1),
+    0 20px 50px -28px var(--hkm-poster-shadow-2);
 }
 
 /* ============================================================
@@ -906,6 +1357,77 @@ a {
   }
 }
 
+/*
+ * 主色层在明色主题下的强度（2026-09-25）
+ *
+ * ★ 明色主题下主色层必须**减弱**，而且理由与暗色不同 ——
+ *   这一点很容易搞反：
+ *
+ *     暗色：主色是**亮**色，压在暗画布上 → 抬亮背景 → 深色文字吃亏
+ *     明色：主色是**暗**色（从深色海报里取的），压在浅玻璃上
+ *           → 压暗背景 → 深色文字同样吃亏（文字与底的亮度差被压缩）
+ *
+ *   即两套主题都要压，但方向相反。
+ *   所以不能把暗色的那组 alpha 直接搬过来：实测同一组值下，
+ *   明色最差只到 4.26:1（AA 线 4.5），失败点全在卡片左上角主色最浓处。
+ *
+ * ★ 0.70× 是扫出来的，不是估的（probe/theme-sweep-accent.cjs）
+ *
+ *   关键在于**扫描必须覆盖主色的取值域**，而不只是当下数据里碰巧存在的几部片：
+ *   主色是「按海报取色」，取到什么取决于抓到了哪些海报。
+ *   实测 data/poster-colors.json 里 288 个主色的亮度跨度为
+ *   0.0116（#041D35）~ 0.1015（#6E5709）—— 明色下**最暗的那一档最吃对比度**。
+ *   若只在现有几部片上标定，下一部深蓝海报的电影上线后才会破线，
+ *   而本地永远复现不了。
+ *
+ *   把 --hkm-accent-rgb 覆写成四个极端值后逐档扫（dim 最差值）：
+ *     强度    最暗 #041D35  次暗 #31121D  中位 #1B2E7E  最亮 #6E5709
+ *     1.00×      4.25 ✗       4.25 ✗       4.43 ✗       4.71 ✓
+ *     0.80×      4.56 ✓       4.56 ✓       4.71 ✓       4.96 ✓
+ *     0.70×      4.76 ✓       4.77 ✓       4.92 ✓       5.13 ✓   ← 采用
+ *     0.60×      4.90 ✓       4.87 ✓       4.99 ✓       5.21 ✓
+ *
+ *   取 0.70× 而不是刚好达标的 0.80×：
+ *   4.56 距 AA 线只剩 0.06，任何一处上游微调（玻璃底色、极光亮度、
+ *   甚至主色取色算法换一个采样点）都能把它推回线下。
+ *   0.70× 的最差值是 4.76，留 0.26 的余量，而 0.60× 换来的额外余量
+ *   （4.87）已经很难看出差别了。
+ *   （与暗色主题那次的选择同一个口径：宁可多留一点，不要在线上擦线。）
+ */
+html[data-theme='light'] .hkm-accent-panel {
+  background-image:
+    radial-gradient(
+      60% 120% at 0% 0%,
+      rgb(var(--hkm-accent-rgb) / 0.168) 0%,
+      rgb(var(--hkm-accent-rgb) / 0.049) 55%,
+      rgb(var(--hkm-accent-rgb) / 0) 100%
+    ),
+    linear-gradient(
+      158deg,
+      rgb(var(--hkm-accent-rgb) / 0.105) 0%,
+      rgb(var(--hkm-accent-rgb) / 0.074) 60%,
+      rgb(var(--hkm-accent-rgb) / 0.042) 100%
+    );
+}
+
+@media (max-width: 640px) {
+  html[data-theme='light'] .hkm-accent-panel {
+    background-image:
+      radial-gradient(
+        95% 78% at 50% 0%,
+        rgb(var(--hkm-accent-rgb) / 0.126) 0%,
+        rgb(var(--hkm-accent-rgb) / 0.049) 40%,
+        rgb(var(--hkm-accent-rgb) / 0) 72%
+      ),
+      linear-gradient(
+        172deg,
+        rgb(var(--hkm-accent-rgb) / 0.126) 0%,
+        rgb(var(--hkm-accent-rgb) / 0.098) 60%,
+        rgb(var(--hkm-accent-rgb) / 0.056) 100%
+      );
+  }
+}
+
 /* ============================================================
    海报主色氛围光（Atmosphere）—— 主色取不到时的兜底层
 
@@ -1011,15 +1533,15 @@ a {
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  border: 1px solid rgb(255 255 255 / 0.14);
+  border: 1px solid var(--hkm-chip-border);
   background: linear-gradient(
     150deg,
-    rgb(255 255 255 / 0.1) 0%,
-    rgb(255 255 255 / 0.04) 100%
+    var(--hkm-chip-bg-1) 0%,
+    var(--hkm-chip-bg-2) 100%
   );
   box-shadow:
-    inset 0 1px 0 0 rgb(255 255 255 / 0.16),
-    inset 0 -1px 0 0 rgb(0 0 0 / 0.3);
+    inset 0 1px 0 0 var(--hkm-chip-inset-top),
+    inset 0 -1px 0 0 var(--hkm-chip-inset-bottom);
   padding: 0.125rem 0.5rem;
   font-size: 0.6875rem;
   line-height: 1.4;
@@ -1038,7 +1560,7 @@ a {
    保留品牌辨识度，但不再抢内容。
    ============================================================ */
 .hkm-grad-text {
-  background-image: linear-gradient(100deg, var(--hkm-accent-soft), #67e8f9);
+  background-image: linear-gradient(100deg, var(--hkm-accent-soft), var(--hkm-grad-2));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -1058,6 +1580,14 @@ a {
 
    黄色选 #facc15：在卡片 #18181B 上对比度 11.57:1（远过 AA），
    且色相偏亮黄而非橙，与座位色的橙 #f59e0b 不会混淆。
+
+   ★ 2026-09-25：色值改由 --hkm-score-fg 提供。
+     上面的 11.57:1 是在**暗色卡片**上算的；加入明色主题后，
+     同一个亮黄在浅色玻璃上只剩 1.5:1，等于那个数字看不见。
+     所以它不能再是写死的颜色，必须随主题走（明色用 amber-700）。
+     ⚠️ 组件里写的是 Tailwind 任意值 text-[#facc15]，
+     现在改成 text-[var(--hkm-score-fg)] —— Tailwind 会把 var()
+     当普通值透传，不需要额外配置。
    ============================================================ */
 
 /*
@@ -1070,7 +1600,7 @@ a {
  */
 .hkm-btn-primary {
   position: relative;
-  background: linear-gradient(135deg, #8b7cff, #6d5cf0);
+  background: linear-gradient(135deg, var(--hkm-btn-primary-1), var(--hkm-btn-primary-2));
   color: #fff;
   box-shadow:
     /* 上沿亮、下沿暗：一根圆柱形玻璃棒的受光 */
@@ -1095,20 +1625,20 @@ a {
  *   开销可以接受。
  */
 .hkm-btn-ghost {
-  border: 1px solid rgb(255 255 255 / 0.16);
+  border: 1px solid var(--hkm-ghost-border);
   background-image: linear-gradient(
     145deg,
-    rgb(255 255 255 / 0.12) 0%,
-    rgb(255 255 255 / 0.05) 100%
+    var(--hkm-ghost-bg-1) 0%,
+    var(--hkm-ghost-bg-2) 100%
   );
-  background-color: rgb(24 24 27 / 0.3);
+  background-color: var(--hkm-ghost-bg);
   -webkit-backdrop-filter: blur(12px) saturate(160%);
   backdrop-filter: blur(12px) saturate(160%);
   color: var(--hkm-fg-soft);
   box-shadow:
-    inset 0 1px 0 0 rgb(255 255 255 / 0.2),
-    inset 0 -1px 0 0 rgb(0 0 0 / 0.28),
-    0 4px 14px -8px rgb(0 0 0 / 0.6);
+    inset 0 1px 0 0 var(--hkm-ghost-inset-top),
+    inset 0 -1px 0 0 var(--hkm-ghost-inset-bottom),
+    0 4px 14px -8px var(--hkm-ghost-outer);
   transition: border-color 0.25s ease, background-color 0.25s ease,
     box-shadow 0.25s ease, color 0.25s ease;
 }
@@ -1116,8 +1646,8 @@ a {
   border-color: rgb(139 124 255 / 0.5);
   background-color: rgb(139 124 255 / 0.14);
   box-shadow:
-    inset 0 1px 0 0 rgb(255 255 255 / 0.3),
-    inset 0 -1px 0 0 rgb(0 0 0 / 0.28),
+    inset 0 1px 0 0 var(--hkm-ghost-inset-top),
+    inset 0 -1px 0 0 var(--hkm-ghost-inset-bottom),
     0 8px 22px -10px rgb(124 108 255 / 0.5);
   color: var(--hkm-fg);
 }
@@ -1178,9 +1708,9 @@ details > summary::-webkit-details-marker {
 .hkm-skeleton {
   background: linear-gradient(
     90deg,
-    rgb(255 255 255 / 0.04) 25%,
-    rgb(255 255 255 / 0.09) 37%,
-    rgb(255 255 255 / 0.04) 63%
+    var(--hkm-skeleton-a) 25%,
+    var(--hkm-skeleton-b) 37%,
+    var(--hkm-skeleton-a) 63%
   );
   background-size: 200% 100%;
   animation: hkm-shimmer 1.4s ease-in-out infinite;
@@ -1262,7 +1792,7 @@ details > summary::-webkit-details-marker {
   --color-veil: var(--hkm-veil);
   --color-veil-strong: var(--hkm-veil-strong);
 
-  --color-accent2: #67e8f9;
+  --color-accent2: var(--hkm-accent2);
   --color-accent-soft: var(--hkm-accent-soft);
 }
 
@@ -1309,6 +1839,29 @@ details > summary::-webkit-details-marker {
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* ============================================================
+   主题切换按钮的两颗图标（见 components/ThemeToggle.tsx）
+
+   两颗图标**都**在 HTML 里，由 data-theme 决定显示哪一颗。
+   这是刻意的：若改用 React state 判断，服务端只能假设一个默认值，
+   hydrate 后才发现猜错 —— 用户会看到图标闪一下（hydration mismatch）。
+   而 CSS 判定发生在首次绘制，与启动脚本同帧生效，不可能闪。
+
+   注意默认（未设 data-theme，例如 JS 被禁用）按深色处理，
+   与 :root 的暗色令牌一致。
+   ============================================================ */
+.hkm-theme-moon {
+  display: none;
+}
+
+html[data-theme='light'] .hkm-theme-sun {
+  display: none;
+}
+
+html[data-theme='light'] .hkm-theme-moon {
+  display: block;
+}
+
 /*
  * .dark 与 :root 保持同一套值。
  *
@@ -1316,8 +1869,15 @@ details > summary::-webkit-details-marker {
  *   与本项目的 zinc 冷色体系并不一致。若哪天有人给 <html> 加上 class="dark"，
  *   全站配色会瞬间变成另一套灰 —— 属于埋着的坑。
  *   现在两处同源，加不加 .dark 都是同一结果。
+ *
+ * ★ 2026-09-25：选择器同时挂上 html[data-theme='dark']。
+ *   主题切换用的是 <html data-theme="light|dark">（见 components/ThemeToggle.tsx），
+ *   但 shadcn 组件与 Tailwind 的 dark: 变体（@custom-variant 定义在文件顶部）
+ *   都只认 .dark 类。两边各写一半就会出现「页面变白了、shadcn 组件还是暗的」
+ *   这种半明半暗的状态，所以这里两个选择器绑在同一份值上。
  */
-.dark {
+.dark,
+html[data-theme='dark'] {
   --background: var(--hkm-canvas);
   --foreground: var(--hkm-fg);
   --card: var(--hkm-surface);

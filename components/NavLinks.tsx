@@ -61,6 +61,10 @@ import { usePathname } from 'next/navigation';
  *
  * href 写 "/showing" 而不是 "/showing/"：项目开了 trailingSlash，
  * 导出时自动补斜杠，源码里带上反而容易在别处（如 usePathname 比较）对不上。
+ *
+ * ★ 2026-09-25 导航项尺寸随主题切换钮的加入而收紧（见文件底部说明）：
+ *   顶栏是 flex-nowrap，390px 下要容纳 logo + 三个导航项 + 切换钮。
+ *   这不是「顺手缩小」，而是不加就会溢出顶栏固定高度（实测导航高 32 → 52px）。
  */
 const LINKS = [
   { href: '/showing', label: '現正上映', nav: 'showing' },
@@ -105,7 +109,7 @@ export function NavLinks() {
   }, [pathname]);
 
   return (
-    <nav className="flex gap-1 text-sm">
+    <nav className="flex min-w-0 gap-1 text-sm">
       {LINKS.map(({ href, label, nav }) => {
         /*
          * ★ 只認**精確匹配**。
@@ -121,9 +125,23 @@ export function NavLinks() {
             data-nav={nav}
             aria-current={active ? 'page' : undefined}
             className={
-              active
-                ? 'rounded-full bg-veil-strong px-3 py-1.5 font-medium text-fg'
-                : 'rounded-full px-3 py-1.5 text-fg-muted transition hover:bg-veil-strong hover:text-fg'
+              /*
+               * ★ 手机上收紧（2026-09-25）：
+               *   顶栏是 flex-nowrap 的，390px 下要同时容纳
+               *   logo + 三个导航项 + 主题切换钮。默认的 px-3 text-sm
+               *   会把它挤出顶栏高度（实测导航高 32 → 52px，换行）。
+               *   手机上改 text-xs / px-2 / whitespace-nowrap，
+               *   sm 以上恢复原来的尺寸。
+               *
+               *   whitespace-nowrap 必须加：中文标签在窄容器里
+               *   会一个字一行地竖着排（「現正上映」变成四行），
+               *   那比换行更难读。
+               */
+              `shrink-0 whitespace-nowrap rounded-full px-2 py-1.5 text-xs transition sm:px-3 sm:text-sm ${
+                active
+                  ? 'bg-veil-strong font-medium text-fg'
+                  : 'text-fg-muted hover:bg-veil-strong hover:text-fg'
+              }`
             }
           >
             {label}

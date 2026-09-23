@@ -33,13 +33,24 @@ import { formatLabel, type MovieGroup } from '@/lib/data';
  *     半透明（原）.. IMDb 3.82:1 / 豆瓣 3.87:1   ✗
  *     不透明（新）.. IMDb 4.65:1 / 豆瓣 4.75:1   ✓
  *   观感上仍是「黄底 / 绿底」，只是不再受身后主色干扰。
+ * ★ 2026-09-25：底色与文字色改由 --hkm-rating-* 令牌提供。
+ *   上面那组不透明值是**暗色主题**的取值；加入明色主题后，
+ *   「深底 + 亮字」在浅色玻璃上会变成「深块贴在白卡上」——
+ *   不仅突兀，深底上的亮绿 #7bd48f 也只有 3.1:1。
+ *   明色改用浅底 + 深字（豆瓣 #166534 / IMDb #92400E，均 6.4:1）。
+ *   品牌徽章（豆瓣绿 / IMDb 黄）两套主题保持一致 —— 那是标识，不随主题变。
+ *
+ * ⚠️ 所以不能再写 Tailwind 任意值 bg-[rgb(34_41_25)]：
+ *   Tailwind 对任意值里的 var() 会做下划线 → 空格的转换，
+ *   但 rgb(var(--x)) 这种嵌套形式容易踩到它自己的解析边界。
+ *   这两张卡的底色直接走内联 style（值只有一处，可读性也更好）。
  */
 const RATING_STYLE: Record<
   IntroRating['source'],
-  { bg: string; fg: string; markBg: string; mark: string; markSize: number }
+  { fg: string; markBg: string; mark: string; markSize: number }
 > = {
-  douban: { bg: 'bg-[rgb(34_41_25)]', fg: 'text-[#7bd48f]', markBg: 'bg-[#2e963d]', mark: '豆瓣', markSize: 12.5 },
-  imdb: { bg: 'bg-[rgb(46_40_20)]', fg: 'text-[#f0c040]', markBg: 'bg-[#f0c040]', mark: 'IMDb', markSize: 11.5 },
+  douban: { fg: 'var(--hkm-rating-douban-fg)', markBg: '#2e963d', mark: '豆瓣', markSize: 12.5 },
+  imdb: { fg: 'var(--hkm-rating-imdb-fg)', markBg: '#f0c040', mark: 'IMDb', markSize: 11.5 },
 };
 
 /**
@@ -142,18 +153,22 @@ function RatingCard({ r }: { r: IntroRating }) {
   const st = RATING_STYLE[r.source];
   const body = (
     <div
-      className={`flex w-[155px] items-center gap-2.5 rounded-xl border border-hairline px-3 py-2 ${st.bg}`}
+      className={`flex w-[155px] items-center gap-2.5 rounded-xl border border-hairline px-3 py-2`}
+      style={{
+        backgroundColor:
+          r.source === 'douban' ? 'var(--hkm-rating-douban-bg)' : 'var(--hkm-rating-imdb-bg)',
+      }}
     >
       <span
-        className={`flex h-7 w-11 shrink-0 items-center justify-center rounded-md font-bold leading-none ${st.markBg} ${r.source === 'imdb' ? 'text-canvas' : 'text-white'}`}
-        style={{ fontSize: `${st.markSize}px` }}
+        className={`flex h-7 w-11 shrink-0 items-center justify-center rounded-md font-bold leading-none ${r.source === 'imdb' ? 'text-canvas' : 'text-white'}`}
+        style={{ backgroundColor: st.markBg, fontSize: `${st.markSize}px` }}
       >
         {st.mark}
       </span>
       <span className="min-w-0">
         <span className="block text-[12px] leading-none text-fg-dim">{r.label}評分</span>
         <span className="mt-1 flex items-baseline gap-1.5">
-          <span className={`text-lg font-semibold leading-none ${st.fg}`}>
+          <span className="text-lg font-semibold leading-none" style={{ color: st.fg }}>
             {r.value != null ? r.value.toFixed(1) : '—'}
           </span>
           {r.value == null && (
@@ -408,6 +423,15 @@ export function MovieIntro({ group }: { group: MovieGroup }) {
         * 颜色用 rgba(255,255,255,0.85)（用户明确给的写法，而不是令牌变量 ——
         * 这是「纯白微调」的精确值，用令牌反而对不上）。
         * 字号也一并从 13/14px 提到 15px：行高放宽后小字号会显得更小。
+        *
+        * ★ 2026-09-25：那个「精确值」本身成了问题。
+        *   它是**暗色专用**的 —— 白 85% 压在浅色玻璃 #FAFAFC 上，
+        *   对比度只有 1.2:1，整段简介在白天模式下等于隐形。
+        *   所以它现在也是令牌（--hkm-summary-fg）：
+        *   暗色仍是 rgb(255 255 255 / 0.85)（逐字未变），
+        *   明色换成 rgb(24 24 27 / 0.88)（玻璃 14.6:1）。
+        *   保留「比主文字略淡」这层意图（即用户当时要的「微调」），
+        *   只是淡的方向随主题反转。
         */}
       {a.summary && (
         <section className="mt-5 border-t border-hairline-soft pt-5">
@@ -420,7 +444,7 @@ export function MovieIntro({ group }: { group: MovieGroup }) {
           </h2>
           <p
             className="max-w-3xl whitespace-pre-line text-[15px] leading-[1.75] sm:text-base"
-            style={{ color: 'rgb(255 255 255 / 0.85)' }}
+            style={{ color: 'var(--hkm-summary-fg)' }}
           >
             {a.summary}
           </p>

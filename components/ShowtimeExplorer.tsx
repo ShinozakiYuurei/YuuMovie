@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { formatDate, formatDateShort, relativeDay, weekdayShort } from '@/lib/format';
-import { seatLevel, SEAT_STYLE } from '@/lib/seat';
+import { seatLevel, SEAT_STYLE, SEAT_NONE_STYLE } from '@/lib/seat';
 import { fromCompact } from '@/lib/compact';
 import { isLiveShow } from '@/lib/live';
 import { FeeLine } from './FeeLine';
@@ -184,14 +184,14 @@ function ShowtimeCard({ row }: { row: ShowRow }) {
       target="_blank"
       rel="noopener noreferrer nofollow"
       aria-label={label}
-      className="flex w-full flex-col items-center justify-center rounded-xl border px-1.5 py-2 text-center transition hover:brightness-125 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60"
+      className="flex w-full flex-col items-center justify-center rounded-xl border px-1.5 py-2 text-center transition hover:brightness-125 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       style={
         st
           ? { backgroundColor: st.bg, borderColor: st.border, color: st.text }
           : {
-              backgroundColor: 'rgb(255 255 255 / 0.05)',
-              borderColor: 'rgb(255 255 255 / 0.08)',
-              color: '#e8ebf3',
+              backgroundColor: SEAT_NONE_STYLE.bg,
+              borderColor: SEAT_NONE_STYLE.border,
+              color: SEAT_NONE_STYLE.text,
             }
       }
     >
@@ -497,19 +497,26 @@ export function ShowtimeExplorer({
                     onClick={() => setPickedDate(d)}
                     className={`flex w-[76px] shrink-0 flex-col items-center rounded-xl border px-2 py-2 transition ${
                       on
-                        ? 'border-fg bg-fg text-canvas shadow-[0_8px_24px_-14px_rgba(255,255,255,0.45)]'
+                        ? 'border-fg bg-fg text-canvas shadow-[0_8px_24px_-14px_var(--hkm-active-pill-glow)]'
                         : 'border-hairline-strong bg-veil text-fg-soft hover:border-hairline-strong hover:bg-veil-strong hover:text-fg'
                     }`}
                   >
                     <span className="tabular-nums text-sm font-bold leading-tight">
                       {formatDateShort(d)}
                     </span>
-                    <span className={`text-xs leading-tight ${on ? 'text-canvas/70' : 'text-fg-muted'}`}>
+                    {/*
+                     * 副行颜色：原为 text-canvas/70（“画布色 70%”），
+                     * 在深色主题下=黑字降透明度，在浅色主题下=白字降透明度，
+                     * 两边都成立 —— 但它是**选中态专用**的写法，
+                     * 这里换成显式两分支更好读，也避开 Tailwind 对
+                     * 带斜杠的任意透明度与 var() 混用的解析歧义。
+                     */}
+                    <span className={`text-xs leading-tight ${on ? 'opacity-70' : 'text-fg-muted'}`}>
                       {weekdayShort(d)}
                     </span>
                     <span
                       className={`mt-0.5 text-[11px] leading-tight ${
-                        on ? 'font-medium text-canvas/70' : 'text-fg-muted'
+                        on ? 'font-medium opacity-70' : 'text-fg-muted'
                       }`}
                     >
                       {rel === '今天' || rel === '明天' || rel === '後天' ? rel : `${n} 場`}

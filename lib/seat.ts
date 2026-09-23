@@ -70,6 +70,17 @@ export const SEAT_THRESHOLDS = {
  *
  * ⚠️ 若想回到实心色块，只需把下面的 bg 改回注释里的原值即可。
  *
+ * ★ 2026-09-25：色值全部改成 **CSS 变量引用**（--hkm-seat-*）。
+ *   原因：这四组值是在**暗色画布**下标定的 —— 淡彩底 + **亮色文字**
+ *   （#86efac / #fcd34d / #fca5a5 / #e8a5a0）。
+ *   加入明色主题后，同一组亮字压在浅色淡彩底上只有 1.2~1.6:1，
+ *   整张场次卡只剩一块淡底色可辨、时间与票价都读不出来。
+ *   明色必须换成「浅底 + 深字」（见 app/globals.css 的
+ *   html[data-theme='light'] 块），这是本主题改造里最不能省的一处。
+ *
+ *   为什么不是在这里用 JS 判断主题：本文件被服务端组件与客户端组件
+ *   共用，而主题是构建时未知的。CSS 变量是唯一「两套值、一处引用」的写法。
+ *
  * 分档阈值（SEAT_THRESHOLDS）未动，仍与 hkmovie6 实测口径一致。
  */
 export const SEAT_STYLE: Record<
@@ -78,37 +89,44 @@ export const SEAT_STYLE: Record<
 > = {
   /* 原实心色：#039704 */
   plenty: {
-    bg: 'rgb(3 151 4 / 0.16)',
-    border: 'rgb(34 197 94 / 0.42)',
-    text: '#86efac',
+    bg: 'var(--hkm-seat-plenty-bg)',
+    border: 'var(--hkm-seat-plenty-border)',
+    text: 'var(--hkm-seat-plenty-fg)',
     label: '餘座充足',
-    dot: '#22c55e',
+    dot: 'var(--hkm-seat-plenty-dot)',
   },
   /* 原实心色：#ec7e0a */
   limited: {
-    bg: 'rgb(236 126 10 / 0.16)',
-    border: 'rgb(245 158 11 / 0.42)',
-    text: '#fcd34d',
+    bg: 'var(--hkm-seat-limited-bg)',
+    border: 'var(--hkm-seat-limited-border)',
+    text: 'var(--hkm-seat-limited-fg)',
     label: '餘座緊張',
-    dot: '#f59e0b',
+    dot: 'var(--hkm-seat-limited-dot)',
   },
   /* 原实心色：#ff0000 */
   few: {
-    bg: 'rgb(255 0 0 / 0.15)',
-    border: 'rgb(239 68 68 / 0.45)',
-    text: '#fca5a5',
+    bg: 'var(--hkm-seat-few-bg)',
+    border: 'var(--hkm-seat-few-border)',
+    text: 'var(--hkm-seat-few-fg)',
     label: '餘座少量',
-    dot: '#ef4444',
+    dot: 'var(--hkm-seat-few-dot)',
   },
   /* 原实心色：#7D0900（比 few 更沉，表达“已无票”而非“快没了”） */
   soldout: {
-    bg: 'rgb(125 9 0 / 0.42)',
-    border: 'rgb(153 27 27 / 0.55)',
-    text: '#e8a5a0',
+    bg: 'var(--hkm-seat-soldout-bg)',
+    border: 'var(--hkm-seat-soldout-border)',
+    text: 'var(--hkm-seat-soldout-fg)',
     label: '滿座',
-    dot: '#7d0900',
+    dot: 'var(--hkm-seat-soldout-dot)',
   },
 };
+
+/** 无余座数据时的中性场次卡（同样必须随主题走，理由同上） */
+export const SEAT_NONE_STYLE = {
+  bg: 'var(--hkm-seat-none-bg)',
+  border: 'var(--hkm-seat-none-border)',
+  text: 'var(--hkm-seat-none-fg)',
+} as const;
 
 /**
  * 计算余座档位

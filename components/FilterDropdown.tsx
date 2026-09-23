@@ -252,6 +252,13 @@ export function FilterDropdown({
                       }`}
                     >
                       {on && (
+                        /*
+                         * 勾選標記維持純白：它是「圖形物件」（WCAG 1.4.11 要求 3:1），
+                         * 而兩套主題的強調色都達標 ——
+                         *   暗色 #8B7CFF 上的白 3.4:1、淺色 #6B46E5 上的白 5.6:1。
+                         * （同在按鈕上的**文字**則不然：暗色那顆白字只有 3.4:1，
+                         *  不到正文 AA 的 4.5 —— 這也是主按鈕在淺色下要換深紫的原因。）
+                         */
                         <svg className="h-3 w-3 text-white" viewBox="0 0 10 10" fill="none" aria-hidden>
                           <path d="M2 5L4 7L8 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                         </svg>
