@@ -626,6 +626,9 @@ function load() {
   for (const m of movies) movieTitleById.set(m.id, m.nameZh || m.nameEn || '');
 
   const specsByCinema = new Map<string, Set<string>>();
+  // 官方戲院資料列明電影中心 1 院採用 SR、2–4 院採用 SRD；此規格不會出現在場次欄位，
+  // 以穩定戲院 ID 注入，不能從普通場次名稱或電影名猜測。
+  specsByCinema.set('broadway-8', new Set(['sr', 'srd']));
   for (const s of shows) {
     const keys = hallSpecsOf({
       houseName: s.houseName,

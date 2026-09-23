@@ -22,6 +22,7 @@
  */
 import { hallSpecsOf, HALL_SPECS, sortSpecs, specLabel } from '../lib/cinema-specs.ts';
 import { readFileSync } from 'node:fs';
+import { getCinemaRows } from '../lib/data.ts';
 
 let bad = 0;
 
@@ -40,6 +41,19 @@ function eq(name: string, got: unknown, want: unknown) {
 // 1. 三处证据各自能独立命中（缺任一处都会漏掉整条院线）
 // ============================================================
 
+eq(
+  '戲院中心官方规格：SR 与 SRD 分别命中',
+  [
+    hallSpecsOf({ houseName: 'SR' }),
+    hallSpecsOf({ houseName: 'SRD' }),
+  ],
+  [['sr'], ['srd']]
+);
+eq(
+  '普通厅名称含 SRD 子串不可误判为 SR 规格',
+  hallSpecsOf({ houseName: '3院 SRD 特別場' }),
+  []
+);
 eq(
   '影厅名证据：MCL 的 LUXE 厅',
   hallSpecsOf({ houseName: 'LUXE', version: '2D 全景聲 英語', title: '生化危機' }),
@@ -213,14 +227,17 @@ for (const source of sourceFiles) {
 }
 eq('實際院線資料中沒有未識別的特色影廳名稱', [...unknownHalls].sort(), []);
 
+const cinemaCentre = getCinemaRows().find((cinema) => cinema.id === 'broadway-8');
+eq('戲院頁實際標籤：百老匯電影中心有 SR 與 SRD', cinemaCentre?.specs.map((spec) => spec.key), ['sr', 'srd']);
+
 // ============================================================
 // 7. 表格自身的完整性
 // ============================================================
 
 const keys = HALL_SPECS.map((s) => s.key);
 eq('规格 key 无重复', new Set(keys).size, keys.length);
-if (HALL_SPECS.length !== 23) {
-  console.log(`✗ 规格条数变了（${HALL_SPECS.length} ≠ 23）—— 增删规格请同步本测试的期望值`);
+if (HALL_SPECS.length !== 25) {
+  console.log(`✗ 规格条数变了（${HALL_SPECS.length} ≠ 25）—— 增删规格请同步本测试的期望值`);
   bad++;
 }
 // 每个规格都要有 label，且不能出现空 label（空 label 会在下拉里留一个空白行）
