@@ -18,8 +18,8 @@
  *
  * 跑法：node_modules/.bin/tsx probe/check-poster-pick.mts
  */
-import { pickPosterByTier } from '../lib/data.ts';
-import { hasFormatMarker } from '../lib/versions.ts';
+import { pickPosterByTier, pickPosterWithResolutionFallback } from '../lib/data.ts';
+import { hasFormatMarker, normalizeTitle } from '../lib/versions.ts';
 import type { Movie } from '../lib/types.ts';
 
 const W = (pairs: Record<string, number>) => new Map(Object.entries(pairs));
@@ -158,6 +158,52 @@ for (const c of cases) {
   }
 }
 
+const rescueCases = [
+  {
+    what: '低清謝票場可跨上映狀態用同片高清語言版補位',
+    preferred: [mv('《誤闖遺忘島》謝票場', '/p/mcl-290.webp')],
+    candidates: [mv('誤闖遺忘島 (英語版)', '/p/broadway-800.webp')],
+    widths: W({ '/p/mcl-290.webp': 290, '/p/broadway-800.webp': 800 }),
+    want: '/p/broadway-800.webp',
+  },
+  {
+    what: '清晰原版不因另一張更大的圖而被換掉',
+    preferred: [mv('電影', '/p/base-800.webp')],
+    candidates: [mv('電影 (英語版)', '/p/language-1000.webp')],
+    widths: W({ '/p/base-800.webp': 800, '/p/language-1000.webp': 1000 }),
+    want: '/p/base-800.webp',
+  },
+  {
+    what: '首選模糊時，高清原版優先於更大的語言版海報',
+    preferred: [mv('電影 (粵語版)', '/p/language-290.webp')],
+    candidates: [mv('電影 (英語版)', '/p/language-1200.webp'), mv('電影', '/p/base-800.webp')],
+    widths: W({ '/p/language-290.webp': 290, '/p/language-1200.webp': 1200, '/p/base-800.webp': 800 }),
+    want: '/p/base-800.webp',
+  },
+  {
+    what: '低清主視覺不以不同的 IMAX 宣傳圖替代',
+    preferred: [mv('電影', '/p/base-290.webp')],
+    candidates: [mv('IMAX 電影', '/p/imax-800.webp')],
+    widths: W({ '/p/base-290.webp': 290, '/p/imax-800.webp': 800 }),
+    want: '/p/base-290.webp',
+  },
+  {
+    what: '599px 候選未達高清門檻，不替換原圖',
+    preferred: [mv('電影', '/p/base-290.webp')],
+    candidates: [mv('電影 (英語版)', '/p/language-599.webp')],
+    widths: W({ '/p/base-290.webp': 290, '/p/language-599.webp': 599 }),
+    want: '/p/base-290.webp',
+  },
+];
+
+for (const c of rescueCases) {
+  const got = pickPosterWithResolutionFallback(c.preferred, c.candidates, c.widths) ?? '';
+  if (got !== c.want) {
+    console.log(`✗ ${c.what}\n    期望 ${c.want}，實際 ${got || '(null)'}`);
+    bad++;
+  }
+}
+
 /**
  * 档位判定的边界：这些写法必须被判成「带会换图的标记」
  */
@@ -179,6 +225,7 @@ const mustHaveMarker = [
  * 它们只说明这是哪一场，物料还是官方那一套。
  */
 const mustBeBase = [
+  ['誤闖遺忘島 謝票場', 'MCL 谢票场不改变海报物料'],
   ['生化危機', '裸片名'],
   ['奧德賽', '裸片名'],
   ['復仇者聯盟5：末日降臨', '裸片名'],
@@ -191,6 +238,11 @@ const mustBeBase = [
   ['破・地獄 (bc30 x APAAA)', '活动标签不改物料'],
   ['鐵達尼號  (3D版)', '2D/3D 是默认规格，无专属物料'],
 ];
+
+if (normalizeTitle('《誤闖遺忘島》謝票場') !== normalizeTitle('誤闖遺忘島 (英語版)')) {
+  console.log('✗ 謝票場后缀未与同片其他版本归一');
+  bad++;
+}
 
 for (const [n, why] of mustHaveMarker) {
   if (!hasFormatMarker(n)) {
@@ -205,5 +257,5 @@ for (const [n, why] of mustBeBase) {
   }
 }
 
-console.log(bad === 0 ? `✓ 选图规则 ${cases.length} 例 + 标记判定 ${mustHaveMarker.length + mustBeBase.length} 例全部通过` : `${bad} 条不通过`);
+console.log(bad === 0 ? `✓ 选图规则 ${cases.length} 例 + 清晰度补位 ${rescueCases.length} 例 + 标记判定 ${mustHaveMarker.length + mustBeBase.length} 例全部通过` : `${bad} 条不通过`);
 process.exit(bad === 0 ? 0 : 1);

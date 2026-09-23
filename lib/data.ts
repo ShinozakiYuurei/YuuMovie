@@ -10,6 +10,7 @@ import {
   formatVersionText,
   hasFormatMarker,
   isBaseVersion,
+  projectionFormats,
   stripFormats,
   stripEnglishTitleNoise,
 } from './versions';
@@ -404,8 +405,94 @@ function nameNoise(m: Movie): number {
   return Math.max(0, name.length - stripFormats(name).length);
 }
 
-function pickDisplayPoster(list: Movie[], primary: Movie): string | null {
-  return pickPosterByTier(list, posterWidths()) ?? primary.poster;
+// 海报卡约 268 CSS px 宽，2× 屏幕需 536px；留少量余量，把低于 600px 视为偏糊。
+const POSTER_SHARP_WIDTH = 600;
+
+/** 同片中、去掉版本/活动标记后的名字，用于跨状态寻找清晰替代海报。 */
+function posterTitleKeys(movie: Movie): Set<string> {
+  const keys = new Set<string>();
+  for (const raw of [movie.nameZh, movie.nameEn]) {
+    if (!raw) continue;
+    // MCL 偶尔将谢票场作为单独条目，但对应主视觉与电影本身相同。
+    const title = raw.normalize('NFKC').replace(/(?:謝票場|谢票场)\s*$/, '').trim();
+    const key = normalizeTitle(title) || fallbackTitle(title);
+    if (key) keys.add(key);
+  }
+  return keys;
+}
+
+function posterFallbackIndex(movies: Movie[], widths: Map<string, number>): Map<string, Movie[]> {
+  const index = new Map<string, Movie[]>();
+  for (const movie of movies) {
+    const width = movie.poster ? widths.get(movie.poster) : undefined;
+    if (!movie.poster || width == null || width < POSTER_SHARP_WIDTH) continue;
+    if (projectionFormats(extractFormats(movie.nameZh || movie.nameEn)).length > 0) continue;
+    for (const key of posterTitleKeys(movie)) {
+      const bucket = index.get(key);
+      if (bucket) bucket.push(movie);
+      else index.set(key, [movie]);
+    }
+  }
+  return index;
+}
+
+/**
+ * 首选海报低于清晰度阈值时，尝试用同片高分辨率的原版/纯语言版海报补位。
+ * IMAX、4DX 等独立主视觉不作为清晰度替代，避免为了像素数换错宣传图。
+ * 纯函数独立导出，部署前探针可覆盖阈值与候选边界。
+ */
+export function pickPosterWithResolutionFallback(
+  list: Movie[],
+  fallbackCandidates: Movie[],
+  widths: Map<string, number>,
+): string | null {
+  const preferred = pickPosterByTier(list, widths);
+  if (!preferred) return null;
+  const preferredWidth = widths.get(preferred);
+  if (preferredWidth != null && preferredWidth >= POSTER_SHARP_WIDTH) return preferred;
+
+  const keys = new Set(list.flatMap((movie) => [...posterTitleKeys(movie)]));
+  if (!keys.size) return preferred;
+
+  const candidates = new Map<string, { tier: number; width: number; noise: number }>();
+  for (const movie of fallbackCandidates) {
+    const poster = movie.poster;
+    const width = poster ? widths.get(poster) : undefined;
+    if (!poster || width == null || width < POSTER_SHARP_WIDTH) continue;
+    if (projectionFormats(extractFormats(movie.nameZh || movie.nameEn)).length > 0) continue;
+    if (![...posterTitleKeys(movie)].some((key) => keys.has(key))) continue;
+
+    const tier = hasFormatMarker(movie.nameZh || movie.nameEn) ? 1 : 0;
+    const noise = nameNoise(movie);
+    const old = candidates.get(poster);
+    if (!old || tier < old.tier || (tier === old.tier && width > old.width) ||
+      (tier === old.tier && width === old.width && noise < old.noise)) {
+      candidates.set(poster, { tier, width, noise });
+    }
+  }
+
+  const clearer = [...candidates.entries()].sort((a, b) =>
+    a[1].tier - b[1].tier || b[1].width - a[1].width ||
+    a[1].noise - b[1].noise || a[0].localeCompare(b[0])
+  )[0];
+  return clearer?.[0] ?? preferred;
+}
+
+function pickDisplayPoster(
+  list: Movie[],
+  primary: Movie,
+  fallbacks: Map<string, Movie[]>,
+  widths: Map<string, number>,
+): string | null {
+  const candidates = new Map<string, Movie>();
+  for (const movie of list) {
+    for (const key of posterTitleKeys(movie)) {
+      for (const candidate of fallbacks.get(key) ?? []) {
+        if (candidate.poster) candidates.set(candidate.poster, candidate);
+      }
+    }
+  }
+  return pickPosterWithResolutionFallback(list, [...candidates.values()], widths) ?? primary.poster;
 }
 
 /**
@@ -1115,6 +1202,8 @@ const _groupsCache = new Map<string, { at: number; groups: MovieGroup[] }>();
 
 function buildMovieGroups(status?: 'showing' | 'upcoming'): MovieGroup[] {
   const { movies, shows, enrich: enrichPool } = load();
+  const posterWidthMap = posterWidths();
+  const highResolutionPosterIndex = posterFallbackIndex(movies, posterWidthMap);
 
   // ---------- 预统计：每个源条目的场次数与最低价 ----------
   const showCount = new Map<string, number>();
@@ -1253,14 +1342,15 @@ function buildMovieGroups(status?: 'showing' | 'upcoming'): MovieGroup[] {
     const prices = versions.map((v) => v.minPrice).filter((p): p is number => p != null);
     const allFormats = sortFormats([...new Set(versions.flatMap((v) => v.formats))]);
     const sources = [...new Set(versions.flatMap((v) => v.sources))] as Source[];
+    const displayPoster = pickDisplayPoster(list, primary, highResolutionPosterIndex, posterWidthMap);
 
     result.push({
       key,
       primary,
       displayName: stripFormats(primary.nameZh || primary.nameEn),
       displayNameEn: pickDisplayNameEn(list),
-      displayPoster: pickDisplayPoster(list, primary),
-      displayAccent: posterAccent(pickDisplayPoster(list, primary)),
+      displayPoster,
+      displayAccent: posterAccent(displayPoster),
       versions,
       totalShows,
       minPrice: prices.length ? Math.min(...prices) : null,
