@@ -659,14 +659,14 @@ const HK_RATINGS = new Set(['I', 'IIA', 'IIB', 'III']);
  * 选择组的展示分级
  *
  * 各源 category 字段含义不同：
- *   - broadway / cinemacity / bestar：香港官方分级（I / IIA / IIB / III）
+ *   - broadway / cinemacity / bestar / mcl：香港官方分级（I / IIA / IIB / III）
  *   - emperor：是 1–10 媒体评分（不是分级）
- *   - mcl：空
+ *   - MCL 分級來自官方 GetMovieDetails，舊資料可能仍為空
  *
  * 这里只接受 HK_RATINGS 里的值；广度优先从「最具分级权威的源」取。
  */
 function pickDisplayCategory(list: Movie[]): string | null {
-  for (const src of ['broadway', 'cinemacity', 'bestar'] as Source[]) {
+  for (const src of ['broadway', 'cinemacity', 'bestar', 'mcl'] as Source[]) {
     const hit = list.find((m) => m.source === src && m.category && HK_RATINGS.has(m.category));
     if (hit) return hit.category!;
   }
@@ -954,7 +954,7 @@ export interface MovieGroup {
   status: 'showing' | 'upcoming';
   /**
    * 聚合后的香港电影分级（卡片左上角）
-   * 优先级：broadway（官方分级） > mcl > 其他
+   * 来源：broadway / cinemacity / bestar / mcl 的香港官方分级。
    * emperor 源的 category 是 1–10 评分，不是官方分级，不参与
    */
   displayCategory: string | null;

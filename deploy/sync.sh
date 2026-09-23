@@ -6,6 +6,7 @@
 #   bash deploy/sync.sh --no-deploy     # 只存档推送，不上线
 #   bash deploy/sync.sh --rollback      # 把线上退回它自己的上一个存档点（不存档不推送）
 #   bash deploy/sync.sh --to <sha>      # 线上切到指定存档点
+#   SCRAPE=1 ONLY=mcl bash deploy/sync.sh  # 本次部署只抓 MCL，再构建发布
 #
 # 为什么需要它：本项目页面是 SSG，代码不推到服务器并重建，线上就永远是旧的。
 # VPS 的 systemd 定时器只重复构建它自己已有的代码，从不拉新代码。
@@ -36,6 +37,19 @@ while [ $# -gt 0 ]; do
 done
 # --to 不带值时不能默默变成一次正常部署，那正好是最危险的结果
 [ "$MODE" != "to" ] || [ -n "$TO" ] || { echo "✖ --to 需要跟一个 sha 或分支名"; exit 1; }
+
+# 显式抓取选项要传到服务器重建进程，供一次性定向抓取（例如 ONLY=mcl）。
+DEPLOY_SCRAPE="${SCRAPE:-0}"
+DEPLOY_ONLY="${ONLY:-}"
+case "$DEPLOY_SCRAPE" in 0|1) ;; *) echo "✖ SCRAPE 只接受 0 或 1"; exit 1 ;; esac
+if [ -n "$DEPLOY_ONLY" ]; then
+  IFS=, read -r -a _sources <<< "$DEPLOY_ONLY"
+  for _source in "${_sources[@]}"; do
+    case "$_source" in broadway|mcl|emperor|cinemacity|bestar) ;;
+      *) echo "✖ ONLY 含未知院线：$_source"; exit 1 ;;
+    esac
+  done
+fi
 
 vps() { timeout "${2:-900}" ssh -o BatchMode=yes -o ConnectTimeout=20 "$VPS" "$1"; }
 
@@ -100,6 +114,8 @@ else
   [ -x "$TSX" ] || { echo "✖ 缺 $TSX，先跑 npm ci --include=dev"; exit 1; }
   "$TSC" --noEmit
   "$TSX" probe/check-danger.mts
+  # MCL 官方详情从数字 ID 抓取；片名不符要拒绝，且分类/片长/简介须进组级资料卡。
+  "$TSX" probe/check-mcl-details.mts
   # 选海报的规则全是取舍，错了不会报错、只会静默换封面（2026-09-21 就踩过），
   # 所以跟错合并一样在发布前钉死。不读 data/、不联网，服务器上也能跑。
   "$TSX" probe/check-poster-pick.mts
@@ -160,6 +176,6 @@ echo "▶ [4/4] 服务器部署"
 # 二是脚本执行途中会被 git checkout 换掉内容，在 bash 逐行读取下担心自覆盖。
 # 放 /tmp 跑副本，两个问题一起消。
 vps "cat > /tmp/hkmovie-vps-deploy.sh" < deploy/vps-deploy.sh
-vps "sudo -u hkmovie APP_DIR=$APP_DIR bash /tmp/hkmovie-vps-deploy.sh $BRANCH"
+vps "sudo -u hkmovie APP_DIR='$APP_DIR' SCRAPE='$DEPLOY_SCRAPE' ONLY='$DEPLOY_ONLY' bash /tmp/hkmovie-vps-deploy.sh '$BRANCH'"
 
 smoke

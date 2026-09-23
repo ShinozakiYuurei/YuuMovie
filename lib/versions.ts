@@ -47,6 +47,10 @@ const FORMAT_TOKENS = [
   '特典應援場',
   '特典場',
   '特典场',
+  '特別放映',
+  '特别放映',
+  '特別上映',
+  '特别上映',
   '優先場',
   '應援場',
   '中秋特典場',
@@ -115,6 +119,7 @@ const ACTIVITY_TAGS = new Set([
   '期間限定',
   'LIMITED',
   '椅套',
+  '特別放映', '特别放映', '特別上映', '特别上映',
   // 2D / 3D 在港片市场是默认规格，单独拿它当「版本」没信息量
   //（且只有 bestar 会写「(2D版)」，会凭多出一堆「2D版」标签）
   '2D',
@@ -227,6 +232,19 @@ const SCREENING_PREFIX_RE =
   /[一-鿿]{0,6}(?:特典|優先|應援|見面|嘉賓|首映|紀念|神秘|節日|場次)場/g;
 
 /**
+ * 特別放映條目有時在括號內附帶活動主題：
+ * `《情書》30周年修復版 (「相約在The One」特別放映)`。
+ * 必須在拆括號前移除整塊；否則只剝「特別放映」會留下「相約在The One」，
+ * 既污染標題又阻止與同片的普通場次合併。
+ */
+const SPECIAL_SCREENING_ANNOTATION_RE =
+  /[（(【\[]\s*(?:[「『][^」』]{1,40}[」』]\s*)?(?:特別放映|特别放映|特別上映|特别上映)\s*[）)】\]]/g;
+
+/** 只剝明確的「數字周年 + 修復版」發行標記；不能碰「30周年修復版日記」這類片名。 */
+const ANNIVERSARY_RESTORATION_RE =
+  /(?<!\d)\d{1,3}\s*(?:周年|週年)\s*(?:4K\s*)?修[復复]版(?=$|[\s（(【\[])/g;
+
+/**
  * 片名预处理：normalizeTitle 与 stripFormats 共用，
  * 保证「比较用的名字」与「显示用的名字」不会出现一个剔了、一个没剔。
  *
@@ -240,8 +258,11 @@ function preprocessTitle(raw: string): string {
       .replace(/[（(【\[]\s*[日粵國英韓台美陸法](?:語|語版|片)?\s*[)）】\]]/g, ' ')
       // 括号内只包罗马序号：英皇用「(IV)」标系列第四部
       .replace(/[（(【\[]\s*(?:[IVX]{1,4}|\d{1,2})\s*[)）】\]](?=\s)/g, ' ')
-      // 场次修饰词（含前面的活动主题名）
+      // 先移掉帶活動主題的整塊括號，避免留下活動名當成片名。
+      .replace(SPECIAL_SCREENING_ANNOTATION_RE, ' ')
+      // 場次修飾詞（含前面的活動主題名）
       .replace(SCREENING_PREFIX_RE, ' ')
+      .replace(ANNIVERSARY_RESTORATION_RE, ' ')
       .replace(/[【】《》（）()「」\[\]]/g, ' '),
   );
 }
@@ -272,6 +293,11 @@ function tokenRegex(token: string, flags = 'gi'): RegExp {
   if (isAscii) {
     // 前后不能是字母数字，避免 "4DX" 匹配 "24DX"
     return new RegExp(`(^|[^A-Za-z0-9])${esc}(?![A-Za-z0-9])`, flags);
+  }
+  // 新增的「特別放映／上映」只认独立的前缀/后缀；不能把真正片名
+  // 「特別放映日記」或「日記特別放映」删短后误合并到《日記》。
+  if (/^特[別别](?:放映|上映)$/.test(token)) {
+    return new RegExp(`(^|[\\s（(【\\[])${esc}(?=$|[\\s）)】\\]，,。、])`, flags);
   }
   return new RegExp(esc, flags);
 }
@@ -507,6 +533,10 @@ export function extractFormats(name: string | null | undefined): string[] {
       found.add(FORMAT_ALIAS[token] || token);
     }
   }
+  // 标题归一时剥去周年修復標記，但放映版本仍须与普通版区分。
+  for (const marker of normalizeText(name).match(ANNIVERSARY_RESTORATION_RE) || []) {
+    found.add(marker.replace(/\s+/g, ''));
+  }
   // 长短写法去重（'35mm' 与 '菲林版' 同命中时只留 '菲林版'）
   return [...new Set(dedupeOverlaps([...found]))];
 }
@@ -543,7 +573,8 @@ const NON_ART_TOKENS = new Set<string>([
   // 放映轮次
   'Encore', '重映', '加碼重映', '限定重映', 'Live Viewing',
   // 场次类型
-  '特典應援場', '特典場', '特典场', '優先場', '應援場', '中秋特典場', '椅套特典場',
+  '特典應援場', '特典場', '特典场', '特別放映', '特别放映', '特別上映', '特别上映',
+  '優先場', '應援場', '中秋特典場', '椅套特典場',
   '椅套', '見面場', 'Hi Bye Meet & Greet', '期間限定', 'LIMITED',
   // 影展 / 节目单元
   'HKLGFF', 'GFF', 'KINO', 'InDPanda', 'anifest動画藝術祭', 'New Wave',
@@ -575,7 +606,7 @@ const ART_FORMAT_TOKENS = SORTED_FORMAT_TOKENS.filter((t) => !NON_ART_TOKENS.has
 export function hasFormatMarker(name: string | null | undefined): boolean {
   if (!name) return false;
   const raw = normalizeText(name);
-  if (DIALECT_SHORTHAND_RE.test(raw)) return true;
+  if (DIALECT_SHORTHAND_RE.test(raw) || raw.match(ANNIVERSARY_RESTORATION_RE)) return true;
   // 注意传 'i' 而不是默认的 'gi'：带 g 的正则 test() 会记 lastIndex，
   // 同一个 token 第二次判定就会漏。
   return ART_FORMAT_TOKENS.some((t) => tokenRegex(t, 'i').test(raw));
