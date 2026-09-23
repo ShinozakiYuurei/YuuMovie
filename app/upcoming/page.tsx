@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { getUpcomingGroupsByMonth, getMeta } from '@/lib/data';
 import { MovieGroupCard } from '@/components/MovieGroupCard';
-import { formatMonth, relativeDay } from '@/lib/format';
+import { formatMonth } from '@/lib/format';
 
 // 动态渲染：数据运行时读取
 
@@ -39,10 +39,6 @@ export default function UpcomingPage() {
             <h2 className="text-lg font-semibold tracking-tight text-fg">
               {m.month === '未定' ? '上映日期未定' : formatMonth(m.month)}
             </h2>
-            {/* 本月最早的片：给出「还有多久」的相对感（未定月无日期，不显示） */}
-            {m.month !== '未定' && (
-              <span className="hkm-chip text-accent">{relativeDay(m.groups[0].primary.openingDate || '')}</span>
-            )}
             <span className="ml-auto text-xs text-fg-dim">{m.groups.length} 部</span>
           </div>
           <div className="hkm-stagger grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
