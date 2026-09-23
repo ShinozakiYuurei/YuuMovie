@@ -60,7 +60,7 @@ export function MovieGroupCard({
   return (
     <Link
       href={`/movie/${group.slug}`}
-      className="hkm-glass group flex h-full flex-col overflow-hidden rounded-2xl"
+      className="hkm-glass hkm-poster-card group flex h-full flex-col overflow-hidden rounded-2xl"
     >
       <div className="relative aspect-[2/3] w-full overflow-hidden bg-[var(--hkm-poster-frame)]">
         {poster ? (
@@ -68,7 +68,7 @@ export function MovieGroupCard({
             src={poster}
             alt={group.displayName}
             sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
-            className="object-cover transition-transform duration-300 group-hover:scale-105"
+            className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
             priority={priority}
           />
         ) : (

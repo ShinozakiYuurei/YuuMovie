@@ -1058,7 +1058,7 @@ a {
 }
 
 @media (hover: hover) {
-  .hkm-glass:hover::after {
+  .hkm-glass:not(.hkm-poster-card):hover::after {
     opacity: 0.55;
     transform: translateX(60%);
   }
