@@ -1287,13 +1287,21 @@ function buildMovieGroups(status?: 'showing' | 'upcoming'): MovieGroup[] {
 
 /** 上映中的电影组（按场次排序） */
 export function getShowingGroups(): MovieGroup[] {
+  // ★ 列表中的「上映中」必须仍有未开映场次。
+  //   上游 showing 列表会保留已下画影片（或无可售场次的影片），单看 status
+  //   会让它们出现在 /showing，但详情页却显示「暫無場次資料」。load() 已按
+  //   当前时间剔除已开映场次，因此 totalShows === 0 代表目前没有可看的排片。
+  //   只影响列表与首页，不删除底层影片组：已有详情页、影院关联仍可正常访问。
+  //
   // ★ 必须复制再排：Array.prototype.sort 就地改动，而 getMovieGroups 现在会 memo，
   //   直接排会把缓存里那个数组顶序改掉，后面的调用者（如 getGroupBySlug、
   //   groupIndex）拿到的就是被排过序的数组 —— 不报错，但会静默改变行为。
-  return [...getMovieGroups('showing')].sort((a, b) => {
-    if (a.totalShows !== b.totalShows) return b.totalShows - a.totalShows;
-    return (b.primary.openingDate || '').localeCompare(a.primary.openingDate || '');
-  });
+  return [...getMovieGroups('showing')]
+    .filter((group) => group.totalShows > 0)
+    .sort((a, b) => {
+      if (a.totalShows !== b.totalShows) return b.totalShows - a.totalShows;
+      return (b.primary.openingDate || '').localeCompare(a.primary.openingDate || '');
+    });
 }
 
 /** 待映的电影组（按上映日排序） */
