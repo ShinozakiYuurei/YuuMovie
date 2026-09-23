@@ -21,6 +21,7 @@
  * 跑法：node_modules/.bin/tsx probe/check-cinema-specs.mts
  */
 import { hallSpecsOf, HALL_SPECS, sortSpecs, specLabel } from '../lib/cinema-specs.ts';
+import { readFileSync } from 'node:fs';
 
 let bad = 0;
 
@@ -123,6 +124,26 @@ eq(
   hallSpecsOf({ houseName: 'MM Plus', version: null, title: '復仇者聯盟4' }),
   ['mmplus']
 );
+eq(
+  '品牌影廳：百老匯 The Oval Office',
+  hallSpecsOf({ houseName: 'The Oval Office', version: null, title: '蜘蛛俠：英雄重生' }),
+  ['ovaloffice']
+);
+eq(
+  '品牌影廳：百老匯 MM MOMENTS',
+  hallSpecsOf({ houseName: 'MM MOMENTS', version: null, title: '末世橡樹街' }),
+  ['mmmoments']
+);
+eq(
+  '品牌影廳名稱必須完整命中，不把普通影廳中的詞語當品牌廳',
+  hallSpecsOf({ houseName: 'MM MOMENTS 影廳', version: null, title: '電影' }),
+  ['mmmoments']
+);
+eq(
+  '非品牌影廳標題不因片名提及 The Oval Office 而命中',
+  hallSpecsOf({ houseName: '3院', version: null, title: 'The Oval Office' }),
+  []
+);
 
 // ============================================================
 // 4. 正则边界（少了 \b 会静默误命中）
@@ -172,13 +193,34 @@ eq('多规格输出顺序稳定（= HALL_SPECS 顺序）', many, sortSpecs(many)
 eq('多规格集合正确', [...many].sort(), ['4dx', 'atmos', 'imax', 'luxe'].sort());
 
 // ============================================================
-// 6. 表格自身的完整性
+// 6. 現有院線資料的影廳名稱覆蓋
+// ============================================================
+
+// 各抓取源会更新影厅名格式；对实际存档源逐条扫描，任何未识别的非编号厅
+// 都需要人工判断是否是新特色厅，以免出现「规则单测通过、真实数据仍漏标签」。
+const sourceFiles = ['broadway', 'mcl', 'emperor', 'cinemacity', 'bestar'];
+const normalHall = /^(?:house\s*\d+(?:\s*\(\s*\d+\s*院\s*\))?|\d+院)$/i;
+const unknownHalls = new Set<string>();
+for (const source of sourceFiles) {
+  const data = JSON.parse(readFileSync(new URL(`../data/sources/${source}.json`, import.meta.url), 'utf8'));
+  const movies = new Map(data.movies.map((movie: { id: string; nameZh?: string; nameEn?: string }) => [movie.id, movie.nameZh || movie.nameEn || '']));
+  for (const show of data.shows) {
+    const house = String(show.houseName || '').trim();
+    if (!house || normalHall.test(house)) continue;
+    const matched = hallSpecsOf({ houseName: house, version: show.version, title: movies.get(show.movieId) || '' });
+    if (!matched.length) unknownHalls.add(`${source}: ${house}`);
+  }
+}
+eq('實際院線資料中沒有未識別的特色影廳名稱', [...unknownHalls].sort(), []);
+
+// ============================================================
+// 7. 表格自身的完整性
 // ============================================================
 
 const keys = HALL_SPECS.map((s) => s.key);
 eq('规格 key 无重复', new Set(keys).size, keys.length);
-if (HALL_SPECS.length !== 21) {
-  console.log(`✗ 规格条数变了（${HALL_SPECS.length} ≠ 21）—— 增删规格请同步本测试的期望值`);
+if (HALL_SPECS.length !== 23) {
+  console.log(`✗ 规格条数变了（${HALL_SPECS.length} ≠ 23）—— 增删规格请同步本测试的期望值`);
   bad++;
 }
 // 每个规格都要有 label，且不能出现空 label（空 label 会在下拉里留一个空白行）

@@ -87,6 +87,8 @@ const SPEC_RULES: SpecRule[] = [
   { key: 'familyhouse', label: 'Family House', group: 'premium', re: /family house/i, fields: ['house'] },
   { key: 'festivalsuite', label: 'Festival Suite', group: 'premium', re: /festival suite/i, fields: ['house'] },
   { key: 'vivo', label: 'Vivo', group: 'premium', re: /\bvivo\b/i, fields: ['house'] },
+  { key: 'ovaloffice', label: 'The Oval Office', group: 'premium', re: /the oval office/i, fields: ['house'] },
+  { key: 'mmmoments', label: 'MM MOMENTS', group: 'premium', re: /\bmm moments\b/i, fields: ['house'] },
 ];
 
 /** 全部规格（展示顺序） */
