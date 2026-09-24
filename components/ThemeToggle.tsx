@@ -60,7 +60,8 @@ export function applyTheme(theme: Theme) {
 
 export function ThemeToggle() {
   const [animating, setAnimating] = useState(false);
-  const animationLock = useRef(false);
+  const transitionLock = useRef(false);
+  const transitionId = useRef(0);
 
   const chooseTheme = (theme: Theme) => {
     applyTheme(theme);
@@ -71,34 +72,63 @@ export function ThemeToggle() {
     }
   };
 
+  /*
+   * 锁的覆盖面要尽量小：只锁到 startViewTransition 完成快照切换为止
+   * （回调执行完、伪元素树建立好，通常只有一两帧）。
+   * 之前用 transition.finished（动画真正播完，最长 560ms）当解锁时点，
+   * 按钮会冻住大半秒。动画播放期间再点是安全的：浏览器会跳过当前
+   * 过渡并接续新的切换，不会出现半明半暗的中间态。
+   */
   const toggle = () => {
-    if (animationLock.current) return;
+    if (transitionLock.current) return;
     const next = currentTheme() === 'dark' ? 'pink' : 'dark';
     const root = document.documentElement;
-
-    const finishTransition = () => {
-      root.classList.remove('hkm-theme-transition');
-      setAnimating(false);
-      animationLock.current = false;
-    };
 
     if (
       window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
       typeof document.startViewTransition !== 'function'
     ) {
+      /* 无动画路径：主题立即生效，无需任何锁。 */
       chooseTheme(next);
       return;
     }
 
-    animationLock.current = true;
+    transitionLock.current = true;
     setAnimating(true);
     root.classList.add('hkm-theme-transition');
 
+    /* hkm-theme-transition 类的所有权归「最新一次过渡」：
+     * 被新过渡跳过的旧过渡不得摘类，否则会拆掉新过渡的样式。 */
+    const id = ++transitionId.current;
+    const finishTransition = () => {
+      if (transitionId.current !== id) return;
+      root.classList.remove('hkm-theme-transition');
+      setAnimating(false);
+      transitionLock.current = false;
+    };
+
     try {
       const transition = document.startViewTransition(() => chooseTheme(next));
+      /*
+       * ready：伪元素树已建好、动画即将开始。此刻就解锁，让连点立即生效；
+       * 但类要留到 finished 再摘——动画播放中摘掉会让
+       * ::view-transition-* 的自定义时长/曲线中途失效。
+       */
+      transition.ready.then(
+        () => {
+          if (transitionId.current !== id) return;
+          transitionLock.current = false;
+          setAnimating(false);
+        },
+        () => {
+          /* 过渡未能启动：解锁即可，finished 会跟着做清理。
+           * 若已被更新的过渡接管（id 变了），锁归它管，不要动。 */
+          if (transitionId.current !== id) return;
+          transitionLock.current = false;
+        },
+      );
       void transition.finished.then(finishTransition, finishTransition);
     } catch {
-      chooseTheme(next);
       finishTransition();
     }
   };
