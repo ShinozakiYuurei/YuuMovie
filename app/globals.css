@@ -688,15 +688,35 @@ html {
 }
 
 html.hkm-theme-transition {
+  background: transparent;
   transition: none;
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  html.hkm-theme-transition .hkm-aurora {
+    view-transition-name: hkm-theme-background;
+  }
+
   html.hkm-theme-transition::view-transition-group(root),
   html.hkm-theme-transition::view-transition-old(root),
   html.hkm-theme-transition::view-transition-new(root) {
     animation-duration: 320ms;
     animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  html.hkm-theme-transition::view-transition-group(root) {
+    z-index: 1;
+  }
+
+  html.hkm-theme-transition::view-transition-group(hkm-theme-background),
+  html.hkm-theme-transition::view-transition-old(hkm-theme-background),
+  html.hkm-theme-transition::view-transition-new(hkm-theme-background) {
+    animation-duration: 560ms;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  html.hkm-theme-transition::view-transition-group(hkm-theme-background) {
+    z-index: 0;
   }
 }
 
