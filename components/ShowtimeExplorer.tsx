@@ -66,6 +66,7 @@ const SORT_DEFAULT_DIR: Record<SortKey, SortDir> = {
 const FILTER_LABELS = {
   sources: '所有院線',
   versions: '所有版本',
+  languages: '所有語言',
   regions: '所有地區',
   districts: '所有區域',
 } as const;
@@ -116,19 +117,27 @@ function hasCoord(id: string): boolean {
 /** 颜色图例（与 hkmovie6 的余座标记一致） */
 function SeatLegend() {
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-fg-soft">
-      <span className="text-fg-muted">餘座：</span>
-      {(['plenty', 'limited', 'few', 'soldout'] as const).map((lv) => (
-        <span key={lv} className="flex items-center gap-1.5">
-          {/* 图例用 .dot（饱和实色）：SEAT_STYLE.bg 现在是 12~16% 的淡彩底，
-              作为 12px 小方块会几乎看不见，起不到「色卡」的作用。 */}
-          <span
-            className="inline-block h-3 w-3 rounded-sm"
-            style={{ backgroundColor: SEAT_STYLE[lv].dot }}
-          />
-          {SEAT_STYLE[lv].label}
-        </span>
-      ))}
+    <div className="overflow-x-auto overscroll-x-contain">
+      <div className="flex w-max min-w-full flex-nowrap items-center gap-x-2 whitespace-nowrap text-[11px] text-fg-soft sm:w-full sm:flex-wrap sm:gap-x-4 sm:text-xs">
+        <span className="shrink-0 text-fg-muted">餘座：</span>
+        {(['plenty', 'limited', 'few', 'soldout'] as const).map((level) => {
+          const label = SEAT_STYLE[level].label;
+          const compactLabel = level === 'soldout' ? label : label.replace(/^餘座/, '');
+
+          return (
+            <span key={level} className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+              {/* 图例用 .dot（饱和实色）：SEAT_STYLE.bg 现在是 12~16% 的淡彩底，
+                  作为 12px 小方块会几乎看不见，起不到「色卡」的作用。 */}
+              <span
+                className="inline-block h-2.5 w-2.5 rounded-sm sm:h-3 sm:w-3"
+                style={{ backgroundColor: SEAT_STYLE[level].dot }}
+              />
+              <span className="sm:hidden">{compactLabel}</span>
+              <span className="hidden sm:inline">{label}</span>
+            </span>
+          );
+        })}
+      </div>
       {/* ★ 2026-09-21 用户要求删除右侧的阈值文字（綠 ≥50% ・ 橙 20–49% ・ 紅 <20%）：
           四个色卡 + 文字标签本身已经说明了分档含义，阈值数字是解释性噪音。 */}
     </div>
@@ -217,9 +226,7 @@ export function ShowtimeExplorer({
    * 「當前時間」（epoch ms）；null = 尚未掛載（一律保留，保證 hydration 一致）
    *
    * ★ 為什麼由父層傳入而不是自己 useLiveNow()：
-   *   同一屏裡「共 N 場」的標題 chip 與本組件的場次列表必須是同一個數字。
-   *   若各自維護一份時鐘，兩個定時器相位不同，最多會有 60 秒對不上
-   *   （標題說 131、列表剩 130）—— 那正是用戶以前專門要求修過的問題。
+   *   父層用同一個時間判斷空狀態並傳給本組件，避免列表與空狀態短暫不同步。
    *   故由 components/MovieShowtimes.tsx 統一算一次往下傳。
    *
    *   原本寫成可選 props（不傳就自建一個 hook），但本組件唯一的調用方
@@ -262,6 +269,7 @@ export function ShowtimeExplorer({
   const [sel, setSel] = useState<Record<FilterDim, string[]>>({
     sources: [],
     versions: [],
+    languages: [],
     regions: [],
     districts: [],
   });
@@ -281,6 +289,7 @@ export function ShowtimeExplorer({
       (r) =>
         pass('sources', r.source) &&
         pass('versions', r.versionKey) &&
+        pass('languages', r.languageLabel) &&
         pass('regions', r.region) &&
         pass('districts', r.district)
     );
@@ -345,13 +354,17 @@ export function ShowtimeExplorer({
   };
 
   const activeFilters =
-    sel.sources.length + sel.versions.length + sel.regions.length + sel.districts.length;
+    sel.sources.length +
+    sel.versions.length +
+    sel.languages.length +
+    sel.regions.length +
+    sel.districts.length;
 
   /** 彈層要顯示的戲院（從已展平的行裡現查，避免額外狀態） */
   const mapCinema = mapCinemaId ? rows.find((r) => r.cinemaId === mapCinemaId) : undefined;
 
   const clearAll = () => {
-    setSel({ sources: [], versions: [], regions: [], districts: [] });
+    setSel({ sources: [], versions: [], languages: [], regions: [], districts: [] });
     setSortRules([{ key: 'time', dir: 'asc' }]);
     setPickedDate(null);
   };
@@ -380,18 +393,16 @@ export function ShowtimeExplorer({
        *     这里换成接近实心的面板色，并保留毛玻璃以维持观感一致。
        *
        * ★ 移动端只在 sm 及以上启用 sticky：
-       *   面板约 200px（标题+四个下拉+排序行），在小屏上占近 1/3 视口，
+       *   面板内容较多，在小屏上占用较多视口，
        *   常驻会把场次列表挤得几乎看不见 —— 得不偿失。
        *   手机用户滚回顶部改筛选的代价，低于永久失去 1/3 屏幕。
        *
-       * 为什么不让整个 200px 面板常驻：同上述理由，故把座位图例
-       *   （纯说明性，看完一次就不再需要）移出 sticky 区。
        */}
       <section
         className="hkm-panel-sticky rounded-2xl p-4 sm:sticky sm:z-40"
         style={{ top: 'var(--hkm-header-h)' }}
       >
-        <LayerHeader title="篩選" hint="同類可多選（或），跨類需同時符合（且）">
+        <LayerHeader title="篩選">
           <span className="tabular-nums text-xs text-fg-soft">
             {sorted.length} / {rows.length} 場
           </span>
@@ -406,9 +417,10 @@ export function ShowtimeExplorer({
           )}
         </LayerHeader>
 
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
           <FilterDropdown placeholder={FILTER_LABELS.sources} options={facets.sources} selected={sel.sources} onChange={setDim('sources')} />
           <FilterDropdown placeholder={FILTER_LABELS.versions} options={facets.versions} selected={sel.versions} onChange={setDim('versions')} />
+          <FilterDropdown placeholder={FILTER_LABELS.languages} options={facets.languages} selected={sel.languages} onChange={setDim('languages')} />
           <FilterDropdown placeholder={FILTER_LABELS.regions} options={facets.regions} selected={sel.regions} onChange={setDim('regions')} />
           <FilterDropdown placeholder={FILTER_LABELS.districts} options={facets.districts} selected={sel.districts} onChange={setDim('districts')} />
         </div>
@@ -446,19 +458,10 @@ export function ShowtimeExplorer({
           })}
         </div>
 
-        {/*
-         * 座位图例不放进 sticky 区。
-         *
-         * ★ 为什么：sticky 区会**永久占据**屏幕顶部。图例（约 45px）
-         *   是纯说明性内容，用户看完一次就够了；把它留在 sticky 里
-         *   等于用宝贵的视口换一条不再需要的信息。
-         *   现改为紧随 sticky 面板之后（仍在筛选层内，语义不变）。
-         */}
+        <div className="mt-2 sm:mt-3">
+          <SeatLegend />
+        </div>
       </section>
-
-      <div className="hkm-panel mt-2.5 rounded-2xl px-4 py-3">
-        <SeatLegend />
-      </div>
 
       {sorted.length === 0 ? (
         /*

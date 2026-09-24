@@ -12,7 +12,6 @@ import { buildIntro } from '@/lib/intro';
 import { MovieJsonLd } from '@/components/MovieJsonLd';
 import { MovieIntro } from '@/components/MovieIntro';
 import { MovieShowtimes } from '@/components/MovieShowtimes';
-import { formatDuration } from '@/lib/format';
 
 // 静态导出：预先列出所有电影 slug。
 // 只导出「组」的代表 slug（每个版本自己的 slug 由组内跳转，不需要单独页面）。
@@ -152,7 +151,7 @@ export default async function MoviePage({ params }: { params: Promise<{ slug: st
       {/*
        * 場次：多維篩選 + 多鍵排序 + 餘座顏色標記
        *
-       * ★ 2026-09-22：整區（含「共 N 場」標題與 section#versions）搬進
+       * ★ 2026-09-22：場次區塊（含 section#versions）搬進
        *   components/MovieShowtimes.tsx（客戶端）。
        *
        *   原因：本站是 SSG，HTML 在構建時定稿 —— 原先這裡的 totalShows 與
@@ -160,14 +159,13 @@ export default async function MoviePage({ params }: { params: Promise<{ slug: st
        *   直到下一次定時重建（每 3 小時）。用戶回報的「電影到時間上映後
        *   不剔除場次」正是這個。
        *
-       *   現在由該組件用瀏覽器時鐘實時剔除，且標題數字與列表同源
+       *   現在由該組件用瀏覽器時鐘實時剔除，空狀態與列表共用時間判斷
        *   （見該文件關於「為什麼要有這一層」的說明）。
        */}
       {totalShows > 0 && (
         <MovieShowtimes
           compact={compact}
           facets={facets}
-          durationText={a.duration ? formatDuration(a.duration) : null}
         />
       )}
     </article>

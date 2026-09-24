@@ -20,15 +20,7 @@ import type { Facets } from '@/lib/data';
  * 期間開映的場次會一直留在頁面上（實測 22:19 仍顯示當天 20:50 的場次）。
  *
  * 真正的實時剔除由 ShowtimeExplorer 做（它拿得到完整數據）。
- * 但標題上的「共 N 場」chip 原先在頁面組件裡 —— 它若不同步，
- * 就會出現「標題說 131 場、下面列表只剩 130 場」的矛盾。
- *
- * 所以把「當前時間」提到這一層算**一次**，同時餵給標題與列表：
- *   - 標題 chip 與列表數字必然一致（同一次 render、同一個 now）
- *   - 只有一個定時器，不會出現兩個相位不同的 tick
- *
- * 若各自維護一份 useLiveNow()，兩者的 60 秒定時器相位不同，
- * 最多會有整整一分鐘對不上 —— 那正是用戶以前專門要求修過的問題。
+ * 本組件用同一個 now 判斷空狀態並傳給列表，避免兩處結果不一致。
  *
  * ===== 為什麼連 section 一起搬過來 =====
  *
@@ -46,12 +38,9 @@ import type { Facets } from '@/lib/data';
 export function MovieShowtimes({
   compact,
   facets,
-  /** 片長 chip 的文案（如「2小時20分」）；null 則不顯示 */ 
-  durationText,
 }: {
   compact: CompactRows;
   facets: Facets;
-  durationText: string | null;
 }) {
   const now = useLiveNow();
 
@@ -73,10 +62,8 @@ export function MovieShowtimes({
       className="mt-8"
       style={{ scrollMarginTop: 'calc(var(--hkm-header-h) + 1rem)' }}
     >
-      <div className="mb-4 flex flex-wrap items-baseline gap-3">
+      <div className="mb-4">
         <h2 className="text-2xl font-bold tracking-tight">場次及購票</h2>
-        {liveCount > 0 && <span className="hkm-chip">共 {liveCount} 場</span>}
-        {durationText && <span className="hkm-chip">片長 {durationText}</span>}
       </div>
 
       {liveCount === 0 ? (

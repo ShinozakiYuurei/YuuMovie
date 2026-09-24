@@ -62,7 +62,7 @@ export interface CompactRows {
   houses: string[];
   /** 日期字典 YYYY-MM-DD */
   dates: string[];
-  versions: { key: string; label: string; text: string }[];
+  versions: { key: string; label: string; text: string; languageLabel: string | null }[];
   /** 场次行；字段顺序见下方元组 */
   rows: [
     id: string,
@@ -128,6 +128,7 @@ export function toCompact(rows: ShowRow[]): CompactRows {
       key: r.versionKey,
       label: r.versionLabel,
       text: r.versionText,
+      languageLabel: r.languageLabel,
     }));
 
     rowsOut.push([
@@ -184,6 +185,7 @@ export function fromCompact(c: CompactRows): ShowRow[] {
       versionKey: ver.key,
       versionLabel: ver.label,
       versionText: ver.text,
+      languageLabel: ver.languageLabel,
       formats: ver.key === '__base__' ? [] : ver.key.split('|'),
     };
   });

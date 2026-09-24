@@ -8,6 +8,7 @@ import {
   sortFormats,
   formatLabel,
   formatVersionText,
+  versionLanguage,
   hasFormatMarker,
   isBaseVersion,
   projectionFormats,
@@ -1889,6 +1890,7 @@ export interface ShowRow {
    *   文案规则见 lib/versions.ts 的 formatVersionText。
    */
   versionText: string;
+  languageLabel: string | null;
   /** 版本标签数组（用于图标/角标） */
   formats: string[];
 }
@@ -1956,6 +1958,7 @@ export function getShowRowsForGroup(group: MovieGroup): ShowRow[] {
       versionKey: formats.length ? formats.join('|').toLowerCase() : '__base__',
       versionLabel: formats.length ? formats.map(formatLabel).join(' + ') : '原版',
       versionText: formatVersionText(formats, filmLang),
+      languageLabel: versionLanguage(formats) ?? filmLang,
       formats,
     });
   }
@@ -1973,6 +1976,7 @@ export function getShowRowsForGroup(group: MovieGroup): ShowRow[] {
 export interface Facets {
   sources: { value: string; label: string; count: number }[];
   versions: { value: string; label: string; count: number }[];
+  languages: { value: string; label: string; count: number }[];
   regions: { value: string; label: string; count: number }[];
   districts: { value: string; label: string; count: number }[];
 }
@@ -1990,6 +1994,7 @@ export function getFacets(rows: ShowRow[]): Facets {
 
   const srcCount = count((r) => r.source);
   const verCount = count((r) => r.versionKey);
+  const langCount = count((r) => r.languageLabel);
   const regCount = count((r) => r.region);
   const disCount = count((r) => r.district);
 
@@ -2011,6 +2016,9 @@ export function getFacets(rows: ShowRow[]): Facets {
         return b[1] - a[1] || a[0].localeCompare(b[0]);
       })
       .map(([value, c]) => ({ value, label: verLabel.get(value) ?? value, count: c })),
+    languages: [...langCount.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([value, c]) => ({ value, label: value, count: c })),
     regions: REGION_ORDER.filter((r) => regCount.has(r)).map((r) => ({
       value: r,
       label: r,
