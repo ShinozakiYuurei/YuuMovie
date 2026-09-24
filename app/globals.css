@@ -6,7 +6,7 @@
  * dark: 变体的判定条件
  *
  * ★ 2026-09-25 从 `&:is(.dark *)` 扩成两个选择器。
- *   本站主题切换用的是 <html data-theme="light|dark">（见 components/ThemeToggle.tsx），
+ *   本站主题切换用的是 <html data-theme="pink|dark">（见 components/ThemeToggle.tsx），
  *   而 Tailwind 的 dark: 变体默认只认 .dark 类 —— 若不扩，
  *   日后任何人写一个 dark:bg-xxx，它都会在白天模式下**永远生效**
  *   （因为 .dark 类从没被加上过），而且这种错很难看出是变体判定失配。
@@ -621,9 +621,9 @@ html[data-theme='pink'] {
 html[data-theme='pink'] {
   color-scheme: light;
 
-  --hkm-canvas: #fff5f8;
-  --hkm-surface: #fffafd;
-  --hkm-surface-hover: #fff0f5;
+  --hkm-canvas: #fff0f6;
+  --hkm-surface: #fff8fb;
+  --hkm-surface-hover: #ffeff5;
   --hkm-fg: #2d1b24;
   --hkm-fg-soft: #543542;
   --hkm-fg-muted: #704d5d;
@@ -638,12 +638,12 @@ html[data-theme='pink'] {
   --hkm-btn-primary-1: #b42362;
   --hkm-btn-primary-2: #92184c;
 
-  --hkm-glass-border: rgb(255 255 255 / 0.78);
-  --hkm-glass-bg: rgb(255 255 255 / 0.68);
-  --hkm-glass-bg-hover: rgb(255 255 255 / 0.82);
-  --hkm-glass-pop-bg: rgb(255 250 252 / 0.9);
-  --hkm-glass-sticky-bg: rgb(255 250 252 / 0.92);
-  --hkm-glass-bar-bg: rgb(255 247 250 / 0.82);
+  --hkm-glass-border: rgb(190 24 84 / 0.15);
+  --hkm-glass-bg: rgb(255 236 244 / 0.86);
+  --hkm-glass-bg-hover: rgb(255 224 237 / 0.92);
+  --hkm-glass-pop-bg: rgb(255 247 250 / 0.94);
+  --hkm-glass-sticky-bg: rgb(255 239 246 / 0.94);
+  --hkm-glass-bar-bg: rgb(255 239 246 / 0.92);
   --hkm-glass-outer: rgb(120 35 72 / 0.14);
   --hkm-glass-outer-hover: rgb(120 35 72 / 0.2);
   --hkm-panel-outer: rgb(120 35 72 / 0.1);
@@ -656,7 +656,7 @@ html[data-theme='pink'] {
   --hkm-aurora-base:
     radial-gradient(ellipse 120% 80% at 50% 0%, rgb(255 190 214 / 0.55), transparent 70%),
     radial-gradient(ellipse 100% 70% at 80% 55%, rgb(255 220 226 / 0.48), transparent 72%),
-    #fff5f8;
+    #fff0f6;
   --hkm-aurora-1: rgb(244 114 182 / 0.2);
   --hkm-aurora-2: rgb(251 146 180 / 0.15);
   --hkm-aurora-3: rgb(217 70 130 / 0.15);
@@ -1877,6 +1877,97 @@ details > summary::-webkit-details-marker {
   display: none;
 }
 
+.hkm-theme-toggle {
+  position: relative;
+  display: flex;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0.25rem;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  color: var(--hkm-fg-muted);
+  background-color: transparent;
+  cursor: pointer;
+  transition:
+    width 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.25s ease,
+    border-color 0.25s ease,
+    color 0.25s ease;
+}
+
+.hkm-theme-toggle:hover:not(:disabled) {
+  color: var(--hkm-fg);
+  background-color: var(--hkm-veil-strong);
+}
+
+.hkm-theme-toggle:focus-visible {
+  outline: 2px solid var(--hkm-accent);
+  outline-offset: 2px;
+}
+
+.hkm-theme-toggle.is-expanded {
+  width: 5rem;
+  border-color: var(--hkm-hairline);
+  background-color: var(--hkm-surface);
+}
+
+.hkm-theme-toggle > svg {
+  position: absolute;
+  transition:
+    opacity 0.18s ease,
+    transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.hkm-theme-toggle.is-expanded > svg {
+  opacity: 0;
+  transform: scale(0.65) rotate(-20deg);
+}
+
+.hkm-theme-toggle__pill {
+  position: absolute;
+  inset: 4px;
+  display: flex;
+  overflow: hidden;
+  border: 1px solid rgb(17 17 19 / 0.08);
+  border-radius: 9999px;
+  opacity: 0;
+  transform: scale(0.55);
+  transition:
+    opacity 0.16s ease,
+    transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.hkm-theme-toggle.is-expanded .hkm-theme-toggle__pill {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.hkm-theme-toggle__swatch {
+  width: 50%;
+  height: 100%;
+}
+
+.hkm-theme-toggle__swatch--light {
+  background-color: #fff;
+}
+
+.hkm-theme-toggle__swatch--dark {
+  background-color: #111113;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hkm-theme-toggle,
+  .hkm-theme-toggle > svg,
+  .hkm-theme-toggle__pill {
+    transition: none;
+  }
+}
+
 html[data-theme='light'] .hkm-theme-sun,
 html[data-theme='pink'] .hkm-theme-sun {
   display: none;
@@ -1899,7 +1990,7 @@ html[data-theme='pink'] .hkm-theme-moon {
  *   现在两处同源，加不加 .dark 都是同一结果。
  *
  * ★ 2026-09-25：选择器同时挂上 html[data-theme='dark']。
- *   主题切换用的是 <html data-theme="light|dark">（见 components/ThemeToggle.tsx），
+ *   主题切换用的是 <html data-theme="pink|dark">（见 components/ThemeToggle.tsx），
  *   但 shadcn 组件与 Tailwind 的 dark: 变体（@custom-variant 定义在文件顶部）
  *   都只认 .dark 类。两边各写一半就会出现「页面变白了、shadcn 组件还是暗的」
  *   这种半明半暗的状态，所以这里两个选择器绑在同一份值上。

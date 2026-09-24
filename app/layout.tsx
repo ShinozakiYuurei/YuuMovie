@@ -37,7 +37,7 @@ const SITE = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
  *
  * ===== 為什麼自己寫而不裝 next-themes =====
  *
- * 本站使用深色、淺色、淡粉色三種主題並記住手動選擇。同步內聯腳本
+ * 本站使用深色與淡粉色兩種主題並記住手動選擇。同步內聯腳本
  * 可在首次繪製前套用主題，無需額外 Provider、依賴或客戶端包體積。
  *
  * ===== 為什麼用 try/catch 包住 localStorage =====
@@ -48,18 +48,19 @@ const SITE = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
  *
  * ===== 預設跟隨系統 =====
  *
- * 首次訪問跟隨系統 prefers-color-scheme（淺色或深色），之後可在三種主題間
+ * 首次訪問跟隨系統 prefers-color-scheme（淡粉色或深色），之後可在兩種主題間
  * 循環並記住手動選擇。只有 localStorage 裡沒有有效值時才讀系統偏好。
  */
 const THEME_SCRIPT = `(function(){try{
 var t=localStorage.getItem('hkm-theme');
-if(t!=='light'&&t!=='dark'&&t!=='pink'){
-t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
+if(t==='light')t='pink';
+if(t!=='dark'&&t!=='pink'){
+t=window.matchMedia('(prefers-color-scheme: light)').matches?'pink':'dark';
 }
 document.documentElement.dataset.theme=t;
 if(t==='dark')document.documentElement.classList.add('dark');
 var m=document.querySelector('meta[name="theme-color"]');
-if(m)m.setAttribute('content',t==='dark'?'#111113':t==='pink'?'#fff5f8':'#f1f2f6');
+if(m)m.setAttribute('content',t==='dark'?'#111113':'#fff0f6');
 }catch(e){}})();`;
 
 export const metadata: Metadata = {

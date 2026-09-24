@@ -1,10 +1,12 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
+
 /**
- * 深色／淺色／淡粉色主題切換鈕（頂欄右端）
+ * 深色／淡粉色主題切換鈕（頂欄右端）
  *
  * 首次訪問由 app/layout.tsx 的啟動腳本按 prefers-color-scheme 決定，
- * 這裡循環切換三種主題並記住手動選擇。
+ * 這裡在兩種主題間切換並記住手動選擇。
  *
  * ===== 為什麼圖示用 CSS 切換而不是 React state =====
  *
@@ -12,15 +14,15 @@
  * 而主題是**執行期**才知道的（localStorage / 系統偏好）。
  * 若用 useState + useEffect 讀出來，就會出現：
  *   服務端渲染 → 假設深色 → 畫太陽
- *   hydrate 後    → 讀到淺色 → 換成月亮
+ *   hydrate 後    → 讀到淡粉色 → 換成月亮
  * 使用者看到圖示閃一下（hydration mismatch 的典型症狀）。
  *
- * 這裡的做法是把**三顆圖示都渲染進 HTML**，由 CSS 依
+ * 這裡的做法是把所有圖示都渲染進 HTML，由 CSS 依
  * html[data-theme] 決定顯示哪一顆（見 globals.css 的 .hkm-theme-*）。
  * 這樣：
  *   · 服務端與客戶端渲染的 HTML 完全相同 → 不可能 mismatch；
  *   · 啟動腳本在首次繪製前就設好了 data-theme → 首屏就是對的圖示；
- *   · 元件本身可以完全沒有 state。
+ *   · React state 只控制短暫的藥丸過場，不影響首屏圖示。
  *
  * ===== 為什麼 aria-label 是固定的 =====
  *
@@ -31,11 +33,11 @@
  */
 
 /** 目前實際生效的主題（以 <html> 上的 data-theme 為唯一事實來源） */
-type Theme = 'light' | 'dark' | 'pink';
+type Theme = 'dark' | 'pink';
 
 function currentTheme(): Theme {
   const theme = document.documentElement.dataset.theme;
-  return theme === 'light' || theme === 'pink' ? theme : 'dark';
+  return theme === 'dark' ? 'dark' : 'pink';
 }
 
 /** 把主題寫進 DOM，並同步瀏覽器 UI（行動端網址列顏色） */
@@ -51,29 +53,57 @@ export function applyTheme(theme: Theme) {
   el.classList.toggle('dark', theme === 'dark');
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) {
-    const color = theme === 'dark' ? '#111113' : theme === 'pink' ? '#fff5f8' : '#f1f2f6';
+    const color = theme === 'dark' ? '#111113' : '#fff0f6';
     meta.setAttribute('content', color);
   }
 }
 
 export function ThemeToggle() {
-  const toggle = () => {
-    const current = currentTheme();
-    const next = current === 'dark' ? 'light' : current === 'light' ? 'pink' : 'dark';
-    applyTheme(next);
+  const [expanded, setExpanded] = useState(false);
+  const [animating, setAnimating] = useState(false);
+  const animationLock = useRef(false);
+  const timers = useRef<number[]>([]);
+
+  useEffect(() => () => timers.current.forEach((timer) => window.clearTimeout(timer)), []);
+
+  const chooseTheme = (theme: Theme) => {
+    applyTheme(theme);
     try {
-      localStorage.setItem('hkm-theme', next);
+      localStorage.setItem('hkm-theme', theme);
     } catch {
-      /* 隱私模式下 localStorage 可能拋錯：切換本身仍然有效，只是記不住 */
+      return;
     }
+  };
+
+  const toggle = () => {
+    if (animationLock.current) return;
+    const next = currentTheme() === 'dark' ? 'pink' : 'dark';
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      chooseTheme(next);
+      return;
+    }
+
+    animationLock.current = true;
+    setAnimating(true);
+    setExpanded(true);
+    timers.current = [
+      window.setTimeout(() => chooseTheme(next), 320),
+      window.setTimeout(() => setExpanded(false), 460),
+      window.setTimeout(() => {
+        setAnimating(false);
+        animationLock.current = false;
+      }, 820),
+    ];
   };
 
   return (
     <button
       type="button"
       onClick={toggle}
-      aria-label="切換主題：深色、淺色、淡粉色"
-      title="切換主題：深色、淺色、淡粉色"
+      aria-disabled={animating}
+      aria-label="切換深色與淡粉色主題"
+      title="切換深色與淡粉色主題"
       /*
        * 尺寸與 hover 語言沿用頂欄其他元素：
        *   rounded-full + bg-veil-strong 是 NavLinks 的 hover 樣式，
@@ -81,10 +111,10 @@ export function ThemeToggle() {
        * h-9 w-9 而非 h-8 w-8：觸控目標要接近 44px 才好點，
        * 但頂欄高度只有 56px，36px 是「好點」與「不擠」的折中。
        */
-      className="ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-fg-muted transition hover:bg-veil-strong hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      className={`hkm-theme-toggle ml-1${expanded ? ' is-expanded' : ''}`}
     >
       {/*
-       * 太陽：表示下一步切到淺色。深色主題時顯示，圖示由 CSS 控制。
+       * 太陽：表示下一步切到淡粉色。深色主題時顯示，圖示由 CSS 控制。
        */}
       <svg
         className="hkm-theme-sun h-[18px] w-[18px]"
@@ -131,6 +161,10 @@ export function ThemeToggle() {
       >
         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" />
       </svg>
+      <span className="hkm-theme-toggle__pill" aria-hidden="true">
+        <span className="hkm-theme-toggle__swatch hkm-theme-toggle__swatch--light" />
+        <span className="hkm-theme-toggle__swatch hkm-theme-toggle__swatch--dark" />
+      </span>
     </button>
   );
 }
