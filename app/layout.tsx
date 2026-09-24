@@ -5,17 +5,17 @@ import { getMeta, SOURCE_LABEL } from '@/lib/data';
 import type { Source } from '@/lib/types';
 import { NavLinks } from '@/components/NavLinks';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { Inter, Noto_Sans_HK } from 'next/font/google';
+import localFont from 'next/font/local';
 import { cn } from "@/lib/utils";
 
-const inter = Inter({
-  subsets: ['latin'],
-  weight: 'variable',
+const inter = localFont({
+  src: './fonts/Inter-Variable.woff2',
+  weight: '100 900',
   variable: '--font-inter',
 });
-const notoSansHK = Noto_Sans_HK({
-  subsets: ['latin'],
-  weight: 'variable',
+const notoSansHK = localFont({
+  src: './fonts/NotoSansHK-Variable.woff2',
+  weight: '100 900',
   variable: '--font-noto-sans-hk',
 });
 
