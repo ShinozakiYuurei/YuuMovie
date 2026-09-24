@@ -37,10 +37,8 @@ const SITE = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
  *
  * ===== 為什麼自己寫而不裝 next-themes =====
  *
- * 本站只需要「兩態 + 記住選擇」這一點功能。next-themes 會帶來
- * 一個 context Provider、一個 hook 與它的打包體積（含對三態、
- * forcedTheme、多標籤頁同步的支援）—— 而這些在本站都用不上。
- * 這段腳本 12 行，無依賴，靜態導出下也不增加任何客戶端 JS。
+ * 本站使用深色、淺色、淡粉色三種主題並記住手動選擇。同步內聯腳本
+ * 可在首次繪製前套用主題，無需額外 Provider、依賴或客戶端包體積。
  *
  * ===== 為什麼用 try/catch 包住 localStorage =====
  *
@@ -50,17 +48,18 @@ const SITE = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
  *
  * ===== 預設跟隨系統 =====
  *
- * 用戶 2026-09-25 選擇：「首次訪問跟隨系統 prefers-color-scheme，
- * 之後記住手動選擇」。所以只有 localStorage 裡**沒有**值時才讀系統偏好；
- * 一旦手動切過，系統再怎麼變也不接管（那正是「記住選擇」的含义）。
+ * 首次訪問跟隨系統 prefers-color-scheme（淺色或深色），之後可在三種主題間
+ * 循環並記住手動選擇。只有 localStorage 裡沒有有效值時才讀系統偏好。
  */
 const THEME_SCRIPT = `(function(){try{
 var t=localStorage.getItem('hkm-theme');
-if(t!=='light'&&t!=='dark'){
+if(t!=='light'&&t!=='dark'&&t!=='pink'){
 t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
 }
 document.documentElement.dataset.theme=t;
 if(t==='dark')document.documentElement.classList.add('dark');
+var m=document.querySelector('meta[name="theme-color"]');
+if(m)m.setAttribute('content',t==='dark'?'#111113':t==='pink'?'#fff5f8':'#f1f2f6');
 }catch(e){}})();`;
 
 export const metadata: Metadata = {
@@ -89,21 +88,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <head>
         {/*
-         * 主題啟動腳本：必須是 <head> 裡第一件事，且不帶 defer / async。
+         * 主題啟動腳本：必須在 <head> 中盡早同步執行，且不帶 defer / async。
+         * 前面的 theme-color meta 會由它立刻更新，避免網址列顏色不匹配。
          * 放在 <head> 而不是 <body> 開頭：<body> 開頭已經要等
          * <head> 全部解析完（包括 CSS 鏈接），那時樣式已可應用，
          * 但瀏覽器可能已開始繪製 —— 早一點終究更穩。
          *
          * 內容與理由見上方 THEME_SCRIPT 的註釋。
          */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
-        {/*
-         * 行動端瀏覽器的網址列／狀態列顏色
-         * ★ 只給一份（深色），淺色由 ThemeToggle.applyTheme() 改寫。
-         *   為什麼不只靠 JS 寫：首次載入的網址列顏色在腳本跑之前就定了，
-         *   不寫進 HTML 會先閃一下瀏覽器預設色。
-         */}
+        {/* 行動端瀏覽器網址列顏色；緊接著由同步啟動腳本按主題更新。 */}
         <meta name="theme-color" content="#111113" />
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
       <body className="min-h-screen">
         {/* 环境光层：固定定位，不参与滚动。

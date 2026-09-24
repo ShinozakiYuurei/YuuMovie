@@ -313,6 +313,7 @@
   /* 品牌强调色 ---- */
   --hkm-accent: #8b7cff;
   --hkm-accent-soft: #a78bfa;
+  --hkm-accent-glow-rgb: 124 108 255;
 
   /* 主按钮的渐变两端
    *
@@ -425,7 +426,8 @@
      覆盖就会静默失效 —— 这类「顺序敏感」的坑本文件已经踩过多次。
      （同理，下方 .dark 的选择器也补上了 [data-theme='dark']。）
    ============================================================ */
-html[data-theme='light'] {
+html[data-theme='light'],
+html[data-theme='pink'] {
   /* 让浏览器原生控件（滚动条、表单、下拉）也跟着切 */
   color-scheme: light;
 
@@ -455,6 +457,7 @@ html[data-theme='light'] {
   /* ---- 品牌强调色（明底上换深一档，见上方注释） ---- */
   --hkm-accent: #6b46e5;
   --hkm-accent-soft: #6b46e5;
+  --hkm-accent-glow-rgb: 91 57 214;
   --hkm-accent2: #0e7490;
   --hkm-grad-2: #0e7490;
 
@@ -614,6 +617,57 @@ html[data-theme='light'] {
   --sidebar-ring: var(--hkm-accent);
 }
 
+/* 淡粉主题沿用浅色主题的高对比度玻璃层级，仅将色彩调整为温柔的玫瑰粉。 */
+html[data-theme='pink'] {
+  color-scheme: light;
+
+  --hkm-canvas: #fff5f8;
+  --hkm-surface: #fffafd;
+  --hkm-surface-hover: #fff0f5;
+  --hkm-fg: #2d1b24;
+  --hkm-fg-soft: #543542;
+  --hkm-fg-muted: #704d5d;
+  --hkm-fg-dim: #785968;
+  --hkm-fg-faint: #b8a1ac;
+
+  --hkm-accent: #b42362;
+  --hkm-accent-soft: #a51d58;
+  --hkm-accent-glow-rgb: 146 24 76;
+  --hkm-accent2: #9d174d;
+  --hkm-grad-2: #9d174d;
+  --hkm-btn-primary-1: #b42362;
+  --hkm-btn-primary-2: #92184c;
+
+  --hkm-glass-border: rgb(255 255 255 / 0.78);
+  --hkm-glass-bg: rgb(255 255 255 / 0.68);
+  --hkm-glass-bg-hover: rgb(255 255 255 / 0.82);
+  --hkm-glass-pop-bg: rgb(255 250 252 / 0.9);
+  --hkm-glass-sticky-bg: rgb(255 250 252 / 0.92);
+  --hkm-glass-bar-bg: rgb(255 247 250 / 0.82);
+  --hkm-glass-outer: rgb(120 35 72 / 0.14);
+  --hkm-glass-outer-hover: rgb(120 35 72 / 0.2);
+  --hkm-panel-outer: rgb(120 35 72 / 0.1);
+  --hkm-sticky-outer: rgb(120 35 72 / 0.14);
+  --hkm-pop-outer: rgb(120 35 72 / 0.16);
+  --hkm-bar-outer: rgb(120 35 72 / 0.1);
+  --hkm-poster-shadow-1: rgb(72 20 42 / 0.22);
+  --hkm-poster-shadow-2: rgb(72 20 42 / 0.3);
+
+  --hkm-aurora-base:
+    radial-gradient(ellipse 120% 80% at 50% 0%, rgb(255 190 214 / 0.55), transparent 70%),
+    radial-gradient(ellipse 100% 70% at 80% 55%, rgb(255 220 226 / 0.48), transparent 72%),
+    #fff5f8;
+  --hkm-aurora-1: rgb(244 114 182 / 0.2);
+  --hkm-aurora-2: rgb(251 146 180 / 0.15);
+  --hkm-aurora-3: rgb(217 70 130 / 0.15);
+
+  --chart-1: #be185d;
+  --chart-2: #db2777;
+  --chart-3: #9d174d;
+  --chart-4: #f472b6;
+  --chart-5: #831843;
+}
+
 /*
  * 画布底色
  *
@@ -724,7 +778,7 @@ body {
   background: var(--hkm-aurora-base);
 }
 
-html:not([data-theme='light']) .hkm-aurora > i {
+html:not([data-theme='light']):not([data-theme='pink']) .hkm-aurora > i {
   display: none;
 }
 
@@ -1360,7 +1414,8 @@ a {
  *   （4.87）已经很难看出差别了。
  *   （与暗色主题那次的选择同一个口径：宁可多留一点，不要在线上擦线。）
  */
-html[data-theme='light'] .hkm-accent-panel {
+html[data-theme='light'] .hkm-accent-panel,
+html[data-theme='pink'] .hkm-accent-panel {
   background-image:
     radial-gradient(
       60% 120% at 0% 0%,
@@ -1377,7 +1432,8 @@ html[data-theme='light'] .hkm-accent-panel {
 }
 
 @media (max-width: 640px) {
-  html[data-theme='light'] .hkm-accent-panel {
+  html[data-theme='light'] .hkm-accent-panel,
+  html[data-theme='pink'] .hkm-accent-panel {
     background-image:
       radial-gradient(
         95% 78% at 50% 0%,
@@ -1572,14 +1628,14 @@ html[data-theme='light'] .hkm-accent-panel {
     /* 上沿亮、下沿暗：一根圆柱形玻璃棒的受光 */
     inset 0 1px 0 0 rgb(255 255 255 / 0.45),
     inset 0 -1px 0 0 rgb(0 0 0 / 0.25),
-    0 6px 20px -12px rgb(124 108 255 / 0.8);
+    0 6px 20px -12px rgb(var(--hkm-accent-glow-rgb) / 0.8);
   transition: box-shadow 0.25s ease, transform 0.25s ease, filter 0.25s ease;
 }
 .hkm-btn-primary:hover {
   box-shadow:
     inset 0 1px 0 0 rgb(255 255 255 / 0.6),
     inset 0 -1px 0 0 rgb(0 0 0 / 0.25),
-    0 10px 26px -12px rgb(124 108 255 / 0.95);
+    0 10px 26px -12px rgb(var(--hkm-accent-glow-rgb) / 0.95);
   filter: brightness(1.06);
 }
 
@@ -1609,12 +1665,12 @@ html[data-theme='light'] .hkm-accent-panel {
     box-shadow 0.25s ease, color 0.25s ease;
 }
 .hkm-btn-ghost:hover {
-  border-color: rgb(139 124 255 / 0.5);
-  background-color: rgb(139 124 255 / 0.14);
+  border-color: rgb(var(--hkm-accent-glow-rgb) / 0.5);
+  background-color: rgb(var(--hkm-accent-glow-rgb) / 0.14);
   box-shadow:
     inset 0 1px 0 0 var(--hkm-ghost-inset-top),
     inset 0 -1px 0 0 var(--hkm-ghost-inset-bottom),
-    0 8px 22px -10px rgb(124 108 255 / 0.5);
+    0 8px 22px -10px rgb(var(--hkm-accent-glow-rgb) / 0.5);
   color: var(--hkm-fg);
 }
 
@@ -1806,9 +1862,9 @@ details > summary::-webkit-details-marker {
 }
 
 /* ============================================================
-   主题切换按钮的两颗图标（见 components/ThemeToggle.tsx）
+   主题切换按钮的三颗图标（见 components/ThemeToggle.tsx）
 
-   两颗图标**都**在 HTML 里，由 data-theme 决定显示哪一颗。
+   三颗图标**都**在 HTML 里，由 data-theme 决定显示哪一颗。
    这是刻意的：若改用 React state 判断，服务端只能假设一个默认值，
    hydrate 后才发现猜错 —— 用户会看到图标闪一下（hydration mismatch）。
    而 CSS 判定发生在首次绘制，与启动脚本同帧生效，不可能闪。
@@ -1816,15 +1872,21 @@ details > summary::-webkit-details-marker {
    注意默认（未设 data-theme，例如 JS 被禁用）按深色处理，
    与 :root 的暗色令牌一致。
    ============================================================ */
-.hkm-theme-moon {
+.hkm-theme-moon,
+.hkm-theme-flower {
   display: none;
 }
 
-html[data-theme='light'] .hkm-theme-sun {
+html[data-theme='light'] .hkm-theme-sun,
+html[data-theme='pink'] .hkm-theme-sun {
   display: none;
 }
 
-html[data-theme='light'] .hkm-theme-moon {
+html[data-theme='light'] .hkm-theme-flower {
+  display: block;
+}
+
+html[data-theme='pink'] .hkm-theme-moon {
   display: block;
 }
 

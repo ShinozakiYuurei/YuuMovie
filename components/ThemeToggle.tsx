@@ -1,18 +1,10 @@
 'use client';
 
 /**
- * 明／暗主題切換鈕（頂欄右端）
+ * 深色／淺色／淡粉色主題切換鈕（頂欄右端）
  *
- * ===== 為什麼是「兩態切換」而不是三態（淺色 / 深色 / 跟隨系統）=====
- *
- * 使用者 2026-09-25 的選擇是：「首次訪問跟隨系統，之後記住手動選擇」。
- * 這句話本身就定義了兩態就夠 —— 「跟隨系統」是**尚未表達偏好時的預設值**，
- * 而不是一個需要長期停留的選項。三態會多出一個永遠只被用一次的按鈕狀態，
- * 而使用者一旦點過任何一顆，那個狀態就再也回不去了（除非再點一次「跟隨系統」，
- * 但那個按鈕的存在反而讓人以為預設值被改掉了）。
- *
- * 所以：預設值由 app/layout.tsx 的啟動腳本按 prefers-color-scheme 決定，
- * 這裡只負責「點一下換到另一邊並記住」。
+ * 首次訪問由 app/layout.tsx 的啟動腳本按 prefers-color-scheme 決定，
+ * 這裡循環切換三種主題並記住手動選擇。
  *
  * ===== 為什麼圖示用 CSS 切換而不是 React state =====
  *
@@ -23,7 +15,7 @@
  *   hydrate 後    → 讀到淺色 → 換成月亮
  * 使用者看到圖示閃一下（hydration mismatch 的典型症狀）。
  *
- * 這裡的做法是把**兩顆圖示都渲染進 HTML**，由 CSS 依
+ * 這裡的做法是把**三顆圖示都渲染進 HTML**，由 CSS 依
  * html[data-theme] 決定顯示哪一顆（見 globals.css 的 .hkm-theme-*）。
  * 這樣：
  *   · 服務端與客戶端渲染的 HTML 完全相同 → 不可能 mismatch；
@@ -32,20 +24,22 @@
  *
  * ===== 為什麼 aria-label 是固定的 =====
  *
- * 無障礙上「按鈕名稱」應該描述**動作**，而這個按鈕在兩種狀態下
- * 動作都是「切換明暗」—— 名稱固定反而比動態改寫更準確，
- * 也避免了「名稱依主題變化」這種需要 JS 才能正確的寫法。
+ * 無障礙上「按鈕名稱」應該描述**動作**，這個按鈕的動作是切換主題；
+ * 名稱固定比依主題動態改寫更穩定，也避免了需要 JS 動態更新的名稱。
  * 真正的狀態由 `aria-pressed` 之外的語意（按鈕旁的 title）與
  * 視覺圖示表達；螢幕閱讀器使用者按下去就能得到結果，不會困惑。
  */
 
 /** 目前實際生效的主題（以 <html> 上的 data-theme 為唯一事實來源） */
-function currentTheme(): 'light' | 'dark' {
-  return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+type Theme = 'light' | 'dark' | 'pink';
+
+function currentTheme(): Theme {
+  const theme = document.documentElement.dataset.theme;
+  return theme === 'light' || theme === 'pink' ? theme : 'dark';
 }
 
 /** 把主題寫進 DOM，並同步瀏覽器 UI（行動端網址列顏色） */
-export function applyTheme(theme: 'light' | 'dark') {
+export function applyTheme(theme: Theme) {
   const el = document.documentElement;
   el.dataset.theme = theme;
   /*
@@ -56,12 +50,16 @@ export function applyTheme(theme: 'light' | 'dark') {
    */
   el.classList.toggle('dark', theme === 'dark');
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', theme === 'dark' ? '#111113' : '#f1f2f6');
+  if (meta) {
+    const color = theme === 'dark' ? '#111113' : theme === 'pink' ? '#fff5f8' : '#f1f2f6';
+    meta.setAttribute('content', color);
+  }
 }
 
 export function ThemeToggle() {
   const toggle = () => {
-    const next = currentTheme() === 'light' ? 'dark' : 'light';
+    const current = currentTheme();
+    const next = current === 'dark' ? 'light' : current === 'light' ? 'pink' : 'dark';
     applyTheme(next);
     try {
       localStorage.setItem('hkm-theme', next);
@@ -74,8 +72,8 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={toggle}
-      aria-label="切換淺色／深色主題"
-      title="切換淺色／深色主題"
+      aria-label="切換主題：深色、淺色、淡粉色"
+      title="切換主題：深色、淺色、淡粉色"
       /*
        * 尺寸與 hover 語言沿用頂欄其他元素：
        *   rounded-full + bg-veil-strong 是 NavLinks 的 hover 樣式，
@@ -86,8 +84,7 @@ export function ThemeToggle() {
       className="ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-fg-muted transition hover:bg-veil-strong hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
     >
       {/*
-       * 太陽：表示「切到淺色」。預設（深色）時顯示。
-       * className 帶 hkm-theme-sun 由 CSS 控制顯隱，見 globals.css。
+       * 太陽：表示下一步切到淺色。深色主題時顯示，圖示由 CSS 控制。
        */}
       <svg
         className="hkm-theme-sun h-[18px] w-[18px]"
@@ -103,7 +100,25 @@ export function ThemeToggle() {
         <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
       </svg>
 
-      {/* 月亮：表示「切到深色」。淺色主題時顯示。 */}
+      {/* 花朵：表示下一步切到淡粉色。淺色主題時顯示。 */}
+      <svg
+        className="hkm-theme-flower h-[18px] w-[18px]"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden
+      >
+        <path d="M12 12c-2.5-2.2-4.5-4.2-2.8-5.9 1.1-1.1 2.4-.3 2.8 1.2.4-1.5 1.7-2.3 2.8-1.2C16.5 7.8 14.5 9.8 12 12Z" />
+        <path d="M12 12c2.2-2.5 4.2-4.5 5.9-2.8 1.1 1.1.3 2.4-1.2 2.8 1.5.4 2.3 1.7 1.2 2.8C16.2 16.5 14.2 14.5 12 12Z" />
+        <path d="M12 12c2.5 2.2 4.5 4.2 2.8 5.9-1.1 1.1-2.4.3-2.8-1.2-.4 1.5-1.7 2.3-2.8 1.2C7.5 16.2 9.5 14.2 12 12Z" />
+        <path d="M12 12c-2.2 2.5-4.2 4.5-5.9 2.8-1.1-1.1-.3-2.4 1.2-2.8-1.5-.4-2.3-1.7-1.2-2.8C7.8 7.5 9.8 9.5 12 12Z" />
+        <circle cx="12" cy="12" r="1.25" />
+      </svg>
+
+      {/* 月亮：表示下一步切到深色。淡粉色主題時顯示。 */}
       <svg
         className="hkm-theme-moon h-[18px] w-[18px]"
         viewBox="0 0 24 24"

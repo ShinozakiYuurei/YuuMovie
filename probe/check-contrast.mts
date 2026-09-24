@@ -69,7 +69,8 @@ function scope(startMarker: string): string {
 }
 
 const DARK_CSS = scope(':root {');
-const LIGHT_CSS = scope("html[data-theme='light'] {");
+const LIGHT_CSS = scope("html[data-theme='light']");
+const PINK_CSS = scope("html[data-theme='pink'] {");
 
 /** 从给定作用域里取一个自定义属性（只认 `--x: #hex;` 写法） */
 function tokenIn(scopeCss: string, name: string, where: string): string {
@@ -182,6 +183,7 @@ function checkTheme(
 let bad = 0;
 bad += checkTheme('暗色（:root）', DARK_CSS, true);
 bad += checkTheme("明色（html[data-theme='light']）", LIGHT_CSS, false);
+bad += checkTheme("淡粉（html[data-theme='pink']）", PINK_CSS, false);
 
-console.log(bad === 0 ? '\n✓ 两套主题的文字对比度令牌全部达 AA（4.5:1）' : `\n${bad} 项不通过`);
+console.log(bad === 0 ? '\n✓ 三套主题的文字对比度令牌全部达 AA（4.5:1）' : `\n${bad} 项不通过`);
 if (bad) process.exit(1);
