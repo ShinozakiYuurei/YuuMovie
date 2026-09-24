@@ -15,20 +15,20 @@ import { computeCardRating, ratingTitle } from '@/lib/rating';
  *   标题（中文，单行截断）
  *   上映中：时长 · 起价
  *   待映：相对天数 + 上映日期
- *   右侧：评分（纯黄文字）
+ *   右侧：评分（深玫瑰底 + 纯黄数字）
  *
  * ★ 2026-09-21 用户要求去掉的四个元素及理由：
  *   1. 格式标签（IMAX / 4DX / 原版…）—— 卡片上最占位、却最不影响
  *      「要不要看这部片」决策的信息。需要时详情页有完整版本列表。
  *   2. 场次数量 —— 与时长、票价混在一行里，三个数字并列反而都不突出。
- *   3. 评分的胶囊底色与来源小字（綜合 / IMDb / 豆瓣）—— 见下方说明。
+ *   3. 评分来源小字（綜合 / IMDb / 豆瓣）—— 见下方说明。
  *   4. 影厅／语言标签同理（原先也不在卡片上）。
  *
- * ★ 评分为什么改成「纯黄文字」：
+ * ★ 评分徽章只保留分数，不显示来源小字：
  *   原先是两行徽章（数值 + 來源小字）+ 按来源变化的三套配色（紫/琥珀/绿）。
  *   但卡片上用户只需要知道「这片分高不高」，不需要知道分从哪来 ——
  *   来源与算法是 hover 才需要的信息，放在 tooltip 里即可。
- *   去掉底色后，黄色数字本身就成了视觉锚点，比徽章更轻也更醒目。
+ *   现在用单一深玫瑰底承接纯黄分数，作为轻量的视觉锚点。
  */
 export function MovieGroupCard({
   group,
@@ -79,7 +79,7 @@ export function MovieGroupCard({
 
       </div>
 
-      <div className="flex flex-1 flex-col gap-1.5 p-3">
+      <div className="hkm-poster-card__info flex flex-1 flex-col gap-1.5 p-3">
         {/* 单行中文标题：过长截断，hover 显示全名。
 
             ★ 2026-09-21 对齐 hkmovie6（用户要求「参考 hkmovie6」）：
@@ -99,16 +99,16 @@ export function MovieGroupCard({
           {group.displayName}
         </h3>
 
-        <div className="mt-auto flex flex-wrap items-baseline gap-x-2 gap-y-1 pt-2">
+        <div className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 pt-2">
           {group.status === 'upcoming' && m.openingDate ? (
-            <p className="min-w-0 text-xs font-medium text-fg-soft">
+            <p className="min-w-0 text-[13px] font-medium text-fg-soft">
               {relativeDay(m.openingDate)}上映 · {m.openingDate}
             </p>
           ) : (
             /* 时长与票价同为「数字 + 单位」形态、同一字重与亮度：
                两者都是选片时的硬指标，之前时长偏暗（次级色）而票价偏亮，
                看上去像两种不同性质的信息。 */
-            <p className="flex flex-wrap items-baseline gap-x-1.5 text-xs font-medium text-fg-soft">
+            <p className="flex flex-wrap items-baseline gap-x-1.5 text-[13px] font-medium text-fg-soft">
               <span>
                 {group.displayDuration ? formatDurationShort(group.displayDuration) : '—'}
               </span>
@@ -121,16 +121,10 @@ export function MovieGroupCard({
             </p>
           )}
 
-          {/* 评分：纯黄文字，无底色、无来源小字。
-              来源与算法仍保留在 tooltip（hover 才可见，不占视觉）——
-              卡片上只需要「分高不高」这一个判断。
-
-              ★ 颜色走 --hkm-score-fg 而不是写死的 #facc15：
-                亮黄在暗底上 11.6:1，在明色玻璃上只剩 1.5:1。
-                详见 app/globals.css 的令牌注释。 */}
+          {/* 评分徽章只显示分数；来源与算法仍保留在 tooltip。 */}
           {rating && (
             <span
-              className="ml-auto shrink-0 text-base font-bold leading-none text-[var(--hkm-score-fg)]"
+              className="hkm-poster-card__score ml-auto shrink-0"
               title={ratingTitle(rating)}
             >
               {rating.value.toFixed(1)}

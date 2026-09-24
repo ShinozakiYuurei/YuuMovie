@@ -325,14 +325,7 @@
   --hkm-btn-primary-1: #8b7cff;
   --hkm-btn-primary-2: #6d5cf0;
 
-  /* 卡片评分文字
-   *
-   * ★ 这个令牌是加明色主题时**必须**补的一类：
-   *   评分原先是写死的 text-[#facc15]（组件里的 Tailwind 任意值）。
-   *   亮黄在暗底上 11.6:1，在明色玻璃 #FAFAFC 上却只有 1.5:1 ——
-   *   整张卡上最醒目的那个数字，到白天模式里会直接消失。
-   *   明色改用 amber-700 #A16207（玻璃 4.76:1，刚好过 AA 正文）。
-   *   仍然避开橙色的场次色（#D97706），两者不会混淆。 */
+  /* 评分统一用亮黄；可读性由深玫瑰色徽章底保证。 */
   --hkm-score-fg: #facc15;
 
   /*
@@ -467,8 +460,7 @@ html[data-theme='pink'] {
   --hkm-btn-primary-1: #6b46e5;
   --hkm-btn-primary-2: #5b39d6;
 
-  /* 评分黄：亮黄在浅底上 1.5:1，必须换成深琥珀（见 :root 注释） */
-  --hkm-score-fg: #a16207;
+  --hkm-score-fg: #facc15;
 
   /* ---- 玻璃（明色三机制，见上方注释） ---- */
   --hkm-glass-border: rgb(255 255 255 / 0.7);
@@ -1046,6 +1038,26 @@ a {
     0 14px 34px -14px var(--hkm-glass-outer-hover);
 }
 
+.hkm-poster-card__info {
+  background-color: var(--hkm-surface);
+  border-top: 1px solid var(--hkm-hairline);
+}
+
+.hkm-poster-card__score {
+  display: inline-flex;
+  min-width: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid rgb(232 160 184 / 0.35);
+  border-radius: 9999px;
+  color: var(--hkm-score-fg);
+  background-color: #5b3948;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
 /*
  * 镜面扫光：hover 时一条斜向高光扫过
  *
@@ -1589,27 +1601,18 @@ html[data-theme='pink'] .hkm-accent-panel {
 }
 
 /* ============================================================
-   卡片评分（纯黄文字）
+   卡片评分徽章（纯黄数字）
 
    ★ 2026-09-21 删除了 .hkm-score / -value / -label / -imdb / -douban
-   五条规则。原因：用户要求评分在卡片上以纯黄文字展示，不要胶囊底色、
-   也不要「綜合 / IMDb / 豆瓣」来源小字。
+   五条规则。卡片只显示评分数值，不显示「綜合 / IMDb / 豆瓣」来源小字。
 
-   那套 CSS 只被 MovieGroupCard 使用，现在评分改为一个 inline 的
-   text-[#facc15] span（来源与算法仍在 tooltip 里），
+   那套 CSS 只被 MovieGroupCard 使用，现在评分改为一个纯黄数字徽章
+   （来源与算法仍在 tooltip 里），
    留着这五条就是死代码 —— 而且它们按来源切换紫/琥珀/绿三套配色，
    与「不要注明来源」的要求正好相反，容易让后人误以为还能用。
 
-   黄色选 #facc15：在卡片 #18181B 上对比度 11.57:1（远过 AA），
-   且色相偏亮黄而非橙，与座位色的橙 #f59e0b 不会混淆。
-
-   ★ 2026-09-25：色值改由 --hkm-score-fg 提供。
-     上面的 11.57:1 是在**暗色卡片**上算的；加入明色主题后，
-     同一个亮黄在浅色玻璃上只剩 1.5:1，等于那个数字看不见。
-     所以它不能再是写死的颜色，必须随主题走（明色用 amber-700）。
-     ⚠️ 组件里写的是 Tailwind 任意值 text-[#facc15]，
-     现在改成 text-[var(--hkm-score-fg)] —— Tailwind 会把 var()
-     当普通值透传，不需要额外配置。
+   黄色选 #facc15，与座位色的橙 #f59e0b 保持区分；深玫瑰底让它在
+   浅色卡片上也清晰，因此所有主题统一使用同一亮黄色值。
    ============================================================ */
 
 /*
