@@ -109,7 +109,7 @@ export function NavLinks() {
   }, [pathname]);
 
   return (
-    <nav className="flex min-w-0 gap-1 text-sm">
+    <nav className="flex min-w-0 gap-1 text-sm font-medium">
       {LINKS.map(({ href, label, nav }) => {
         /*
          * ★ 只認**精確匹配**。

@@ -5,10 +5,19 @@ import { getMeta, SOURCE_LABEL } from '@/lib/data';
 import type { Source } from '@/lib/types';
 import { NavLinks } from '@/components/NavLinks';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { Geist } from "next/font/google";
+import { Inter, Noto_Sans_HK } from 'next/font/google';
 import { cn } from "@/lib/utils";
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+const inter = Inter({
+  subsets: ['latin'],
+  weight: 'variable',
+  variable: '--font-inter',
+});
+const notoSansHK = Noto_Sans_HK({
+  subsets: ['latin'],
+  weight: 'variable',
+  variable: '--font-noto-sans-hk',
+});
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
@@ -73,7 +82,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const meta = getMeta();
   const updated = meta.lastUpdated.slice(0, 16).replace('T', ' ');
   return (
-    <html lang="zh-HK" className={cn("font-sans", geist.variable)} suppressHydrationWarning>
+    <html
+      lang="zh-HK"
+      className={cn('font-sans', inter.variable, notoSansHK.variable)}
+      suppressHydrationWarning
+    >
       <head>
         {/*
          * 主題啟動腳本：必須是 <head> 裡第一件事，且不帶 defer / async。
