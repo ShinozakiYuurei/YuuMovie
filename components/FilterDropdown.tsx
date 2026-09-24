@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 /**
  * 多選下拉：點擊展開，勾選後不關閉（便於連續多選）
@@ -12,17 +13,21 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * 原先它内联在 ShowtimeExplorer 里，戲院頁若再抄一份，两份会各自演化 ——
  * 改一个 z-index 修顶栏遮挡、改一个宽度修移动端换行，都要记得改两处。
  *
- * ===== 这里踩过的两个坑（别再改回去） =====
+ * ===== 这里踩过的四个坑（别再改回去） =====
  *
  * 1. **下拉面板 z-[60]，必须高于顶栏 z-50**
  *    原为 z-40，筛选区滚到顶栏下方时展开菜单会被顶栏遮住一截
  *    （表现为「筛选项顶进 sticky header 下面、叠在一起」）。
  *
- * 2. **遮罩 z-30，必须低于顶栏 z-50**
+ * 2. **遮罩 z-[45]，高于筛选面板 z-40、低于顶栏 z-50**
  *    遮罩只负责拦截面板外的点击。若它也提到 50 以上，
  *    用户在菜单展开时点导航会被遮罩吃掉，表现为「导航点不动」。
  *
- * 3. **菜單用 position:fixed + 實測坐標，不能用 absolute left-0**
+ * 3. **菜单和遮罩必须 Portal 到 body**
+ *    筛选面板的 backdrop-filter 会成为 fixed 子元素的定位包含块；
+ *    不脱离面板时，视口坐标会被当作面板内坐标，造成重复偏移。
+ *
+ * 4. **菜單用 position:fixed + 實測坐標，不能用 absolute left-0**
  *    手機（390px）上篩選區是 2 列網格，右列按鈕的左邊緣約在 200px，
  *    而菜單寬 256px —— `absolute left-0 w-64` 會向右溢出 66px，
  *    把右側的命中數直接切掉（截圖確認）。
@@ -30,9 +35,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  *    展開時量按鈕的 rect，算出「不越出視窗」的 left 與寬度，用 fixed 定位。
  *    這樣左右兩列、桌面與手機都用同一套邏輯，不必判斷在第幾欄。
  *
- *    代價是滾動/縮放時 fixed 菜單會與按鈕錯位 —— 因此監聽 scroll / resize
- *    直接關閉菜單。用戶在 sticky 篩選區展開菜單後立刻滾動是極少數情況，
- *    關掉比「跟著跑」或「錯位」都好。
+ *    滾動/縮放時重新量測並重貼菜單；按鈕完全離開視窗時才關閉。
  */
 export interface FilterOption {
   value: string;
@@ -165,30 +168,6 @@ export function FilterDropdown({
 
   return (
     <div className="relative">
-      {/*
-       * 打開時把**按鈕自己**抬到遮罩之上（relative z-40）
-       *
-       * ===== 為什麼（踩過的坑） =====
-       *
-       * 遮罩是 `fixed inset-0 z-30`，它蓋住整個視窗 —— **包括按鈕自己**。
-       * 而按鈕的 onClick 是 toggle（開著就關）：
-       *   點按鈕 → 命中的是遮罩 → 遮罩關掉菜單
-       * 結果看起來「再點按鈕能關」，其實是按鈕的 toggle 分支**從沒被執行過**
-       * （實測 elementFromPoint：按鈕中心的最上層元素是 div.fixed.inset-0.z-30）。
-       *
-       * ⚠️ 不能改成「給外層 relative 容器加 z-40」：
-       *   position:relative + z-index 會**建立層疊上下文**，
-       *   菜單的 z-[60] 就會被關在那個上下文裡 ——
-       *   容器本身 z-40 < 頂欄 z-50，菜單反而被頂欄遮住（實測確認）。
-       *
-       * 所以只抬按鈕：按鈕 `relative z-40` 高於遮罩 z-30、仍低於頂欄 z-50
-       *（滚到頂欄下面時按鈕不該浮在導航上）；
-       * 而外層容器保持無 z-index，菜單的 z-[60] 繼續留在根層疊上下文，
-       * 依然高於頂欄。
-       *
-       * 其他下拉的按鈕仍被遮罩蓋著 —— 點它們 = 關掉當前菜單，
-       * 與用户預期一致（相當於「點空白處」）。
-       */}
       <button
         ref={btnRef}
         type="button"
@@ -196,8 +175,6 @@ export function FilterDropdown({
         aria-expanded={open}
         aria-haspopup="listbox"
         className={`relative flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
-          open ? 'z-40' : ''
-        } ${
           has
             ? 'border-accent/60 bg-accent/15 text-fg'
             : 'border-hairline-strong bg-veil text-fg-soft hover:border-hairline-strong hover:bg-veil-strong hover:text-fg'
@@ -220,9 +197,9 @@ export function FilterDropdown({
         </svg>
       </button>
 
-      {open && pos && (
+      {open && pos && typeof document !== 'undefined' && createPortal(
         <>
-          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} aria-hidden />
+          <div className="fixed inset-0 z-[45]" onClick={() => setOpen(false)} aria-hidden />
           <div
             ref={menuRef}
             style={{ top: pos.top, left: pos.left, width: pos.width, maxHeight: pos.maxH }}
@@ -283,7 +260,8 @@ export function FilterDropdown({
               </button>
             )}
           </div>
-        </>
+        </>,
+        document.body,
       )}
     </div>
   );

@@ -93,7 +93,7 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
       {/* ============ 第一層：篩選 ============
        *
        * ★ 與場次頁同一套 sticky 策略：緊貼頂欄下緣（top = 頂欄高度變數），
-       *   z-40 低於頂欄（z-50）、高於內容與遮罩（z-30）。
+       *   z-40 低於頂欄（z-50）與遮罩（z-45），高於內容。
        *   背景用不透明面板色（.hkm-panel-sticky），否則滾動時會透出戲院卡片。
        *
        * ★ 移動端不啟用 sticky：面板約 200px，小屏上常駐會把戲院列表
