@@ -300,9 +300,8 @@
   --hkm-seat-none-border: rgb(255 255 255 / 0.08);
   --hkm-seat-none-fg: #e8ebf3;
 
-  /* 暗色背景保持柔和平滑；不绘制网格或彩色光斑。 */
+  /* 暗色背景保持柔和平滑；不绘制彩色光斑。 */
   --hkm-aurora-base: #111113;
-  --hkm-aurora-grid: transparent;
   --hkm-aurora-1: rgb(99 102 120 / 0.14);
   --hkm-aurora-2: rgb(74 100 106 / 0.08);
   --hkm-aurora-3: rgb(100 87 123 / 0.1);
@@ -584,8 +583,6 @@ html[data-theme='light'] {
     radial-gradient(ellipse 120% 80% at 50% 0%, rgb(206 208 255 / 0.6), transparent 70%),
     radial-gradient(ellipse 100% 70% at 80% 55%, rgb(198 240 248 / 0.5), transparent 72%),
     #f1f2f6;
-  /* 网格线：暗色是白线，明色改黑线（同一手法：低透明度的高频纹理） */
-  --hkm-aurora-grid: rgb(9 9 11 / 0.035);
   --hkm-aurora-1: rgb(99 102 241 / 0.22);
   --hkm-aurora-2: rgb(34 211 238 / 0.16);
   --hkm-aurora-3: rgb(139 124 255 / 0.2);
@@ -723,49 +720,10 @@ body {
   z-index: -1;
   pointer-events: none;
   overflow: hidden;
-  /* 底色：略高于柔和近黑画布，带一点冷紫倾向
-   * ★ 整套值（底色 / 网格 / 三团光）现在是 --hkm-aurora-* 令牌，
-   *   明暗两套各自一份 —— 这一层是玻璃的**输入数据**，
-   *   主题一变它必须跟着变，否则明色主题下玻璃身后是一片暗紫。 */
+  /* 背景底色按主题切换；浅色保留柔和光斑，暗色使用纯色近黑。 */
   background: var(--hkm-aurora-base);
 }
 
-/*
- * ★★ 高频纹理层：液态玻璃能不能被看见的关键 ★★
- *
- * 这一层是实测后才补上的，过程值得记下：
- *   第一版只加了极光（平滑径向渐变），结果玻璃效果几乎看不出来。
- *   原因：backdrop-filter 的模糊作用在**平滑渐变**上，模糊前后
- *   像素几乎一样 —— 采样到 rgb(30,27,58)，模糊后还是 rgb(30,27,58)，
- *   玻璃与「一块半透明色块」在观感上无法区分，白付了性能。
- *
- *   回头对照原 demo 才发现：它的背景是 55px 的**网格线**（高频细节），
- *   blur 一上去线就化开了，用户看到的是「原本锐利的网格在自己身后
- *   变成一片糊」—— 这才叫玻璃。
- *
- * 所以这里补回一张低透明度的网格（颜色取自原 demo 的 #E1E1E1，
- * 但透明度从它的不透明降 1 个数量级，因为暗色画布上白线很显眼）。
- * 网格尺寸 44px：比原 demo 的 55px 略密，因为本站内容列宽更小。
- *
- * 成本：纯 CSS 渐变，无图片请求、无额外元素（是 .hkm-aurora 自己的
- * background-image 之一），不参与滚动，不引起 layout/paint。
- */
-.hkm-aurora::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  --grid: var(--hkm-aurora-grid);
-  background-image:
-    linear-gradient(0deg, transparent 24%, var(--grid) 25%, var(--grid) 26%, transparent 27%, transparent 74%, var(--grid) 75%, var(--grid) 76%, transparent 77%),
-    linear-gradient(90deg, transparent 24%, var(--grid) 25%, var(--grid) 26%, transparent 27%, transparent 74%, var(--grid) 75%, var(--grid) 76%, transparent 77%);
-  background-size: 44px 44px;
-  /* 边缘淡出：硬切到视口边界会看到网格突然断掉 */
-  -webkit-mask-image: radial-gradient(ellipse 100% 100% at 50% 40%, #000 30%, transparent 100%);
-  mask-image: radial-gradient(ellipse 100% 100% at 50% 40%, #000 30%, transparent 100%);
-}
-
-/* 暗色模式要的是干净、平滑的柔和黑：关闭网格纹理及彩色背景光斑。 */
-html:not([data-theme='light']) .hkm-aurora::before,
 html:not([data-theme='light']) .hkm-aurora > i {
   display: none;
 }
