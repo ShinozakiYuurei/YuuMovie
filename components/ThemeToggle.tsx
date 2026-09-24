@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 
 /**
  * 深色／淡粉色主題切換鈕（頂欄右端）
@@ -22,7 +22,7 @@ import { useEffect, useRef, useState } from 'react';
  * 這樣：
  *   · 服務端與客戶端渲染的 HTML 完全相同 → 不可能 mismatch；
  *   · 啟動腳本在首次繪製前就設好了 data-theme → 首屏就是對的圖示；
- *   · React state 只控制短暫的藥丸過場，不影響首屏圖示。
+ *   · React state 只控制过渡期间的交互锁，不影响首屏图示。
  *
  * ===== 為什麼 aria-label 是固定的 =====
  *
@@ -59,12 +59,8 @@ export function applyTheme(theme: Theme) {
 }
 
 export function ThemeToggle() {
-  const [expanded, setExpanded] = useState(false);
   const [animating, setAnimating] = useState(false);
   const animationLock = useRef(false);
-  const timers = useRef<number[]>([]);
-
-  useEffect(() => () => timers.current.forEach((timer) => window.clearTimeout(timer)), []);
 
   const chooseTheme = (theme: Theme) => {
     applyTheme(theme);
@@ -78,23 +74,33 @@ export function ThemeToggle() {
   const toggle = () => {
     if (animationLock.current) return;
     const next = currentTheme() === 'dark' ? 'pink' : 'dark';
+    const root = document.documentElement;
 
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const finishTransition = () => {
+      root.classList.remove('hkm-theme-transition');
+      setAnimating(false);
+      animationLock.current = false;
+    };
+
+    if (
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+      typeof document.startViewTransition !== 'function'
+    ) {
       chooseTheme(next);
       return;
     }
 
     animationLock.current = true;
     setAnimating(true);
-    setExpanded(true);
-    timers.current = [
-      window.setTimeout(() => chooseTheme(next), 300),
-      window.setTimeout(() => {
-        setExpanded(false);
-        setAnimating(false);
-        animationLock.current = false;
-      }, 740),
-    ];
+    root.classList.add('hkm-theme-transition');
+
+    try {
+      const transition = document.startViewTransition(() => chooseTheme(next));
+      void transition.finished.then(finishTransition, finishTransition);
+    } catch {
+      chooseTheme(next);
+      finishTransition();
+    }
   };
 
   return (
@@ -111,7 +117,7 @@ export function ThemeToggle() {
        * h-9 w-9 而非 h-8 w-8：觸控目標要接近 44px 才好點，
        * 但頂欄高度只有 56px，36px 是「好點」與「不擠」的折中。
        */
-      className={`hkm-theme-toggle ml-1${expanded ? ' is-expanded' : ''}`}
+      className="hkm-theme-toggle ml-1"
     >
       {/*
        * 太陽：表示下一步切到淡粉色。深色主題時顯示，圖示由 CSS 控制。
@@ -161,10 +167,6 @@ export function ThemeToggle() {
       >
         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" />
       </svg>
-      <span className="hkm-theme-toggle__pill" aria-hidden="true">
-        <span className="hkm-theme-toggle__swatch hkm-theme-toggle__swatch--light" />
-        <span className="hkm-theme-toggle__swatch hkm-theme-toggle__swatch--dark" />
-      </span>
     </button>
   );
 }
