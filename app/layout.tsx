@@ -90,7 +90,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
          *   為什麼不只靠 JS 寫：首次載入的網址列顏色在腳本跑之前就定了，
          *   不寫進 HTML 會先閃一下瀏覽器預設色。
          */}
-        <meta name="theme-color" content="#0a0a0c" />
+        <meta name="theme-color" content="#111113" />
       </head>
       <body className="min-h-screen">
         {/* 环境光层：固定定位，不参与滚动。

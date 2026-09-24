@@ -9,7 +9,7 @@
  *   2. 万一日后有人重新启用 @config，值不至于与 globals.css 冲突。
  *
  * ★ 2026-09-21 已同步到新的暗色体系：
- *   ink #07080d → canvas #0A0A0C（带冷蓝倾向，拒绝死气沉沉的纯黑）
+ *   ink #07080d → canvas #111113（柔和近黑，拒绝纯黑与明显彩色泛光）
  *   panel #111318 → surface #18181B（比底层亮一档）
  *   并补上 hairline（1px、8% 白的发丝边框，卡片浮起的关键）。
  * 改 globals.css 时请顺手同步这里，否则两边会静默漂移。
@@ -36,8 +36,8 @@ export default {
         // ⚠️ 下面全部是**暗色**取值。明色下这些 key 在页面上的实际颜色
         //    由 globals.css 的 html[data-theme='light'] 覆盖 ——
         //    本文件只是镜像，不参与明色主题的计算。
-        ink: '#0a0a0c',
-        canvas: '#0a0a0c',
+        ink: '#111113',
+        canvas: '#111113',
         panel: '#18181b',
         surface: '#18181b',
         edge: '#ffffff14',
