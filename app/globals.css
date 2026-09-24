@@ -295,12 +295,9 @@
   --hkm-seat-none-border: rgb(255 255 255 / 0.08);
   --hkm-seat-none-fg: #e8ebf3;
 
-  /* 环境光（极光层）：底色 + 高频网格 + 三团光 */
-  --hkm-aurora-base:
-    radial-gradient(ellipse 120% 80% at 50% 0%, rgb(28 28 32 / 0.28), transparent 70%),
-    radial-gradient(ellipse 100% 70% at 80% 55%, rgb(25 29 31 / 0.2), transparent 72%),
-    #111113;
-  --hkm-aurora-grid: rgb(255 255 255 / 0.015);
+  /* 暗色背景保持柔和平滑；不绘制网格或彩色光斑。 */
+  --hkm-aurora-base: #111113;
+  --hkm-aurora-grid: transparent;
   --hkm-aurora-1: rgb(99 102 120 / 0.14);
   --hkm-aurora-2: rgb(74 100 106 / 0.08);
   --hkm-aurora-3: rgb(100 87 123 / 0.1);
@@ -760,6 +757,12 @@ body {
   /* 边缘淡出：硬切到视口边界会看到网格突然断掉 */
   -webkit-mask-image: radial-gradient(ellipse 100% 100% at 50% 40%, #000 30%, transparent 100%);
   mask-image: radial-gradient(ellipse 100% 100% at 50% 40%, #000 30%, transparent 100%);
+}
+
+/* 暗色模式要的是干净、平滑的柔和黑：关闭网格纹理及彩色背景光斑。 */
+html:not([data-theme='light']) .hkm-aurora::before,
+html:not([data-theme='light']) .hkm-aurora > i {
+  display: none;
 }
 
 .hkm-aurora > i {
