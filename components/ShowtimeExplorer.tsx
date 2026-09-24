@@ -277,7 +277,49 @@ export function ShowtimeExplorer({
   /** 用户点选的日期；null = 尚未选（跟随筛选结果的第一天） */
   const [pickedDate, setPickedDate] = useState<string | null>(null);
 
-  const setDim = (dim: FilterDim) => (next: string[]) => setSel((s) => ({ ...s, [dim]: next }));
+  const setDim = (dim: FilterDim) => (next: string[]) => {
+    setSel((current) => {
+      const updated = { ...current, [dim]: next };
+      if (dim !== 'regions') return updated;
+
+      const selectedRegions = new Set(next);
+      const availableDistricts = new Set(
+        rows
+          .filter(
+            (row) =>
+              next.length === 0 ||
+              (row.region != null && selectedRegions.has(row.region))
+          )
+          .map((row) => row.district)
+          .filter((district): district is string => district != null && district !== '')
+      );
+
+      return {
+        ...updated,
+        districts: current.districts.filter((district) => availableDistricts.has(district)),
+      };
+    });
+  };
+
+  const districtOptions = useMemo(() => {
+    const selectedRegions = new Set(sel.regions);
+    const counts = new Map<string, number>();
+
+    for (const row of rows) {
+      if (
+        selectedRegions.size > 0 &&
+        (row.region == null || !selectedRegions.has(row.region))
+      ) {
+        continue;
+      }
+      if (row.district == null || row.district === '') continue;
+      counts.set(row.district, (counts.get(row.district) ?? 0) + 1);
+    }
+
+    return facets.districts
+      .filter((option) => counts.has(option.value))
+      .map((option) => ({ ...option, count: counts.get(option.value)! }));
+  }, [facets.districts, rows, sel.regions]);
 
   /** 多选筛选：同维度内 OR，维度之间 AND */
   const filtered = useMemo(() => {
@@ -422,7 +464,7 @@ export function ShowtimeExplorer({
           <FilterDropdown placeholder={FILTER_LABELS.versions} options={facets.versions} selected={sel.versions} onChange={setDim('versions')} />
           <FilterDropdown placeholder={FILTER_LABELS.languages} options={facets.languages} selected={sel.languages} onChange={setDim('languages')} />
           <FilterDropdown placeholder={FILTER_LABELS.regions} options={facets.regions} selected={sel.regions} onChange={setDim('regions')} />
-          <FilterDropdown placeholder={FILTER_LABELS.districts} options={facets.districts} selected={sel.districts} onChange={setDim('districts')} />
+          <FilterDropdown placeholder={FILTER_LABELS.districts} options={districtOptions} selected={sel.districts} onChange={setDim('districts')} />
         </div>
 
         {/* 排序（可多键叠加） */}

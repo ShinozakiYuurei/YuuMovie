@@ -57,6 +57,43 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
     );
   }, [rows, sources, specs, regions, districts]);
 
+  const districtOptions = useMemo(() => {
+    const selectedRegions = new Set(regions);
+    const counts = new Map<string, number>();
+
+    for (const row of rows) {
+      if (
+        selectedRegions.size > 0 &&
+        (row.region == null || !selectedRegions.has(row.region))
+      ) {
+        continue;
+      }
+      if (row.district == null || row.district === '') continue;
+      counts.set(row.district, (counts.get(row.district) ?? 0) + 1);
+    }
+
+    return facets.districts
+      .filter((option) => counts.has(option.value))
+      .map((option) => ({ ...option, count: counts.get(option.value)! }));
+  }, [facets.districts, regions, rows]);
+
+  const changeRegions = (nextRegions: string[]) => {
+    const selectedRegions = new Set(nextRegions);
+    const availableDistricts = new Set(
+      rows
+        .filter(
+          (row) =>
+            nextRegions.length === 0 ||
+            (row.region != null && selectedRegions.has(row.region))
+        )
+        .map((row) => row.district)
+        .filter((district): district is string => district != null && district !== '')
+    );
+
+    setRegions(nextRegions);
+    setDistricts((current) => current.filter((district) => availableDistricts.has(district)));
+  };
+
   /**
    * 按院線分組展示
    *
@@ -145,11 +182,11 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
             placeholder="所有地區"
             options={facets.regions}
             selected={regions}
-            onChange={setRegions}
+            onChange={changeRegions}
           />
           <FilterDropdown
             placeholder="所有區域"
-            options={facets.districts}
+            options={districtOptions}
             selected={districts}
             onChange={setDistricts}
           />
