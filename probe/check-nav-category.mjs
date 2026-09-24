@@ -111,8 +111,18 @@ for (const [page, linked, nav] of [
     console.error(`✖ ${page} 上一條 /movie 連結都沒有 —— 檢查沒真的跑起來`);
     process.exit(2);
   }
-  // 列表頁連結到的片，其詳情頁歸屬必須與列表一致（用戶抱怨的正是這個矛盾）
+  // 列表頁連結到的片，其詳情頁歸屬必須與列表一致。
+  // 同一 slug 若同時出現在兩份列表，靜態路由只能產生一張詳情頁；
+  // 它按 all-source canonical 組決定歸屬（例如 canonical upcoming），
+  // 因此這種重複 slug 不可要求同一頁同時屬於 showing 與 upcoming。
   for (const s of linked) {
+    const sharedAcrossLists = linkedUpcoming.has(s) && linkedShowing.has(s);
+    if (sharedAcrossLists) {
+      if (!byNav.showing.has(s) && !byNav.upcoming.has(s)) {
+        problems.push(`${page} 連結的重複 slug /movie/${s}/ 沒有 canonical 詳情頁`);
+      }
+      continue;
+    }
     if (!byNav[nav].has(s)) {
       const actual = byNav.showing.has(s) ? 'showing' : byNav.upcoming.has(s) ? 'upcoming' : '（無標記）';
       problems.push(`${page} 連結的 /movie/${s}/ 詳情頁歸屬是 ${actual}，應為 ${nav}`);
