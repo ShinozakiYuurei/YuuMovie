@@ -88,12 +88,12 @@ export function ThemeToggle() {
     setAnimating(true);
     setExpanded(true);
     timers.current = [
-      window.setTimeout(() => chooseTheme(next), 320),
-      window.setTimeout(() => setExpanded(false), 460),
+      window.setTimeout(() => chooseTheme(next), 300),
       window.setTimeout(() => {
+        setExpanded(false);
         setAnimating(false);
         animationLock.current = false;
-      }, 820),
+      }, 740),
     ];
   };
 
