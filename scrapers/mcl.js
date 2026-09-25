@@ -136,7 +136,8 @@ async function movieDetails(movies, proxy, request, cacheFile, detailBudgetMs) {
       const id = String(movie.id);
       const title = movie.name || '';
       const saved = cache[id];
-      const old = saved && parseMclMovieDetails(saved.raw, id, title);
+      // Grid 没有标题时无法验证缓存是否属于当前这部电影，须现场查询官方详情后才能关联。
+      const old = title && saved ? parseMclMovieDetails(saved.raw, id, title) : null;
       const ttl = old && old.duration && old.category && old.director && old.cast && old.description
         ? DETAIL_TTL_MS : INCOMPLETE_DETAIL_TTL_MS;
       if (old && Date.now() - Date.parse(saved.at) < ttl &&

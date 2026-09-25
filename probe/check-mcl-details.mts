@@ -121,13 +121,33 @@ try {
     id: listOnlyId, vst: [{ v: '2D', l: '粵語', vn: '2D 粵語', c: [{ ci: '017', cn: 'K11',
       s: [{ si: 9999, sn: '星期六, 9月26日, 02:10 PM, 1院 $120', r: 60 }] }] }],
   }] };
+  const listOnlyCache = path.join(tmpScraper, 'list-only-cache.json');
+  fs.writeFileSync(listOnlyCache, JSON.stringify({ [listOnlyId]: {
+    at: new Date().toISOString(),
+    raw: [{ ...listOnlyRaw[0], mn: '舊片名' }],
+  } }));
+  let listOnlyDetailRequests = 0;
+  const listOnlyOffline = await scrapeMcl({ request: async (url: string) => {
+    if (url.startsWith('GetNowShowingGrid')) return grid;
+    if (url.startsWith('GetNowShowingList')) return listWithMissingGridMovie;
+    if (url.startsWith('GetCinemaDetails')) return [];
+    if (url.includes(`id=${listOnlyId}&`)) {
+      listOnlyDetailRequests++;
+      throw new Error('detail endpoint unavailable');
+    }
+    return request(url);
+  }, detailCacheFile: listOnlyCache });
+  assert.equal(listOnlyDetailRequests, 1, 'Grid 缺标题时不能盲用缓存详情');
+  assert.equal(listOnlyOffline.movies.find((m) => m.id === `mcl-${listOnlyId}`)?.duration, null,
+    'Grid 缺标题且详情请求失败时不能套用舊影片資料');
+
   const listOnlyResult = await scrapeMcl({ request: async (url: string) => {
     if (url.startsWith('GetNowShowingGrid')) return grid;
     if (url.startsWith('GetNowShowingList')) return listWithMissingGridMovie;
     if (url.startsWith('GetCinemaDetails')) return [];
     if (url.includes(`id=${listOnlyId}&`)) return listOnlyRaw;
     return request(url);
-  }, detailCacheFile: path.join(tmpScraper, 'list-only-cache.json') });
+  }, detailCacheFile: listOnlyCache });
   const recoveredMovie = listOnlyResult.movies.find((m) => m.id === `mcl-${listOnlyId}`);
   assert.equal(recoveredMovie?.nameZh, listOnlyTitle, 'Grid 漏項時以 ID 匹配的官方詳情補回片名');
   assert.equal(listOnlyResult.shows.length, 3, 'Grid 漏項不應丟失該影片場次');
