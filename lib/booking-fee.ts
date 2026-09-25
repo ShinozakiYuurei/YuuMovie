@@ -42,6 +42,16 @@
  *       因此只在 BY_CINEMA 覆寫該分店；分店頁同時註明目前沒有網上售票，見該筆提示。
  *  其餘新增院線暫無足以確認統一金額的院方證據；不採用 HK Movie 6 的 fee 欄位。
  *
+ *
+ * ===== CGV / 影藝（2026-09-26 用戶指定）=====
+ *  CGV（cgv）      $8   院方場次資料的 online surcharge 設定（surchargeGroups
+ *       名為「$$8」、description「online surcharge」，price 8）。
+ *       該 surchargeType 目前標為 active:false，故先前判為「停用設定、不認列」；
+ *       2026-09-26 用戶指定按 HK$8 記錄。note 已標明此數字出自設定而非結帳實測。
+ *  影藝（cineart）  $10  院方場次資料的 online surcharge 設定（surchargeGroups
+ *       名為「Online transaction (JP)」，price 10），同樣 active:false；
+ *       2026-09-26 用戶指定按 HK$10 記錄，note 亦已標明出處。
+ *
  * ===== 新光補查（2026-09-26）=====
  *  新光（sunbeam）   $10  官方購票站 www.sunbeamwhampoa.com 的結帳元件明列
  *       「手續費 (N張×$10)」，serviceFee 由票數 ×1000（分）計算得出；
@@ -108,6 +118,21 @@ const BY_SOURCE: Partial<Record<Source, BookingFee>> = {
   lumen: {
     amount: 10,
     note: 'Lumen 官方網上選票頁列明每張戲票收 HK$10 服務費。',
+    included: false,
+  },
+  // CGV / 影藝：院方場次資料的網上手續費設定（surchargeGroups）分別為每票 HK$8
+  // 與 HK$10。兩者的 surchargeType 目前標為 active:false，先前因此判為停用、
+  // 不認列；2026-09-26 用戶指定按此金額記錄，故在此寫死。
+  // ★ note 必須保留「設定標為停用、以結帳金額為準」這句：
+  //   這不是結帳實測值，寫清楚才不會被後來的人當成已驗證的收費。
+  cgv: {
+    amount: 8,
+    note: 'CGV：院方場次資料的網上手續費設定為每票 HK$8（online surcharge）；該設定目前標為停用，實際以結帳金額為準。',
+    included: false,
+  },
+  cineart: {
+    amount: 10,
+    note: '影藝：院方場次資料的網上交易手續費設定為每票 HK$10（Online transaction）；該設定目前標為停用，實際以結帳金額為準。',
     included: false,
   },
   newport: {
