@@ -18,7 +18,8 @@
 #     - 抓取失败 → set -e 直接中止，**不**发布半成品，线上保持原样
 #
 # 用法：bash /opt/hk-movie/deploy/rebuild-static.sh
-#       SCRAPE=0 bash /opt/hk-movie/deploy/rebuild-static.sh   # 跳过抓取
+#       SCRAPE=0 bash /opt/hk-movie/deploy/rebuild-static.sh   # 跳过院线抓取
+#       ENRICH=1 FORCE_REFRESH=1 SCRAPE=0 POSTERS=0 bash deploy/rebuild-static.sh  # 刷评分后重建
 #       POSTERS=0 bash /opt/hk-movie/deploy/rebuild-static.sh  # 跳过海报本地化
 #
 #   2026-09-19 同时加了 flock 串行锁（见下）。
@@ -26,16 +27,28 @@
 #   图片必须先落 public/posters/ 再构建，否则同源海报会 404。
 set -euo pipefail
 
-# ★ 串行锁：light（每 2h）与 heavy（每 6h）两个定时器**共用本脚本**，
-#   二者会同时 rm -rf out/ 并清空 /home/web/html。正常情况下时间窗相差
-#   28 分钟不会撞车，但一次慢速抓取（网络抖动 / TimeoutStartSec=900 内）
-#   就可能让两次构建交叉。这里用 flock 独占，第二个直接放弃（exit 0，
-#   不报错），等下一个定时器重建 —— 数据已由第一个进程更新。
+# ★ 串行锁：院线抓取与评分刷新共用本脚本，避免同时读写 data/ 或重建 out/。
+#   常规抓取立即放弃重复任务；每小时的评分刷新可设置 LOCK_WAIT_SEC 等待
+#   当前构建结束，LOCK_BUSY_EXIT=75 时若等不到会将本轮明确标记为失败。
 LOCK_FILE="${LOCK_FILE:-/tmp/hk-movie-rebuild.lock}"
+LOCK_WAIT_SEC="${LOCK_WAIT_SEC:-0}"
+LOCK_BUSY_EXIT="${LOCK_BUSY_EXIT:-0}"
+[[ "${LOCK_WAIT_SEC}" =~ ^[0-9]+$ && "${LOCK_BUSY_EXIT}" =~ ^[0-9]+$ ]] || {
+  echo "✖ LOCK_WAIT_SEC / LOCK_BUSY_EXIT 必须是非负整数" >&2
+  exit 2
+}
+[ "${LOCK_BUSY_EXIT}" -le 255 ] || { echo "✖ LOCK_BUSY_EXIT 最大为 255" >&2; exit 2; }
 exec 9>"${LOCK_FILE}"
-if ! flock -n 9; then
-  echo "⚠️ 另一个重建正在进行，本次退出（数据不受影响）"
-  exit 0
+if [ "${LOCK_WAIT_SEC}" -gt 0 ]; then
+  LOCKED=0
+  flock -w "${LOCK_WAIT_SEC}" 9 || LOCKED=$?
+else
+  LOCKED=0
+  flock -n 9 || LOCKED=$?
+fi
+if [ "${LOCKED}" -ne 0 ]; then
+  echo "⚠️ 另一個重建正在進行；等待 ${LOCK_WAIT_SEC}s 后仍未释放锁，本次退出（数据不受影响）"
+  exit "${LOCK_BUSY_EXIT}"
 fi
 
 APP_DIR="${APP_DIR:-/opt/hk-movie}"
@@ -56,7 +69,15 @@ if [ "${SCRAPE:-1}" = "1" ]; then
   node scrape.js
   echo "  抓取耗时 $(( $(date +%s) - T_SCRAPE ))s"
 else
-  echo "▶ SCRAPE=0，跳过抓取（仅重建）"
+  echo "▶ SCRAPE=0，跳过院线抓取"
+fi
+
+# ---------- 0.5 外部评分刷新（可选）----------
+if [ "${ENRICH:-0}" = "1" ]; then
+  echo "▶ 刷新 IMDb / 豆瓣评分（FORCE_REFRESH=${FORCE_REFRESH:-0}）..."
+  FORCE_REFRESH="${FORCE_REFRESH:-0}" node scrapers/enrich.js
+else
+  echo "▶ ENRICH=0，跳过评分刷新"
 fi
 
 # ---------- 1. 校验数据 ----------

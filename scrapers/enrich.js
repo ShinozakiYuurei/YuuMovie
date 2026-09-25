@@ -1,13 +1,11 @@
 #!/usr/bin/env node
 /**
- * 补充数据抓取：IMDb 评分
+ * 补充数据抓取：IMDb / 豆瓣评分
  *
- * 背景：五家院线的结构化数据里**没有**任何外部评分，
- * 而 IMDb 是唯一「无鉴权、无风控、可从 VPS 直连」的稳定源。
+ * 院线结构化数据不提供外部评分；此脚本独立抓取并缓存 IMDb 与豆瓣评分。
  *
- * ★ 只做 IMDb —— 豆瓣评分与发行商已按需求取消（2026-09-19）：
- *   豆瓣要过 sec.douban.com 的 PoW 盾且会被弹回挑战页，成本高且不稳；
- *   发行商在院线数据、豆瓣、IMDb 三处都没有可靠来源。
+ * 评分通过独立缓存 data/enrich.json 保存，定时任务可单独刷新评分，不必重抓院线数据。
+ * 发行商在院线数据、豆瓣、IMDb 三处都没有可靠来源，未做。
  *
  * ★ 为什么单独存 data/enrich.json 而不写进 movies.json：
  *   movies.json 每 2–6 小时被 scrape.js 整体重写，评分混进去会被冲掉；
@@ -22,9 +20,10 @@
  *   ONLY=坂本,超風 node scrapers/enrich.js  # 只跑片名含这些词的
  *   REFRESH_DAYS=0 node scrapers/enrich.js  # 全部重抓（刷新评分）
  *   DUBAN_ONLY=1 只跑豆瓣不动 IMDb         NO_DUBAN=1 关掉豆瓣
+ *   FORCE_REFRESH=1 node scrapers/enrich.js # 忽略缓存新鲜度，强制刷新评分
  *   DRY=1 node scrapers/enrich.js           # 不发请求，只看计划
  *
- * 节流：每次请求间隔 0.3–0.7s。全量 212 部约 4–6 分钟。
+ * 节流：查询逐片串行，定时强制刷新时豆瓣请求间隔 0.25–0.45s。
  * 中断安全：每部首写盘一次。
  */
 import fs from 'node:fs';
@@ -44,6 +43,8 @@ const MANUAL_FILE = path.join(OUT, 'enrich-manual.json');
 const LIMIT = Number(process.env.LIMIT || 0);
 const ONLY = (process.env.ONLY || '').split(',').map((s) => s.trim()).filter(Boolean);
 const DRY = process.env.DRY === '1';
+/** 定时评分刷新时强制更新缓存里已有 ID 的评分，避免重复标题搜索。 */
+const FORCE_REFRESH = process.env.FORCE_REFRESH === '1';
 /** 评分会变动，默认 3 天刷新一次（比数据刷新慢，比重映一年一次快） */
 const REFRESH_DAYS = Number(process.env.REFRESH_DAYS ?? 3);
 /**
@@ -179,17 +180,18 @@ async function fetchImdb(names, year, opt = {}) {
  * 片名自动匹配偶尔会撞到同名旧片（尤其短片/电视电影），
  * 这时候不必跟算法绕，data/enrich-manual.json 里写死 imdbId 即可。
  */
-async function fetchImdbById(imdbId) {
+async function fetchImdbById(imdbId, previous = null) {
   const r = await imdbRatings(imdbId);
   await sleep(jitter(250, 600));
   return {
+    ...previous,
     imdbId,
-    imdbUrl: imdbUrl(imdbId),
-    imdbTitle: null,
-    imdbYear: null,
+    imdbUrl: previous?.imdbUrl || imdbUrl(imdbId),
+    imdbTitle: previous?.imdbTitle || null,
+    imdbYear: previous?.imdbYear || null,
     rating: r ? r.rating : null,
     votes: r ? r.votes : null,
-    queriedWith: 'manual',
+    queriedWith: previous?.queriedWith || 'manual',
   };
 }
 
@@ -237,9 +239,11 @@ async function main() {
   if (ONLY.length) {
     todo = todo.filter((p) => ONLY.some((s) => p.key.includes(enrichKey(s)) || p.key.includes(s.toLowerCase())));
   }
-  let work = todo.filter((p) => needsWork(entries[p.key], now));
+  let work = FORCE_REFRESH
+    ? todo.filter((p) => entries[p.key]?.imdb?.imdbId || entries[p.key]?.douban?.doubanId || manual[p.key]?.imdbId)
+    : todo.filter((p) => needsWork(entries[p.key], now));
   // DUBAN_ONLY：IMDb 已经新，不想重跑那 212 次搜索，只补豆瓣
-  if (DUBAN_ONLY) {
+  if (DUBAN_ONLY && !FORCE_REFRESH) {
     work = todo.filter((p) => {
       const row = entries[p.key];
       if (!row?.douban) return true;
@@ -299,8 +303,11 @@ async function main() {
       const dAt = row.douban?.at ? Date.parse(row.douban.at) : 0;
       const dFresh = row.douban && !row.douban.notFound && now - dAt <= DUBAN_REFRESH_DAYS * 864e5;
       const dRetry = row.douban?.notFound && now - dAt <= 7 * 864e5;
-      if (!dFresh && !dRetry) {
+      // 每小时强制刷新只查询已识别的豆瓣条目；无 ID 的影片沿用普通增量周期，
+      // 避免反复搜索尚未上映/未匹配的片名。
+      if ((FORCE_REFRESH && row.douban?.doubanId) || (!FORCE_REFRESH && !dFresh && !dRetry)) {
         try {
+          const previousDouban = row.douban;
           const found = await resolveDouban({ zh: p.nameZh, en: p.nameEn, year: p.year });
           if (found) {
             const parsed = parseDoubanCard(found.card);
@@ -310,31 +317,61 @@ async function main() {
               alternatives: found.alternatives,
               at: new Date().toISOString(),
             };
+            // 相同豆瓣条目偶发回传「暂无评分」时保留已知分数，避免一次异常响应清空评分。
+            if (parsed.rating == null && previousDouban?.doubanId === parsed.doubanId && previousDouban.rating != null) {
+              row.douban.rating = previousDouban.rating;
+              row.douban.ratingState = 'rated';
+            }
             if (parsed.rating != null) dbHits++;
-          } else {
+          } else if (!row.douban || row.douban.notFound) {
             row.douban = { notFound: true, at: new Date().toISOString() };
           }
         } catch (e) {
           log(`  ⚠️ 豆瓣 ${p.nameZh || p.nameEn}: ${e.message}`);
+        } finally {
+          // 豆瓣评分每小时刷新时仍逐片节流，避免把所有查询集中成突发请求。
+          if (FORCE_REFRESH) await sleep(jitter(250, 450));
         }
       }
     }
 
     // ---------- IMDb ----------
+    // 时间戳在 row 顶层（updatedAt），imdb 子对象里没这个字段。
+    const iAt = row.updatedAt ? Date.parse(row.updatedAt) : 0;
+    // 没有匹配 ID 的影片不必每小时重新跑标题搜索；沿用一周重试窗口。
+    const retryDeferred =
+      FORCE_REFRESH && !ov?.imdbId && !row.imdb?.imdbId && Number.isFinite(iAt) && now - iAt <= 7 * 864e5;
     try {
       // IMDb 也要按自己的新鲜度判：needsWork 会因为「豆瓣还没跑过」而放行，
       // 那时 IMDb 往往是刚抓的，不卡就会每轮重跑 212 次搜索。
-      // 时间戳在 row 顶层（updatedAt），imdb 子对象里没这个字段。
-      const iAt = row.updatedAt ? Date.parse(row.updatedAt) : 0;
       const iFresh =
-        DUBAN_ONLY ||
-        (REFRESH_DAYS !== 0 &&
-          !!row.imdb &&
-          (row.imdb.notFound ? now - iAt <= 7 * 864e5 : now - iAt <= REFRESH_DAYS * 864e5));
+        (FORCE_REFRESH && !row.imdb?.imdbId && !ov?.imdbId) ||
+        retryDeferred ||
+        (!FORCE_REFRESH &&
+          (DUBAN_ONLY ||
+            (REFRESH_DAYS !== 0 &&
+              !!row.imdb &&
+              (row.imdb.notFound ? now - iAt <= 7 * 864e5 : now - iAt <= REFRESH_DAYS * 864e5))));
       if (ov?.imdbId && !DUBAN_ONLY) {
-        row.imdb = await fetchImdbById(ov.imdbId);
+        const refreshed = await fetchImdbById(ov.imdbId, row.imdb);
+        const sameId = row.imdb?.imdbId === refreshed.imdbId;
+        row.imdb = {
+          ...row.imdb,
+          ...refreshed,
+          rating: refreshed.rating ?? (sameId ? row.imdb?.rating : null) ?? null,
+          votes: refreshed.rating != null ? refreshed.votes : sameId ? row.imdb?.votes ?? null : null,
+        };
         if (row.imdb.rating != null) hits++;
-      } else if (iFresh) {
+      } else if (FORCE_REFRESH && row.imdb?.imdbId && !row.imdb.notFound && !DUBAN_ONLY) {
+        const refreshed = await fetchImdbById(row.imdb.imdbId, row.imdb);
+        row.imdb = {
+          ...row.imdb,
+          ...refreshed,
+          rating: refreshed.rating ?? row.imdb.rating ?? null,
+          votes: refreshed.rating != null ? refreshed.votes : row.imdb.votes ?? null,
+        };
+        if (refreshed.rating != null) hits++;
+      } else if (FORCE_REFRESH || DUBAN_ONLY || iFresh) {
         reused++;
       } else {
         const hit = await fetchImdb(p.queries, p.year, {
@@ -347,7 +384,8 @@ async function main() {
       log(`  ⚠️ IMDb ${p.nameZh || p.nameEn}: ${e.message}`);
     }
 
-    row.updatedAt = new Date().toISOString();
+    // 未匹配 IMDb ID 的影片若尚在一周重试冷却期，保留原更新时间，避免每小时刷新把冷却永久延长。
+    if (!retryDeferred) row.updatedAt = new Date().toISOString();
     commit(row);
     done++;
     if (done % 25 === 0) {

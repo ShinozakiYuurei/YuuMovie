@@ -179,4 +179,8 @@ echo "▶ [4/4] 服务器部署"
 vps "cat > /tmp/hkmovie-vps-deploy.sh" < deploy/vps-deploy.sh
 vps "sudo -u hkmovie APP_DIR='$APP_DIR' SCRAPE='$DEPLOY_SCRAPE' ONLY='$DEPLOY_ONLY' bash /tmp/hkmovie-vps-deploy.sh '$BRANCH'"
 
+# 评分数据也要同步更新静态页面；安装独立的每小时定时器，并立即跑首轮刷新。
+echo "▶ 安装并立即运行 IMDb / 豆瓣每小时刷新"
+vps "sudo APP_DIR='$APP_DIR' SERVICE_USER=hkmovie bash '$APP_DIR/deploy/setup-rating-timer.sh' --run-now" 5400
+
 smoke

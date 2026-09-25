@@ -206,13 +206,8 @@ else
 fi
 
 # ---------- 4 重建静态站 ----------
-# ★ 2026-09-19 修正注释：此前这里写「仓库里的 rebuild-static.sh 是本地版、
-#   含 ENRICH 评分步骤，服务器版没有」—— 那是两条独立历史并存时期的情况。
-#   现在仓库与服务器已统一（md5 一致），rebuild-static.sh 本身就**不含**
-#   ENRICH 步骤（只有 SCRAPE 与 POSTERS 两个开关）。
-#   因此下面仍传 ENRICH=0 只是无害的兼容写法：脚本不读该变量，传了也不生效。
-#   若将来把评分补充接回 rebuild-static.sh，ENRICH 默认值需重新确认——
-#   两个 systemd 定时器直接 ExecStart 该脚本，默认值会同时影响它们。
+# rebuild-static.sh 默认只抓院线数据；ENRICH=1 时可在构建前增量刷新评分。
+# 常规定时抓取与发布默认 ENRICH=0，评分由独立的每小时 service/timer 处理。
 #
 # ★ 2026-09-21 修复：POSTER_ORIGIN 必须显式传下去
 #
@@ -231,7 +226,7 @@ fi
 #   注意这里不能用 `:-` 的空字符串默认—— 那正是 bug 的来源；
 #   回滚办法是显式传 POSTER_ORIGIN= （空）来强制同源。
 POSTER_ORIGIN="${POSTER_ORIGIN-https://imgmove.yuurei.de}"
-log "重建静态站（SCRAPE=${SCRAPE:-0} ENRICH=${ENRICH:-0} POSTER_ORIGIN=${POSTER_ORIGIN:-<同源>}）"
+log "重建静态站（SCRAPE=${SCRAPE:-0} ENRICH=${ENRICH:-0} FORCE_REFRESH=${FORCE_REFRESH:-0} POSTER_ORIGIN=${POSTER_ORIGIN:-<同源>}）"
 # ★ 2026-09-25 修复：rebuild-static.sh 在「另一个重建正在进行」时会 **exit 0**
 #   （flock 抢不到就放弃，见该脚本第 0 节）—— 它什么都没构建，但退出码是成功。
 #   原先这里直接往下走到 verify_site，于是：
@@ -242,7 +237,7 @@ log "重建静态站（SCRAPE=${SCRAPE:-0} ENRICH=${ENRICH:-0} POSTER_ORIGIN=${P
 REBUILD_OUT=$(mktemp)
 trap 'rm -f "$REBUILD_OUT"' EXIT
 set +e
-SCRAPE="${SCRAPE:-0}" ENRICH="${ENRICH:-0}" POSTER_ORIGIN="$POSTER_ORIGIN" \
+SCRAPE="${SCRAPE:-0}" ENRICH="${ENRICH:-0}" FORCE_REFRESH="${FORCE_REFRESH:-0}" POSTER_ORIGIN="$POSTER_ORIGIN" \
   eval "${REBUILD:-bash deploy/rebuild-static.sh}" 2>&1 | tee "$REBUILD_OUT"
 REBUILD_RC=${PIPESTATUS[0]}
 set -e
