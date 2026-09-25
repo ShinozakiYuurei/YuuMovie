@@ -180,7 +180,7 @@ async function movieDetails(movies, proxy, request, cacheFile, detailBudgetMs) {
  * 注意：Node 内置 fetch 不读 http_proxy，且 undici 的 ProxyAgent 与内置 dispatcher 版本
  * 不兼容（invalid onRequestStart method），故这里用 node:https + https-proxy-agent。
  */
-async function getJson(path, { proxy, timeoutMs = 20000 } = {}) {
+export async function getJson(path, { proxy, timeoutMs = 20000, httpsModule = https } = {}) {
   const url = `${API}/${path}`;
   const agent = await getProxyAgent(proxy);
 
@@ -193,7 +193,7 @@ async function getJson(path, { proxy, timeoutMs = 20000 } = {}) {
       clearTimeout(timer);
       callback(value);
     };
-    const req = https.get(
+    const req = httpsModule.get(
       url,
       {
         agent,
@@ -226,15 +226,16 @@ async function getJson(path, { proxy, timeoutMs = 20000 } = {}) {
   });
 }
 
-async function getJsonWithRetry(path, options = {}) {
+export async function getJsonWithRetry(path, options = {}) {
   const attempts = options.attempts ?? 2;
+  const retryDelayMs = options.retryDelayMs ?? 400;
   let lastError;
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
       return await getJson(path, options);
     } catch (error) {
       lastError = error;
-      if (attempt < attempts) await new Promise((resolve) => setTimeout(resolve, 400 * attempt));
+      if (attempt < attempts) await new Promise((resolve) => setTimeout(resolve, retryDelayMs * attempt));
     }
   }
   throw lastError;

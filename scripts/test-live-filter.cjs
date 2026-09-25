@@ -4,17 +4,8 @@
 // 本站是 SSG（output: 'export'），構建時的過濾管不到「構建之後才開映」的場次，
 // 故加了客戶端過濾。本腳本用 Playwright 的假時鐘驗證它真的有效。
 //
-// ===== 測試前提的兩個坑（都踩過，記在這裡）=====
-//
-// 1. **期望值不能直接從 data/shows.json 取全集**。
-//    構建時已經剔除過一次，9/19 的場次不會出現在產物裡 ——
-//    若拿數據全集當期望，會把「構建時已剔除」誤判成「客戶端過濾失效」。
-//    正確做法：以**產物在極早時刻的可見集合**為基準（= 構建留下的集合），
-//    再斷言「晚於 T 的那些仍在、早於 T 的那些已消失」。
-//
-// 2. **fastForward 的字串格式不可靠**。
-//    實測 fastForward('36:00:00') 並沒有快進 36 小時（場次一個都沒少）。
-//    改用**數字毫秒**，語義無歧義。
+// 測試不綁定特定院線或固定日期：選取當前數據中有未來排片的有效頁面，
+// 以構建產物在基準時刻實際顯示的場次作為期望集合，再以毫秒快進驗證客戶端剔除。
 //
 // 用法：node scripts/test-live-filter.cjs
 const { chromium } = require('../probe/node_modules/playwright');
@@ -77,23 +68,18 @@ const readCount = (page) => page.evaluate(() => {
 /** 'M/D HH:mm' → epoch；跨年場次按香港當前年份推算，避免一月日期錯落回同年。 */
 const epochOf = ({ date, time }) => {
   const [mo, d] = date.split('/').map(Number);
-  const now = new Date(Date.now() + 8 * 3600_000);
-  let year = now.getUTCFullYear();
-  let epoch = Date.parse(`${year}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}T${time}:00+08:00`);
-  if (epoch < Date.now() - 180 * 24 * 3600_000) {
-    year++;
-    epoch = Date.parse(`${year}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}T${time}:00+08:00`);
-  } else if (epoch > Date.now() + 180 * 24 * 3600_000) {
-    year--;
-    epoch = Date.parse(`${year}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}T${time}:00+08:00`);
-  }
-  return epoch;
+  const year = new Date(Date.now() + 8 * 3600_000).getUTCFullYear();
+  const candidates = [year - 1, year, year + 1].map((candidateYear) => Date.parse(
+    `${candidateYear}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}T${time}:00+08:00`
+  ));
+  return candidates.filter((epoch) => epoch >= Date.now() - 5 * 60_000).sort((a, b) => a - b)[0] ?? candidates[1];
 };
 
 const keyOf = (s) => `${s.date} ${s.time}`;
 
 (async () => {
-  await new Promise((r) => server.listen(4321, r));
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch();
   const fails = [];
   const check = (name, cond, extra = '') => {
@@ -122,8 +108,8 @@ const keyOf = (s) => `${s.date} ${s.time}`;
   const movieGroupIds = new Set(movies.filter((item) => (item.nameEn || item.nameZh).toLocaleLowerCase() === movieTitle).map((item) => item.id));
   const movieGroupShows = shows.filter((show) => movieGroupIds.has(show.movieId));
   const cases = [
-    { kind: 'cinema', url: `http://127.0.0.1:4321/cinema/${cinemaId}/`, label: `戲院頁 /cinema/${cinemaId}`, list: shows.filter((show) => show.cinemaId === cinemaId) },
-    { kind: 'movie', url: `http://127.0.0.1:4321/movie/${movie.slug}/`, label: `詳情頁 /movie/${movie.slug}`, list: movieGroupShows },
+    { kind: 'cinema', url: `${baseUrl}/cinema/${cinemaId}/`, label: `戲院頁 /cinema/${cinemaId}`, list: shows.filter((show) => show.cinemaId === cinemaId) },
+    { kind: 'movie', url: `${baseUrl}/movie/${movie.slug}/`, label: `詳情頁 /movie/${movie.slug}`, list: movieGroupShows },
   ];
 
   for (const { kind, url, label, list } of cases) {
@@ -174,7 +160,7 @@ const keyOf = (s) => `${s.date} ${s.time}`;
 
     if (kind === 'movie') {
       const count = await readCount(p1);
-      check('剔除後場次總數同步更新', !!count && !!initialCount && count[0] < initialCount[0] && count[0] === count[1], `初始=${initialCount?.join(' / ')} 場；更新=${count?.join(' / ')} 場`);
+      check('剔除後場次總數同步更新', !!count && !!initialCount && count[0] < initialCount[0] && count[1] < initialCount[1] && count[0] === count[1], `初始=${initialCount?.join(' / ')} 場；更新=${count?.join(' / ')} 場`);
     }
     await p1.close();
 

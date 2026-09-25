@@ -12,6 +12,7 @@
     "poster-colors": "node scripts/poster-colors.mjs",
     "test:live": "node scripts/test-live-filter.cjs",
     "test:hydrate": "node scripts/test-hydration.cjs",
+    "test:mcl": "node --test scripts/test-mcl-http.mjs",
     "test:lux": "node --test scripts/test-lux-scraper.mjs"
   },
   "dependencies": {

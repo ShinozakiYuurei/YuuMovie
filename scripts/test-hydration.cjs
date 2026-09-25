@@ -29,9 +29,13 @@ const URLS = [
   ['/', '首頁'],
   ['/showing/', '上映中列表'],
   ['/cinema/', '戲院列表'],
-  ['/cinema/mcl-021/', '戲院詳情'],
-  ['/movie/movie-mcl-14858/', '電影詳情'],
 ];
+for (const [section, label] of [['cinema', '戲院詳情'], ['movie', '電影詳情']]) {
+  const route = fs.readdirSync(path.join(ROOT, section)).sort().find((name) =>
+    fs.existsSync(path.join(ROOT, section, name, 'index.html'))
+  );
+  if (route) URLS.push([`/${section}/${route}/`, label]);
+}
 
 (async () => {
   await new Promise((r) => server.listen(4321, r));
