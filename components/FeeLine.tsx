@@ -1,3 +1,5 @@
+import { FEE_NO_ONLINE } from '@/lib/booking-fee';
+
 /**
  * 手續費藥丸（場次頁 / 戲院列表頁 / 戲院詳情頁共用）
  *
@@ -43,7 +45,10 @@ export function FeeLine({
   note,
   className = '',
 }: {
-  /** 每張戲票手續費（HKD）。0 = 免手續費；負值 = 待確認 */
+  /**
+   * 每張戲票手續費（HKD）
+   *  >= 0 金額（0 = 免手續費）／-1 待確認／-2 不設網上購票（FEE_NO_ONLINE）
+   */
   amount: number;
   /** hover 說明：寫明 0 元的來歷（會員豁免）與是否已含在票價內 */
   note: string;
@@ -62,7 +67,11 @@ export function FeeLine({
       className={`hkm-chip hkm-fee ${amount < 0 ? 'hkm-fee--unknown' : ''} ${className}`}
       title={note}
     >
-      {amount < 0 ? '手續費待確認' : `手續費 $${amount}`}
+      {amount === FEE_NO_ONLINE
+        ? '不設網上購票'
+        : amount < 0
+          ? '手續費待確認'
+          : `手續費 $${amount}`}
     </span>
   );
 }

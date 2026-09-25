@@ -46,17 +46,16 @@
  *  這幾項先前都查無官方公開的固定金額（停用設定或無網售），由用戶拍板後寫入。
  *  註解一律標明出處，避免後來的人誤以為有官方依據：
  *
- *   CGV（cgv）         $8   院方場次資料 online surcharge 設定
- *                          （surchargeGroups 名為「$$8」，price 8），
- *                          但 surchargeType 標為 active:false（停用）。
- *  影藝（cineart）     $10  同上，設定停用（Online transaction，price 10）。
+ *   CGV（cgv）         $8   院方場次資料 online surcharge 設定（price 8）；
+ *                          surchargeType 標為 active:false，但用戶 2026-09-26
+ *                          實際購票確認「就是收這麼多」，故按實測口徑記錄。
+ *  影藝（cineart）     $10  同上（price 10），用戶實測確認。
  *  高先（goldenscene） $0   用戶指定免手續費；官網接 Tixis 但未公開價目。
- *  寶石（lux）         $0   用戶指定免手續費；HK Movie 6 標該院 purchasable=false
- *                          （沒有網上售票）。
- *                          ⚠️ 「免手續費」與「不能網上買」是兩回事：
- *                             若日後確認無網售，此項應改為表達「不設網上購票」。
+ *  寶石（lux）        -2    不設網上購票（用戶 2026-09-26 確認）；
+ *                          HK Movie 6 標該院 purchasable=false、只能票房購票。
  *
- *  至此 53 間戲院全數有確切金額，UI 不再出現「手續費待確認」。
+ *  至此 53 間戲院全數有確切狀態，UI 不再出現「手續費待確認」。
+ *  （寶石顯示「不設網上購票」而非金額，見 FEE_NO_ONLINE。）
  *
  * ===== 新光補查（2026-09-26）=====
  *  新光（sunbeam）   $10  官方購票站 www.sunbeamwhampoa.com 的結帳元件明列
@@ -75,8 +74,29 @@
 
 import type { Source } from './types';
 
+/**
+ * amount 的哨兵值
+ *
+ * 用負值而不是 null：這個物件要經過 lib/compact.ts 的字典壓縮打進瀏覽器
+ * bundle，數量欄位維持 number 才能一行一個數字，不必多帶一個可選欄位。
+ */
+/** 院方沒有公開的固定金額，也不知道收不收 */
+export const FEE_UNKNOWN = -1;
+/** 該戲院不設網上購票（HK Movie 6 之類的來源標 purchasable=false） */
+export const FEE_NO_ONLINE = -2;
+
 export interface BookingFee {
-  /** 每張戲票手續費（HKD）。0 = 免手續費，負值 = 未確認 */
+  /**
+   * 每張戲票手續費（HKD）
+   *
+   *  >= 0  實際金額（0 = 免手續費）
+   *  -1    FEE_UNKNOWN：未確認，顯示「手續費待確認」（灰字弱化）
+   *  -2    FEE_NO_ONLINE：該戲院不設網上購票，顯示「不設網上購票」
+   *
+   * ★ -2 與 0 的差別務必分清楚：0 是「能網上買、不收費」，
+   *   -2 是「根本不能網上買」。混在一起會讓用戶以為能在線上買到免費票，
+   *   到了現場才發現只能去票房。
+   */
   amount: number;
   /**
    * 一句話說明（顯示為 hover 提示）
@@ -126,45 +146,50 @@ const BY_SOURCE: Partial<Record<Source, BookingFee>> = {
     note: 'Lumen 官方網上選票頁列明每張戲票收 HK$10 服務費。',
     included: false,
   },
-  // CGV / 影藝：院方場次資料的網上手續費設定（surchargeGroups）分別為每票 HK$8
-  // 與 HK$10。兩者的 surchargeType 目前標為 active:false，先前因此判為停用、
-  // 不認列；2026-09-26 用戶指定按此金額記錄，故在此寫死。
-  // ★ note 必須保留「設定標為停用、以結帳金額為準」這句：
-  //   這不是結帳實測值，寫清楚才不會被後來的人當成已驗證的收費。
+  // CGV / 影藝：每票分別 HK$8 與 HK$10。
+  //
+  // ★ 2026-09-26 用戶實際購票確認「就是收這麼多」，故 hover 採實測口徑，
+  //   不再提「設定停用、以結帳金額為準」—— 那句話會讓用戶懷疑數字不準。
+  //
+  // ★ 註解仍保留原始出處，供日後複核：兩者在院方場次資料的 surchargeGroups
+  //   設定裡分別是 price 8（名為「$$8」）與 price 10（Online transaction），
+  //   且 surchargeType 標為 active:false。也就是說「設定值」與「實收」一致，
+  //   只是 active 旗標沒跟上 —— 這是給維護者看的，不必寫進給訪客的 hover。
   cgv: {
     amount: 8,
-    note: 'CGV：院方場次資料的網上手續費設定為每票 HK$8（online surcharge）；該設定目前標為停用，實際以結帳金額為準。',
+    note: 'CGV：網上購票每張戲票收 HK$8 手續費（結帳時外加）。',
     included: false,
   },
   cineart: {
     amount: 10,
-    note: '影藝：院方場次資料的網上交易手續費設定為每票 HK$10（Online transaction）；該設定目前標為停用，實際以結帳金額為準。',
+    note: '影藝戲院：網上購票每張戲票收 HK$10 手續費（結帳時外加）。',
     included: false,
   },
-  // 高先 / 寶石：2026-09-26 用戶指定「免手續費」，記 0。
+  // 高先：2026-09-26 用戶指定「免手續費」，記 0。
   //
-  // ★ 這兩家先前查無官方公開的固定每票金額（高先接 Tixis 但未公開價目；
-  //   寶石在 HK Movie 6 標 purchasable=false），所以一直維持「未確認」。
-  //   現在的 0 是用戶拍板，不是抓到的證據 —— 註解寫清楚，
-  //   後來的人改價時才不會誤以為這 0 有官方出處。
+  // ★ 先前查無官方公開的固定每票金額（官網接 Tixis 但未公開價目），
+  //   所以一直維持「未確認」。現在的 0 是用戶拍板，不是抓到的證據 ——
+  //   註解寫清楚，後來的人改價時才不會誤以為這 0 有官方出處。
   //
   // ★ note 只對訪客說「免手續費」：内部查證過程不該出現在給訪客看的 hover。
-  //
-  // ⚠️ 待確認：寶石在 HK Movie 6 標 purchasable=false（該院沒有網上售票）。
-  //   「免手續費」與「根本不能網上買」是兩回事 —— 若確認無網售，
-  //   這一項將來應改為表達「不設網上購票」而非 $0。
   goldenscene: {
     amount: 0,
     note: '高先電影院：網上購票免手續費。',
     included: false,
   },
+  // 寶石：不設網上購票（FEE_NO_ONLINE）。
+  //
+  // ★ 2026-09-26 用戶確認「該院沒有網上售票」。這與「免手續費」是兩回事：
+  //   HK Movie 6 對該院標 purchasable=false、場次不帶售票連結，
+  //   即只能到現場票房買。若記成 $0，用戶會以為能在線上買到免費票，
+  //   到了現場才發現不行 —— 比不顯示更糟，故獨立成一個狀態。
   lux: {
-    amount: 0,
-    note: '寶石戲院：網上購票免手續費。',
+    amount: FEE_NO_ONLINE,
+    note: '寶石戲院目前不設網上購票，須於戲院票房現場購票。',
     included: false,
   },
   newport: {
-    amount: -1,
+    amount: FEE_UNKNOWN,
     note: '新寶官方 FAQ 只列網上訂票每票 HK$6 或以上，未有確切固定金額；請以結帳金額為準。',
     included: false,
   },
@@ -191,7 +216,7 @@ const BY_CINEMA: Record<string, BookingFee> = {
 
 /** 未知院線的兜底：不顯示數字比顯示錯的數字好 */
 const UNKNOWN: BookingFee = {
-  amount: -1,
+  amount: FEE_UNKNOWN,
   note: '未確認手續費；請以院線官方購票頁結帳金額為準。',
   included: false,
 };
@@ -222,5 +247,6 @@ export function bookingFeeOf(cinemaId: string, source: Source): BookingFee {
  *   這個函數只給需要「一行文字」的場合（如 SEO 描述、測試斷言）。
  */
 export function feeText(amount: number): string {
+  if (amount === FEE_NO_ONLINE) return '不設網上購票';
   return amount < 0 ? '手續費待確認' : '手續費 $' + amount;
 }
