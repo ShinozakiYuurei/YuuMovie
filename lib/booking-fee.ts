@@ -17,7 +17,7 @@
  * 反之，像百老匯的 Insight Pass 手續費連「免費戲票」都要收，
  * 沒有任何豁免途徑，就必須記 10。
  *
- * ===== 各院線數字出處（2026-09-21 實查，非猜測）=====
+ * ===== 已確認院線數字出處（原有資料於 2026-09-21 實查）=====
  *
  *  百老匯  $10  官網 FAQ：「於網上購票，需收取每張戲票HK$10手續費。」
  *               無會員豁免 —— 條款頁明寫連 Insight Pass 的免費戲票
@@ -31,6 +31,15 @@
  *               會員優惠（85折 / 9折 / 積分）未含手續費豁免。
  *  星達    $0   官網 FAQ：「經星達院線官方網頁及手機應用程式訂票均收取每票$10手續費，
  *               如登記了網上會員則豁免手續費。」（同上，免費登記即免）
+ *
+ * ===== 新增院線補查（2026-09-25）=====
+ *  華懋（chinachem） $5  官方 FAQ：網站網上購票每票收 HK$5.00 服務費。
+ *       https://www.cel-cinemas.com/en/info/faq
+ *  Lumen              $10 官方選票頁明列「The service charge is HK$10 for each ticket」。
+ *       https://www.lumencinema.com.hk/Ticketing/visSelectTickets.aspx
+ *  新寶（newport）    未填 官方 FAQ 只稱每票「$6 or more」，未能確認確切固定金額，
+ *       因 UI 目前只展示單一確切金額，保留未確認；不把最低額誤標成定價。
+ *  其餘新增院線暫無足以確認統一金額的院方證據；不採用 HK Movie 6 的 fee 欄位。
  *
  * ===== 維護提示 =====
  *
@@ -55,7 +64,7 @@ export interface BookingFee {
   included: boolean;
 }
 
-/** 院線預設（同一院線全線一致，故按 source 而非按戲院） */
+/** 院線預設（已確認為全線一致時按 source；分店例外再用 BY_CINEMA） */
 const BY_SOURCE: Partial<Record<Source, BookingFee>> = {
   broadway: {
     amount: 10,
@@ -82,12 +91,27 @@ const BY_SOURCE: Partial<Record<Source, BookingFee>> = {
     note: '星達：免費登記網上會員即免手續費（非會員每張 HK$10）。',
     included: false,
   },
+  chinachem: {
+    amount: 5,
+    note: '華懋院線官方 FAQ：網站網上購票每張戲票收 HK$5.00 服務費。',
+    included: false,
+  },
+  lumen: {
+    amount: 10,
+    note: 'Lumen 官方網上選票頁列明每張戲票收 HK$10 服務費。',
+    included: false,
+  },
+  newport: {
+    amount: -1,
+    note: '新寶官方 FAQ 只列網上訂票每票 HK$6 或以上，未有確切固定金額；請以結帳金額為準。',
+    included: false,
+  },
 };
 
 /**
  * 個別戲院覆寫
  *
- * 目前為空 —— 五條院線的手續費都是「全線一致」。
+ * 目前為空 —— 已確認的分店尚未發現個別收費例外。
  * 保留這張表是為了避免日後出現例外時去改函數邏輯：
  * 例如某間戲院退出免手續費名單，只需在這裡加一條。
  */

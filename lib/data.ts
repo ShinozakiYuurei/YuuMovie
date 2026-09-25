@@ -26,6 +26,7 @@ import type { BookingFee } from './booking-fee';
 // 已開映場次的判定：與客戶端（components/CinemaShowtimes.tsx 等）共用同一份規則
 import { isLiveShow } from './live';
 import { CINEMA_DISPLAY_NAME } from './cinema-names';
+import { CINEMA_DISPLAY_ADDRESS } from './cinema-addresses';
 import type { Region } from './types';
 // 紧凑传输格式的编解码在同目录的 compact.ts（零依赖，客户端组件也要用）
 export { toCompact, fromCompact } from './compact';
@@ -613,6 +614,9 @@ function load() {
     // ★ 戲院顯示名修正：必须在 inferGeo **之后**（见 lib/cinema-names.ts 的说明）。
     //   region.ts 的两张表仍以原始名索引，先把地理归属算完，再换成展示名，
     //   这样改名不必连 region.ts 的表一起维护。未列出的戲院原样保留。
+    const displayAddress = CINEMA_DISPLAY_ADDRESS[c.id];
+    if (displayAddress) c.address = displayAddress;
+
     const display = CINEMA_DISPLAY_NAME[c.id];
     if (display) c.nameZh = display;
     // 原始名可能带首尾空白 / 换行（MCL「MCL THE ONE 戲院\n」实测如此），
