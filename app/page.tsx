@@ -73,8 +73,10 @@ function PosterGrid({ groups }: { groups: MovieGroup[] }) {
 }
 
 export default function HomePage() {
-  const showing = getShowingGroups().slice(0, PER_SECTION);
-  const upcoming = getUpcomingGroups().slice(0, PER_SECTION);
+  const showingGroups = getShowingGroups();
+  const upcomingGroups = getUpcomingGroups();
+  const showing = showingGroups.slice(0, PER_SECTION);
+  const upcoming = upcomingGroups.slice(0, PER_SECTION);
   const meta = getMeta();
 
   return (
@@ -88,7 +90,7 @@ export default function HomePage() {
               現正<span className="hkm-grad-text">上映</span>
             </>
           }
-          subtitle={`共 ${meta.counts.movies} 部電影 · ${meta.counts.shows} 場次，按排片場次排列。`}
+          subtitle={`共 ${showingGroups.length} 部電影 · ${meta.counts.shows} 場次，按排片場次排列。`}
           cta="查看全部"
         />
         <PosterGrid groups={showing} />
@@ -106,7 +108,7 @@ export default function HomePage() {
               即將<span className="hkm-grad-text">上映</span>
             </>
           }
-          subtitle={`共 ${meta.counts.upcoming} 部電影等待上映，查看上映日期與場次。`}
+          subtitle={`共 ${upcomingGroups.length} 部電影等待上映，查看上映日期與場次。`}
           cta="查看全部"
         />
         <PosterGrid groups={upcoming} />

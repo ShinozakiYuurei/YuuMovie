@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import './globals.css';
-import { getMeta, SOURCE_LABEL } from '@/lib/data';
+import { getMeta, getShowingGroups, getUpcomingGroups, SOURCE_LABEL } from '@/lib/data';
 import type { Source } from '@/lib/types';
 import { NavLinks } from '@/components/NavLinks';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -76,11 +76,23 @@ export const metadata: Metadata = {
     locale: 'zh_HK',
     siteName: 'YuuMovie',
   },
+  icons: {
+    icon: [{ url: '/favicon.ico' }, { url: '/favicon.svg', type: 'image/svg+xml' }],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const meta = getMeta();
-  const updated = meta.lastUpdated.slice(0, 16).replace('T', ' ');
+  const movieCount = getShowingGroups().length + getUpcomingGroups().length;
+  const updated = new Intl.DateTimeFormat('zh-HK', {
+    timeZone: 'Asia/Hong_Kong',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(new Date(meta.lastUpdated));
   return (
     <html
       lang="zh-HK"
@@ -198,7 +210,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               {meta.sources
                 .map((s) => SOURCE_LABEL[s as Source] ?? s)
                 .join('、')}{' '}
-              · 最後更新 {updated} · 共 {meta.counts.movies} 部電影 /{' '}
+              · 最後更新 {updated} · 共 {movieCount} 部電影 /{' '}
               {meta.counts.cinemas} 間戲院 / {meta.counts.shows} 場次
             </p>
           </div>
