@@ -369,13 +369,20 @@ async function scrapeCinemas() {
     const mapM = seg.match(/"googleMapUrl":"([^"]*)"/);
     const codeM = seg.match(/"code":"([^"]*)"/);
     const nameM = seg.match(/"name_lang":\{[^}]*?"zh_hk":"((?:[^"\\]|\\.)*)"/);
+    const address = addrM?.[1] ?? '';
+    const nameZh = nameM?.[1] ?? m[1];
+    // The official YOHO branch address says MALL I, while its Google URL points to MALL II.
+    // Replace only that stale map target with a search built from the official branch name/address.
+    const mapUrl = id === 10
+      ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(`${nameZh} ${address}`)
+      : mapM?.[1] ?? '';
 
     cinemas.push({
       id: `${SOURCE}-${id}`,
       code: codeM?.[1] ?? '',
-      nameZh: nameM?.[1] ?? m[1],
-      address: addrM?.[1] ?? '',
-      mapUrl: mapM?.[1] ?? '',
+      nameZh,
+      address,
+      mapUrl,
       detailUrl: `${BASE}/hk/cinema/${id}`,
       source: SOURCE,
     });

@@ -162,7 +162,7 @@ export async function scrapeChinachem() {
     }
   }
   if (!shows.length) throw new Error('Chinachem returned no showtimes');
-  return { movies: [...movieMap.values()], cinemas: [{ id: 'chinachem-plnym', code: 'PLNYM', nameZh: '巴黎倫敦紐約米蘭戲院', address: 'G/F Hong Lai Garden, Ho Pong Street, Tuen Mun, N.T.', mapUrl: mapSearch('Paris London New York Milano Cinema', 'Hong Lai Garden, Tuen Mun'), detailUrl: base + '/en/home', source: 'chinachem' }], shows };
+  return { movies: [...movieMap.values()], cinemas: [{ id: 'chinachem-plnym', code: 'PLNYM', nameZh: '巴黎倫敦紐約米蘭戲院', address: 'Hong Lai Garden, Ho Pong Street, TMTL 280, Tuen Mun, N.T.', mapUrl: 'https://goo.gl/maps/NvkxDVniiQn', detailUrl: base + '/en/home', source: 'chinachem' }], shows };
 }
 
 export function parseLumenPoster(_html, filmId, base = 'https://www.lumencinema.com.hk') {
@@ -206,7 +206,7 @@ export async function scrapeLumen() {
   const cinemaUrl = base + '/Browsing/Cinemas/Details/1001';
   const cinemaPage = await fetchText(cinemaUrl);
   const map = cinemaPage.match(/maps\.google\.com\/maps\?[^"']+/i)?.[0] || '';
-  const address = '1-25 Ta Chuen Ping Street, Kwai Chung, N.T.';
+  const address = 'G/F Po Sing Plaza, 1-25 Ta Chuen Ping Street, Kwai Chung, N.T.';
   return { movies, shows, cinemas: [{ id: 'lumen-1001', code: '1001', nameZh: 'Lumen Cinema', address, mapUrl: map ? 'https://' + map.replace(/^\/\//, '') : mapSearch('Lumen Cinema', address), detailUrl: cinemaUrl, source: 'lumen' }] };
 }
 
