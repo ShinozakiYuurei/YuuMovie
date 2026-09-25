@@ -37,8 +37,9 @@
  *       https://www.cel-cinemas.com/en/info/faq
  *  Lumen              $10 官方選票頁明列「The service charge is HK$10 for each ticket」。
  *       https://www.lumencinema.com.hk/Ticketing/visSelectTickets.aspx
- *  新寶（newport）    未填 官方 FAQ 只稱每票「$6 or more」，未能確認確切固定金額，
- *       因 UI 目前只展示單一確切金額，保留未確認；不把最低額誤標成定價。
+ *  新寶（newport）    院線預設仍未確認：官方 FAQ 只稱每票「$6 or more」，不足以推定全線固定額。
+ *       凱都戲院（屯門）分店資料另列 Online Admin Fee: HK$6，並由用戶確認按 $6 記錄，
+ *       因此只在 BY_CINEMA 覆寫該分店；分店頁同時註明目前沒有網上售票，見該筆提示。
  *  其餘新增院線暫無足以確認統一金額的院方證據；不採用 HK Movie 6 的 fee 欄位。
  *
  * ===== 維護提示 =====
@@ -111,11 +112,16 @@ const BY_SOURCE: Partial<Record<Source, BookingFee>> = {
 /**
  * 個別戲院覆寫
  *
- * 目前為空 —— 已確認的分店尚未發現個別收費例外。
- * 保留這張表是為了避免日後出現例外時去改函數邏輯：
- * 例如某間戲院退出免手續費名單，只需在這裡加一條。
+ * 新寶院線 FAQ 的「HK$6 或以上」不作全線固定額；凱都戲院（屯門）分店資料
+ * 明列 Online Admin Fee: HK$6，故只對這間戲院記錄固定 $6，不外推到其他分店。
  */
-const BY_CINEMA: Record<string, BookingFee> = {};
+const BY_CINEMA: Record<string, BookingFee> = {
+  'newport-hyland': {
+    amount: 6,
+    note: '凱都戲院（屯門）分店資料列 Online Admin Fee: HK$6；院線 FAQ 列網上購票每票 HK$6 起。分店頁亦註明目前沒有網上售票，實際收取方式以院方公布為準。',
+    included: false,
+  },
+};
 
 /** 未知院線的兜底：不顯示數字比顯示錯的數字好 */
 const UNKNOWN: BookingFee = {
