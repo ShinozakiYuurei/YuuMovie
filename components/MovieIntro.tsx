@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import { buildIntro, type IntroRating } from '@/lib/intro';
 import { formatLabel, type MovieGroup } from '@/lib/data';
+import { projectionFormats } from '@/lib/versions';
 
 /**
  * 影片资料卡（详情页头部）
@@ -199,6 +200,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 export function MovieIntro({ group }: { group: MovieGroup }) {
   const a = buildIntro(group);
+  const projectionTags = projectionFormats(group.allFormats);
   // 「粵語 / 英語（中字）」：只有一侧有值时不留孤立括号
   const lang = a.language
     ? `${a.language}${a.subtitleLang ? `（${a.subtitleLang}字幕）` : ''}`
@@ -376,10 +378,10 @@ export function MovieIntro({ group }: { group: MovieGroup }) {
             ))}
           </div>
 
-          {/* 版本標籤（IMAX / 4DX …）*/}
-          {group.allFormats.length > 0 && (
+          {/* 只展示放映規格；特典場、重映、語言等活動/版本標記不放在此處 */}
+          {projectionTags.length > 0 && (
             <div className="mt-4 flex flex-wrap items-center gap-1.5">
-              {group.allFormats.map((f) => (
+              {projectionTags.map((f) => (
                 <span
                   key={f}
                   className="rounded-full border border-accent/35 bg-accent/12 px-2.5 py-0.5 text-[11px] font-semibold text-accent"
