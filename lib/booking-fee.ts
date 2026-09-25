@@ -42,15 +42,21 @@
  *       因此只在 BY_CINEMA 覆寫該分店；分店頁同時註明目前沒有網上售票，見該筆提示。
  *  其餘新增院線暫無足以確認統一金額的院方證據；不採用 HK Movie 6 的 fee 欄位。
  *
+ * ===== 用戶指定金額（2026-09-26，非抓取證據）=====
+ *  這幾項先前都查無官方公開的固定金額（停用設定或無網售），由用戶拍板後寫入。
+ *  註解一律標明出處，避免後來的人誤以為有官方依據：
  *
- * ===== CGV / 影藝（2026-09-26 用戶指定）=====
- *  CGV（cgv）      $8   院方場次資料的 online surcharge 設定（surchargeGroups
- *       名為「$$8」、description「online surcharge」，price 8）。
- *       該 surchargeType 目前標為 active:false，故先前判為「停用設定、不認列」；
- *       2026-09-26 用戶指定按 HK$8 記錄。note 已標明此數字出自設定而非結帳實測。
- *  影藝（cineart）  $10  院方場次資料的 online surcharge 設定（surchargeGroups
- *       名為「Online transaction (JP)」，price 10），同樣 active:false；
- *       2026-09-26 用戶指定按 HK$10 記錄，note 亦已標明出處。
+ *   CGV（cgv）         $8   院方場次資料 online surcharge 設定
+ *                          （surchargeGroups 名為「$$8」，price 8），
+ *                          但 surchargeType 標為 active:false（停用）。
+ *  影藝（cineart）     $10  同上，設定停用（Online transaction，price 10）。
+ *  高先（goldenscene） $0   用戶指定免手續費；官網接 Tixis 但未公開價目。
+ *  寶石（lux）         $0   用戶指定免手續費；HK Movie 6 標該院 purchasable=false
+ *                          （沒有網上售票）。
+ *                          ⚠️ 「免手續費」與「不能網上買」是兩回事：
+ *                             若日後確認無網售，此項應改為表達「不設網上購票」。
+ *
+ *  至此 53 間戲院全數有確切金額，UI 不再出現「手續費待確認」。
  *
  * ===== 新光補查（2026-09-26）=====
  *  新光（sunbeam）   $10  官方購票站 www.sunbeamwhampoa.com 的結帳元件明列
@@ -133,6 +139,28 @@ const BY_SOURCE: Partial<Record<Source, BookingFee>> = {
   cineart: {
     amount: 10,
     note: '影藝：院方場次資料的網上交易手續費設定為每票 HK$10（Online transaction）；該設定目前標為停用，實際以結帳金額為準。',
+    included: false,
+  },
+  // 高先 / 寶石：2026-09-26 用戶指定「免手續費」，記 0。
+  //
+  // ★ 這兩家先前查無官方公開的固定每票金額（高先接 Tixis 但未公開價目；
+  //   寶石在 HK Movie 6 標 purchasable=false），所以一直維持「未確認」。
+  //   現在的 0 是用戶拍板，不是抓到的證據 —— 註解寫清楚，
+  //   後來的人改價時才不會誤以為這 0 有官方出處。
+  //
+  // ★ note 只對訪客說「免手續費」：内部查證過程不該出現在給訪客看的 hover。
+  //
+  // ⚠️ 待確認：寶石在 HK Movie 6 標 purchasable=false（該院沒有網上售票）。
+  //   「免手續費」與「根本不能網上買」是兩回事 —— 若確認無網售，
+  //   這一項將來應改為表達「不設網上購票」而非 $0。
+  goldenscene: {
+    amount: 0,
+    note: '高先電影院：網上購票免手續費。',
+    included: false,
+  },
+  lux: {
+    amount: 0,
+    note: '寶石戲院：網上購票免手續費。',
     included: false,
   },
   newport: {
