@@ -39,7 +39,7 @@ export interface IntroRating {
   label: string;
   value: number | null;
   votes: number | null;
-  url: string | null;
+  url: string;
 }
 
 export interface MovieIntro {
@@ -109,24 +109,46 @@ export function buildIntro(group: MovieGroup): MovieIntro {
   const ratings: IntroRating[] = [];
 
   const rating = man?.rating ?? i?.rating ?? null;
-  // IMDb 卡始终显示（有分显分数，无分显「— 暫無評分」）
+  const imdbSearchUrl = `https://www.imdb.com/find/?q=${encodeURIComponent(
+    group.displayNameEn || group.displayName,
+  )}`;
+  const imdbId = man?.imdbId || i?.imdbId;
+  const imdbDetailUrl = imdbId && /^tt\d+$/.test(imdbId)
+    ? `https://www.imdb.com/title/${imdbId}/`
+    : i?.imdbUrl && /^https:\/\/(www\.)?imdb\.com\/title\/tt\d+\/?$/.test(i.imdbUrl)
+      ? i.imdbUrl
+      : null;
+  // IMDb 卡始终显示（有分显分数，无分显「— 暫無評分」）。没有匹配条目时回退到搜索，
+  // 确保整张卡始终可点；人工指定的 ID 优先于自动匹配结果。
   ratings.push({
     source: 'imdb',
     label: 'IMDb',
     value: rating,
     votes: man?.votes ?? i?.votes ?? null,
-    url: i?.imdbUrl || (i?.imdbId ? `https://www.imdb.com/title/${i.imdbId}/` : null),
+    url: imdbDetailUrl || imdbSearchUrl,
   });
 
   const d = e?.douban && !e.douban.notFound ? e.douban : null;
-  // 豆瓣卡始终显示（有分显分数，无分显「— 暫無評分」）
-  // 页面侧也不渲染人数（IMDb 卡片同样只留分数，两张卡视觉对齐）。
+  const doubanSearchUrl = `https://www.douban.com/search?cat=1002&q=${encodeURIComponent(
+    group.displayName,
+  )}`;
+  // 仅接受豆瓣电影条目。搜索建议可能误匹配到书籍或音乐，
+  // 这类条目不应作为电影评分卡的跳转目标。
+  const doubanUrlId = d?.doubanUrl?.match(
+    /^https:\/\/movie\.douban\.com\/subject\/(\d+)(?:\/|$)/,
+  )?.[1];
+  const doubanId = !d?.doubanUrl || doubanUrlId ? doubanUrlId || d?.doubanId : null;
+  const doubanDetailUrl = doubanId && /^\d+$/.test(doubanId)
+    ? `https://movie.douban.com/subject/${doubanId}/`
+    : null;
+  // 豆瓣卡始终显示；没有有效电影条目时回退到豆瓣电影搜索，确保整张卡始终可点。
+  // 页面侧不渲染人数（IMDb 卡片同样只留分数，两张卡视觉对齐）。
   ratings.push({
     source: 'douban',
     label: '豆瓣',
     value: d && d.ratingState !== 'unreleased' ? (d.rating ?? null) : null,
     votes: null,
-    url: d?.doubanUrl || null,
+    url: doubanDetailUrl || doubanSearchUrl,
   });
 
   // ---------- 级别 ----------

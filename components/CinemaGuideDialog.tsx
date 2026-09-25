@@ -43,13 +43,48 @@ export function CinemaGuideDialog({
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:px-5">
           <p className="text-sm font-semibold text-accent">{guide.sectionTitle}</p>
           <section>
-            <h4 className="text-sm font-semibold text-fg">影廳與設備</h4>
+            <h4 className="text-sm font-semibold text-fg">場地概況與設備</h4>
             <ul className="mt-2 list-disc space-y-2 pl-5 text-sm leading-relaxed text-fg-soft">
               {guide.highlights.map((highlight) => (
                 <li key={highlight}>{highlight}</li>
               ))}
             </ul>
           </section>
+          {guide.features && guide.features.length > 0 && (
+            <section>
+              <h4 className="text-sm font-semibold text-fg">影院特色與設施</h4>
+              <ul className="mt-2 list-disc space-y-2 pl-5 text-sm leading-relaxed text-fg-soft">
+                {guide.features.map((feature) => (
+                  <li key={feature}>{feature}</li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {guide.rooms && guide.rooms.length > 0 && (
+            <section>
+              <h4 className="text-sm font-semibold text-fg">影廳介紹與選座</h4>
+              <div className="mt-2 space-y-3">
+                {guide.rooms.map((room) => (
+                  <article key={room.name} className="rounded-xl border border-hairline px-3 py-3">
+                    <h5 className="text-sm font-semibold text-fg">{room.name}</h5>
+                    {room.description && (
+                      <p className="mt-1 text-sm leading-relaxed text-fg-soft">{room.description}</p>
+                    )}
+                    {room.experience && room.experience.length > 0 && (
+                      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-relaxed text-fg-soft">
+                        {room.experience.map((item) => <li key={item}>{item}</li>)}
+                      </ul>
+                    )}
+                    {room.seatTips && room.seatTips.length > 0 && (
+                      <p className="mt-2 text-sm leading-relaxed text-fg-muted">
+                        選座建議：{room.seatTips.join('；')}
+                      </p>
+                    )}
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
           {guide.route && (
             <section>
               <h4 className="text-sm font-semibold text-fg">交通指南</h4>
@@ -73,7 +108,7 @@ export function CinemaGuideDialog({
             查看完整指南 ↗
           </a>
           <span className="text-[11px] leading-relaxed text-fg-dim">
-            內容為指南摘要；最新路線與圖片以原文檔為準。
+            影廳體驗與選座建議為原指南整理的觀眾回饋，實際以現場為準；路線細節及圖片請查看原文檔。
           </span>
         </div>
       </div>

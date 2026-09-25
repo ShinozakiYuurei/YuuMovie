@@ -1,6 +1,15 @@
+export interface CinemaGuideRoom {
+  name: string;
+  description?: string;
+  experience?: string[];
+  seatTips?: string[];
+}
+
 export interface CinemaGuideContent {
   sectionTitle: string;
   highlights: string[];
+  features?: string[];
+  rooms?: CinemaGuideRoom[];
   route?: string;
   note?: string;
 }
@@ -49,7 +58,12 @@ export const CINEMA_GUIDES: Record<string, CinemaGuideContent> = {
   'bestar-58002': { sectionTitle: 'StagE', highlights: ['全院配置 Dolby Atmos、QSC 音響及 Barco 4K 激光放映機。', '部分影廳設 D-BOX 動感座椅。'], route: '屯門站 C 出口，步行約 10–12 分鐘。' },
   'bestar-58003': { sectionTitle: '嘉禾大埔', highlights: ['指南列有影廳及到達路線資訊。'], route: '大埔墟站 A3 出口。' },
   'mcl-002': { sectionTitle: 'MCL 新都城戲院', highlights: ['全院採用 Dolby 7.1；1、3 院配置 Barco 4K 激光放映機。'], route: '寶琳站 A2 出口，沿商場通道前往新都城中心二期。' },
-  'mcl-003': { sectionTitle: 'MCL 皇室', highlights: ['指南提供由港鐵前往戲院的步行指引。'], route: '銅鑼灣站 E 出口，步行至皇室大廈一帶。' },
+  'mcl-003': {
+    sectionTitle: 'MCL 皇室',
+    highlights: ['銅鑼灣站 E 出口扶手電梯有時停用，原指南另列 F1 出口備用走法。'],
+    features: ['觀眾回饋稱自助售票機不能掃碼取票，需到前台或小食部列印；另有觀眾提到沙發移動時聲音較大。'],
+    route: '銅鑼灣站 E 出口左轉，先到翡翠明珠廣場，再到皇室大廈；進入皇室堡後乘扶手電梯至 4 樓。若 E 出口扶手電梯停用，可由 F1 出口過馬路接回原路。詳細位置及路線圖片請查看原指南。',
+  },
   'mcl-005': { sectionTitle: 'MCL 德福（TC）', highlights: ['全院 Sony 4K 放映；House 1 為 MX4D，House 2、3 配置 QSC 音響及 Dolby Atmos。'], route: '九龍灣站 A 出口。' },
   'mcl-009': { sectionTitle: 'Star Cinema', highlights: ['指南標示影廳設備資料待補充。'], route: '將軍澳站 C 出口，前往 PopCorn 商場。' },
   'mcl-012': { sectionTitle: 'FESTIVAL GRAND CINEMA（FG）', highlights: ['目前收錄 House 2、3、4、5、7；1 院設 Dolby Atmos。', 'Festival Suite 為 Barco 放映及 Dolby Surround 7.1 音效；指南附有年齡提示。'], route: '九龍塘站前往又一城。', note: '原指南提醒未滿 18 歲觀影者留意影片級別及證件要求。' },
