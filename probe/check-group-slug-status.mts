@@ -42,10 +42,12 @@ try {
   const { getGroupBySlug, getMovieGroups } = await import('../lib/data.ts');
   const canonical = getMovieGroups().find((g) => g.slug === 'avengers-doomsday-1274');
   const showingSubset = getMovieGroups('showing').find((g) => g.slug === 'avengers-doomsday-1274');
-  assert.equal(canonical?.status, 'upcoming');
-  assert.equal(showingSubset?.status, 'showing', 'fixture must reproduce same-slug cross-status collision');
-  assert.equal(getGroupBySlug('avengers-doomsday-1274')?.status, 'upcoming', 'detail slug resolves from canonical all-source group first');
-  console.log('✓ same-slug cross-status collision resolves to the canonical upcoming detail');
+  assert.equal(canonical?.status, 'showing', 'any showing version makes the whole movie showing');
+  assert.equal(showingSubset?.status, 'showing');
+  assert.equal(getMovieGroups('upcoming').some((g) => g.versions.some((v) => v.movieIds.includes('broadway-1274'))), false,
+    'upcoming-only subset must not duplicate a movie that has a showing version');
+  assert.equal(getGroupBySlug('avengers-doomsday-1274')?.status, 'showing', 'detail status matches the movie group');
+  console.log('✓ movie with showing and upcoming versions appears only in showing');
 } finally {
   fs.rmSync(dir, { recursive: true, force: true });
 }

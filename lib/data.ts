@@ -1148,9 +1148,8 @@ export function getMovieGroups(status?: 'showing' | 'upcoming'): MovieGroup[] {
   //
   // 背景：status 過濾發生在 buildMovieGroups 的**第一步**（按片名分組之前），
   //   所以 upcoming 池只看得到該片的 upcoming 條目，看不到同片的 showing 條目，
-  //   於是把它當成一部獨立待映片建組。緊接著的 canonicalSlugById() 又把 slug
-  //   改寫成全量池的 slug —— 兩個池撞到同一個 slug，詳情頁（取全量池的
-  //   status=showing）與 /upcoming/ 列表（upcoming 池）互相矛盾。
+  //   於是把它當成一部獨立待映片建組。不同院線各自的 movie id 不同，不能只
+  //   比對 showing/upcoming 兩池的 id；要透過全量池的組把條目 id 對回電影身份。
   //
   //   2026-09-23 實際踩到（probe/check-nav-category.mjs 在部署時攔下）：
   //     《善男信女》 broadway-1341(showing, 4 場) + broadway-1086(upcoming, 0 場)
@@ -1162,14 +1161,15 @@ export function getMovieGroups(status?: 'showing' | 'upcoming'): MovieGroup[] {
   //   全量池是 slug 的唯一權威（見下方 canonicalSlugById），詳情頁也是按
   //   全量池的組渲染的。要讓列表與詳情頁一致，判據必須同源，否則又是兩套邏輯。
   if (status === 'upcoming') {
-    const showingIds = new Set<string>();
+    const allStatusByMovieId = new Map<string, MovieGroup['status']>();
     for (const g of getMovieGroups()) {
-      if (g.status !== 'showing') continue;
-      for (const v of g.versions) for (const id of v.movieIds) showingIds.add(id);
+      for (const v of g.versions) {
+        for (const id of v.movieIds) allStatusByMovieId.set(id, g.status);
+      }
     }
     for (let i = groups.length - 1; i >= 0; i--) {
       const ids = groups[i].versions.flatMap((v) => v.movieIds);
-      if (ids.some((id) => showingIds.has(id))) groups.splice(i, 1);
+      if (ids.some((id) => allStatusByMovieId.get(id) === 'showing')) groups.splice(i, 1);
     }
   }
 
@@ -1383,7 +1383,9 @@ function buildMovieGroups(status?: 'showing' | 'upcoming'): MovieGroup[] {
       sources,
       allFormats,
       slug: primary.slug,
-      status: primary.status,
+      // 同一部片的任一院線已有上映場次，就以「上映中」作整組狀態；
+      // 否則 base version 可能來自 upcoming 院線，令同一片同時出現在兩個列表。
+      status: list.some((movie) => movie.status === 'showing') ? 'showing' : 'upcoming',
       // ★ 卡片显示用的聚合字段（按各源语义优先级选择，详见 helper 注释）
       displayCategory: pickDisplayCategory(list),
       displayLanguage: pickDisplayLanguage(list),
