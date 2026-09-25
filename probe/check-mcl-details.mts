@@ -110,6 +110,27 @@ try {
   }, detailCacheFile: cacheFile, detailBudgetMs: 0 });
   assert.equal(reusedId.movies[1].duration, null, '数字 ID 重用、片名变化时不得套用旧资料');
   assert.equal(reusedId.shows.length, 2);
+
+  // 偶发缺席于 Grid 但仍在排片 List 的影片，使用同数字 ID 的官方详情补回片名。
+  const listOnlyId = 14999;
+  const listOnlyTitle = '特別放映電影';
+  const listOnlyRaw = [{ id: listOnlyId, mn: listOnlyTitle,
+    b: { mg: '劇情', mrt: '100', mc: 'IIA', ml: '粵語', ms: '' },
+    e: { md: '導演', mc: '演員' }, i: '官方簡介' }];
+  const listWithMissingGridMovie = { ...list, movies: [...list.movies, {
+    id: listOnlyId, vst: [{ v: '2D', l: '粵語', vn: '2D 粵語', c: [{ ci: '017', cn: 'K11',
+      s: [{ si: 9999, sn: '星期六, 9月26日, 02:10 PM, 1院 $120', r: 60 }] }] }],
+  }] };
+  const listOnlyResult = await scrapeMcl({ request: async (url: string) => {
+    if (url.startsWith('GetNowShowingGrid')) return grid;
+    if (url.startsWith('GetNowShowingList')) return listWithMissingGridMovie;
+    if (url.startsWith('GetCinemaDetails')) return [];
+    if (url.includes(`id=${listOnlyId}&`)) return listOnlyRaw;
+    return request(url);
+  }, detailCacheFile: path.join(tmpScraper, 'list-only-cache.json') });
+  const recoveredMovie = listOnlyResult.movies.find((m) => m.id === `mcl-${listOnlyId}`);
+  assert.equal(recoveredMovie?.nameZh, listOnlyTitle, 'Grid 漏項時以 ID 匹配的官方詳情補回片名');
+  assert.equal(listOnlyResult.shows.length, 3, 'Grid 漏項不應丟失該影片場次');
 } finally { fs.rmSync(tmpScraper, { recursive: true, force: true }); }
 
 // 静态导出读取层的真实合成路径：MCL 为唯一院线时也必须填上香港分级等组级字段。

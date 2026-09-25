@@ -82,13 +82,16 @@ function plainText(value) {
 }
 
 /**
- * 只接纳与列表 ID、标题均一致的官方详情。新数据/缓存均走这道校验，
- * 防止 MCL 复用数字 ID 或详情接口返回其他电影时误填整张资料卡。
+ * 官方详情的数字 ID 必须匹配；列表有标题时再要求标题完全匹配。
+ * 列表偶尔漏掉 Grid 影片时，仅凭官方详情中的同一数字 ID 补回片名。
+ * 新数据/缓存均走这道校验，避免 ID 复用或误关联详情污染资料卡。
  */
-export function parseMclMovieDetails(raw, id, title) {
+export function parseMclMovieDetails(raw, id, title = '') {
   const info = Array.isArray(raw) && raw.length === 1 ? raw[0] : null;
+  const expectedTitle = typeof title === 'string' ? title.normalize('NFKC').trim() : '';
   if (!info || !/^\d+$/.test(String(id)) || Number(info.id) !== Number(id) ||
-      typeof info.mn !== 'string' || info.mn.normalize('NFKC').trim() !== title.normalize('NFKC').trim()) return null;
+      typeof info.mn !== 'string' || !info.mn.trim() ||
+      (expectedTitle && info.mn.normalize('NFKC').trim() !== expectedTitle)) return null;
 
   const b = info.b || {};
   const e = info.e || {};
@@ -99,6 +102,7 @@ export function parseMclMovieDetails(raw, id, title) {
   const category = plainText(b.mc).toUpperCase();
   const genreText = plainText(b.mg).replace(/\s*[（(]特備節目[）)]\s*/g, '');
   return {
+    nameZh: info.mn.trim(),
     nameEn: VERIFIED_ENGLISH_TITLES.get(`${id}|${info.mn}`) || '',
     duration,
     category: HK_CATEGORIES.has(category) ? category : null,
@@ -321,7 +325,8 @@ export async function scrapeMcl({ proxy, request = getJsonWithRetry, detailCache
     movies.push({
       id,
       slug: mclSlug(info.name, mv.id),
-      nameZh: info.name,
+      // MCL 的 Grid 偶爾漏掉仍在排片列表中的特別放映；此時只用同 ID 的官方詳情補片名。
+      nameZh: info.name || detail?.nameZh || '',
       nameEn: detail?.nameEn || '',
       poster: info.poster,
       duration: detail?.duration ?? null,
