@@ -28,7 +28,7 @@ export function FeeLine({
   note,
   className = '',
 }: {
-  /** 每張戲票手續費（HKD）。0 = 免手續費，仍顯示 $0 */
+  /** 每張戲票手續費（HKD）。0 = 免手續費；負值顯示「未確認」 */
   amount: number;
   /** hover 說明：寫明 0 元的來歷（會員豁免）與是否已含在票價內 */
   note: string;
@@ -49,9 +49,9 @@ export function FeeLine({
        * tabular-nums 讓 $10 內部兩個數字等寬。
        */}
       <span className="hkm-num font-semibold tabular-nums" title={note}>
-        ${amount}
+        {amount < 0 ? '—' : '$' + amount}
       </span>{' '}
-      <span title={note}>手續費</span>
+      <span title={note}>{amount < 0 ? '手續費未確認' : '手續費'}</span>
     </p>
   );
 }

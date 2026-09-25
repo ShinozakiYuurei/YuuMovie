@@ -11,7 +11,8 @@
     "posters": "node scripts/fetch-posters.mjs",
     "poster-colors": "node scripts/poster-colors.mjs",
     "test:live": "node scripts/test-live-filter.cjs",
-    "test:hydrate": "node scripts/test-hydration.cjs"
+    "test:hydrate": "node scripts/test-hydration.cjs",
+    "test:lux": "node --test scripts/test-lux-scraper.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

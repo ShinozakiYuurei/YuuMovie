@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { FilterDropdown } from './FilterDropdown';
 import { FeeLine } from './FeeLine';
 import { CinemaMapDialog } from './CinemaMapDialog';
+import { CinemaGuideDialog } from './CinemaGuideDialog';
+import { CINEMA_GUIDES } from '@/lib/cinema-guides';
 import { CINEMA_COORD } from '@/lib/cinema-geo';
 import type { CinemaFacets, CinemaRow } from '@/lib/data';
 
@@ -42,6 +44,7 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
   const [districts, setDistricts] = useState<string[]>([]);
   /** 目前開啟地圖彈層的戲院 id（null = 未開啟） */
   const [mapId, setMapId] = useState<string | null>(null);
+  const [guideId, setGuideId] = useState<string | null>(null);
 
   /** 多選篩選：同維度內 OR，維度之間 AND */
   const filtered = useMemo(() => {
@@ -287,6 +290,15 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
                         地圖
                       </button>
                     )}
+                    {CINEMA_GUIDES[c.id] && (
+                      <button
+                        type="button"
+                        onClick={() => setGuideId(c.id)}
+                        className="hkm-btn-ghost rounded-full px-3.5 py-1.5 text-xs"
+                      >
+                        指南
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -305,6 +317,19 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
               name={c.nameZh}
               address={c.address}
               onClose={() => setMapId(null)}
+            />
+          ) : null;
+        })()}
+      {guideId &&
+        (() => {
+          const c = rows.find((x) => x.id === guideId);
+          const guide = CINEMA_GUIDES[guideId];
+          return c && guide ? (
+            <CinemaGuideDialog
+              name={c.nameZh}
+              address={c.address}
+              guide={guide}
+              onClose={() => setGuideId(null)}
             />
           ) : null;
         })()}

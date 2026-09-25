@@ -42,7 +42,7 @@
 import type { Source } from './types';
 
 export interface BookingFee {
-  /** 每張戲票手續費（HKD）。0 = 免手續費 */
+  /** 每張戲票手續費（HKD）。0 = 免手續費，負值 = 未確認 */
   amount: number;
   /**
    * 一句話說明（顯示為 hover 提示）
@@ -56,7 +56,7 @@ export interface BookingFee {
 }
 
 /** 院線預設（同一院線全線一致，故按 source 而非按戲院） */
-const BY_SOURCE: Record<Source, BookingFee> = {
+const BY_SOURCE: Partial<Record<Source, BookingFee>> = {
   broadway: {
     amount: 10,
     note: '百老匯官網：於網上購票，每張戲票收取 HK$10 手續費（結帳時外加，無會員豁免）。',
@@ -95,8 +95,8 @@ const BY_CINEMA: Record<string, BookingFee> = {};
 
 /** 未知院線的兜底：不顯示數字比顯示錯的數字好 */
 const UNKNOWN: BookingFee = {
-  amount: 0,
-  note: '手續費以院線官方公佈為準。',
+  amount: -1,
+  note: '未確認手續費；請以院線官方購票頁結帳金額為準。',
   included: false,
 };
 
@@ -124,5 +124,5 @@ export function bookingFeeOf(cinemaId: string, source: Source): BookingFee {
  *   掛上 .hkm-num，純字串做不到。這個函數只給需要「一行文字」的場合。
  */
 export function feeText(amount: number): string {
-  return `$${amount} 手續費`;
+  return amount < 0 ? '手續費未確認' : '$' + amount + ' 手續費';
 }

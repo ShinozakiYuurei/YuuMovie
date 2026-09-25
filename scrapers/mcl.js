@@ -180,11 +180,19 @@ async function movieDetails(movies, proxy, request, cacheFile, detailBudgetMs) {
  * 注意：Node 内置 fetch 不读 http_proxy，且 undici 的 ProxyAgent 与内置 dispatcher 版本
  * 不兼容（invalid onRequestStart method），故这里用 node:https + https-proxy-agent。
  */
-async function getJson(path, { proxy, timeoutMs = 30000 } = {}) {
+async function getJson(path, { proxy, timeoutMs = 20000 } = {}) {
   const url = `${API}/${path}`;
   const agent = await getProxyAgent(proxy);
 
   return new Promise((resolve, reject) => {
+    let timer;
+    let settled = false;
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      callback(value);
+    };
     const req = https.get(
       url,
       {
@@ -195,23 +203,41 @@ async function getJson(path, { proxy, timeoutMs = 30000 } = {}) {
       (res) => {
         if (res.statusCode !== 200) {
           res.resume();
-          return reject(new Error(`${path} → HTTP ${res.statusCode}`));
+          return finish(reject, new Error(`${path} → HTTP ${res.statusCode}`));
         }
         let body = '';
         res.setEncoding('utf8');
         res.on('data', (c) => (body += c));
         res.on('end', () => {
           try {
-            resolve(JSON.parse(body));
+            finish(resolve, JSON.parse(body));
           } catch (e) {
-            reject(new Error(`${path} → JSON 解析失败: ${e.message}`));
+            finish(reject, new Error(`${path} → JSON 解析失败: ${e.message}`));
           }
         });
+        res.on('error', (error) => finish(reject, error));
       }
     );
-    req.on('timeout', () => req.destroy(new Error(`${path} → 超时`)));
-    req.on('error', reject);
+    // request.setTimeout() 只在 socket 建立后才可靠；用独立总时限覆盖 DNS/TCP
+    // 连接阶段，避免不可达网络一直卡住抓取流程。
+    timer = setTimeout(() => req.destroy(new Error(`${path} → 请求超时（${timeoutMs}ms）`)), timeoutMs);
+    req.on('timeout', () => req.destroy(new Error(`${path} → 响应超时（${timeoutMs}ms）`)));
+    req.on('error', (error) => finish(reject, error));
   });
+}
+
+async function getJsonWithRetry(path, options = {}) {
+  const attempts = options.attempts ?? 2;
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await getJson(path, options);
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) await new Promise((resolve) => setTimeout(resolve, 400 * attempt));
+    }
+  }
+  throw lastError;
 }
 
 /**
@@ -249,7 +275,7 @@ export function parseShowDesc(desc) {
 }
 
 /** 抓取 MCL 全部数据 */
-export async function scrapeMcl({ proxy, request = getJson, detailCacheFile = DETAIL_CACHE_FILE, detailBudgetMs = 30_000 } = {}) {
+export async function scrapeMcl({ proxy, request = getJsonWithRetry, detailCacheFile = DETAIL_CACHE_FILE, detailBudgetMs = 30_000 } = {}) {
   const [grid, list, cinemaDetails] = await Promise.all([
     request(`GetNowShowingGrid.aspx?l=${LANG}`, { proxy }),
     request(`GetNowShowingList.aspx?l=${LANG}`, { proxy }),

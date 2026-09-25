@@ -734,10 +734,18 @@ export const SOURCE_LABEL: Record<Source, string> = {
   emperor: '英皇',
   cinemacity: 'Cinema City',
   bestar: '星達',
+  cgv: 'CGV',
+  chinachem: '華懋',
+  cineart: '影藝',
+  goldenscene: '高先',
+  lumen: 'Lumen',
+  lux: 'Lux',
+  newport: '新寶',
+  sunbeam: '新光',
 };
 
 /** 院线展示顺序（按规模） */
-const SOURCE_ORDER: Source[] = ['broadway', 'mcl', 'emperor', 'cinemacity', 'bestar'];
+const SOURCE_ORDER: Source[] = ['broadway', 'mcl', 'emperor', 'cinemacity', 'bestar', 'cgv', 'chinachem', 'cineart', 'goldenscene', 'lumen', 'newport', 'sunbeam', 'lux'];
 
 /**
  * 是否含中日韩字符
@@ -763,7 +771,7 @@ const HK_RATINGS = new Set(['I', 'IIA', 'IIB', 'III']);
  * 这里只接受 HK_RATINGS 里的值；广度优先从「最具分级权威的源」取。
  */
 function pickDisplayCategory(list: Movie[]): string | null {
-  for (const src of ['broadway', 'cinemacity', 'bestar', 'mcl'] as Source[]) {
+  for (const src of ['broadway', 'cinemacity', 'bestar', 'mcl', 'cgv', 'chinachem', 'cineart', 'goldenscene', 'newport', 'sunbeam'] as Source[]) {
     const hit = list.find((m) => m.source === src && m.category && HK_RATINGS.has(m.category));
     if (hit) return hit.category!;
   }
@@ -824,6 +832,14 @@ const EN_SOURCE_ORDER: Record<Source, number> = {
   cinemacity: 2,
   bestar: 3,
   mcl: 4,
+  cgv: 5,
+  chinachem: 6,
+  cineart: 7,
+  goldenscene: 8,
+  lumen: 9,
+  newport: 10,
+  sunbeam: 11,
+  lux: 12,
 };
 
 function pickDisplayNameEn(list: Movie[]): string | null {

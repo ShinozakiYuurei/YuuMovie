@@ -1,4 +1,4 @@
-export type Source = 'broadway' | 'mcl' | 'emperor' | 'cinemacity' | 'bestar';
+export type Source = 'broadway' | 'mcl' | 'emperor' | 'cinemacity' | 'bestar' | 'cgv' | 'chinachem' | 'cineart' | 'goldenscene' | 'lumen' | 'lux' | 'newport' | 'sunbeam';
 
 export interface Movie {
   id: string;

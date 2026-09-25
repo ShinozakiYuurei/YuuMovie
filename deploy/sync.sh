@@ -45,7 +45,7 @@ case "$DEPLOY_SCRAPE" in 0|1) ;; *) echo "✖ SCRAPE 只接受 0 或 1"; exit 1 
 if [ -n "$DEPLOY_ONLY" ]; then
   IFS=, read -r -a _sources <<< "$DEPLOY_ONLY"
   for _source in "${_sources[@]}"; do
-    case "$_source" in broadway|mcl|emperor|cinemacity|bestar) ;;
+    case "$_source" in broadway|mcl|emperor|cinemacity|bestar|cgv|chinachem|cineart|goldenscene|lumen|lux|newport|sunbeam) ;;
       *) echo "✖ ONLY 含未知院线：$_source"; exit 1 ;;
     esac
   done

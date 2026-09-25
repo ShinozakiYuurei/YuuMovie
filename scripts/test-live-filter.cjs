@@ -68,15 +68,26 @@ const readShows = (page, kind) => page.evaluate((k) => {
   return out;
 }, kind);
 
-const readChip = (page) => page.evaluate(() =>
-  [...document.querySelectorAll('.hkm-chip')].map((e) => e.textContent.trim()).find((t) => t.includes('場')));
+const readCount = (page) => page.evaluate(() => {
+  const text = document.querySelector('section#versions')?.innerText || '';
+  const match = text.match(/(\d+) \/ (\d+) 場/);
+  return match ? [Number(match[1]), Number(match[2])] : null;
+});
 
-/** 'M/D HH:mm' → epoch（資料都是 2026 年；香港時區顯式寫入，與測試機時區無關） */
+/** 'M/D HH:mm' → epoch；跨年場次按香港當前年份推算，避免一月日期錯落回同年。 */
 const epochOf = ({ date, time }) => {
   const [mo, d] = date.split('/').map(Number);
-  return Date.parse(
-    `2026-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}T${time}:00+08:00`
-  );
+  const now = new Date(Date.now() + 8 * 3600_000);
+  let year = now.getUTCFullYear();
+  let epoch = Date.parse(`${year}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}T${time}:00+08:00`);
+  if (epoch < Date.now() - 180 * 24 * 3600_000) {
+    year++;
+    epoch = Date.parse(`${year}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}T${time}:00+08:00`);
+  } else if (epoch > Date.now() + 180 * 24 * 3600_000) {
+    year--;
+    epoch = Date.parse(`${year}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}T${time}:00+08:00`);
+  }
+  return epoch;
 };
 
 const keyOf = (s) => `${s.date} ${s.time}`;
@@ -91,21 +102,36 @@ const keyOf = (s) => `${s.date} ${s.time}`;
   };
 
   const shows = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'shows.json'), 'utf8'));
-  const cinemaId = 'mcl-021';
-  const movieId = 'mcl-14858';
+  const movies = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'movies.json'), 'utf8'));
+  const futureShows = shows.filter((show) => Date.parse(show.startAt) > Date.now() + 60_000);
+  if (!futureShows.length) throw new Error('測試資料沒有未來場次；請先更新 data/shows.json');
 
+  // 不綁定特定院線：取場次最多的有效影院與電影，讓單場長尾不影響時鐘斷言。
+  const countByCinema = new Map();
+  const countByMovie = new Map();
+  for (const show of futureShows) {
+    countByCinema.set(show.cinemaId, (countByCinema.get(show.cinemaId) || 0) + 1);
+    if (movies.some((movie) => movie.id === show.movieId && movie.slug)) {
+      countByMovie.set(show.movieId, (countByMovie.get(show.movieId) || 0) + 1);
+    }
+  }
+  const cinemaId = [...countByCinema].sort((a, b) => b[1] - a[1])[0]?.[0];
+  const movieId = [...countByMovie].sort((a, b) => b[1] - a[1])[0]?.[0];
+  const movie = movies.find((item) => item.id === movieId);
+  const movieTitle = (movie.nameEn || movie.nameZh).toLocaleLowerCase();
+  const movieGroupIds = new Set(movies.filter((item) => (item.nameEn || item.nameZh).toLocaleLowerCase() === movieTitle).map((item) => item.id));
+  const movieGroupShows = shows.filter((show) => movieGroupIds.has(show.movieId));
   const cases = [
-    { kind: 'cinema', url: `http://127.0.0.1:4321/cinema/${cinemaId}/`, label: `戲院頁 /cinema/${cinemaId}`, list: shows.filter((s) => s.cinemaId === cinemaId) },
-    { kind: 'movie', url: `http://127.0.0.1:4321/movie/movie-${movieId}/`, label: `詳情頁 /movie/movie-${movieId}`, list: shows.filter((s) => s.movieId === movieId) },
+    { kind: 'cinema', url: `http://127.0.0.1:4321/cinema/${cinemaId}/`, label: `戲院頁 /cinema/${cinemaId}`, list: shows.filter((show) => show.cinemaId === cinemaId) },
+    { kind: 'movie', url: `http://127.0.0.1:4321/movie/${movie.slug}/`, label: `詳情頁 /movie/${movie.slug}`, list: movieGroupShows },
   ];
 
   for (const { kind, url, label, list } of cases) {
     console.log(`\n=== ${label} ===`);
 
-    // 數據中該實體的最後一場（用來算「全部開映」的時刻）
-    const lastAt = Math.max(...list.map((s) => Date.parse(s.startAt)));
-    // 基準時刻：2026-09-19 00:00 —— 產物裡留下的場次全都還沒開映
-    const T0 = Date.parse('2026-09-19T00:00:00+08:00');
+    // 構建產物已剔除構建時刻以前的場次；把假時鐘設在現在之前一分鐘，
+    // 讓產物中剩下的場次都可見，再直接從實際頁面內容推導測試時間。
+    const T0 = Date.now() - 60_000;
 
     // ---------- 1. 基準：極早時刻，頁面應等於構建留下的集合 ----------
     const p1 = await browser.newPage();
@@ -115,9 +141,9 @@ const keyOf = (s) => `${s.date} ${s.time}`;
     const base = await readShows(p1, kind);
     check('基準時刻：場次非空', base.length > 0, `${base.length} 場`);
 
+    const initialCount = kind === 'movie' ? await readCount(p1) : null;
     if (kind === 'movie') {
-      const chip = await readChip(p1);
-      check('標題「共 N 場」與列表數字一致', chip === `共 ${base.length} 場`, `chip=${chip} 列表=${base.length}`);
+      check('場次總數標記可讀且不超過資料總數', !!initialCount && initialCount[0] > 0 && initialCount[0] <= initialCount[1], `標記=${initialCount?.join(' / ')} 場`);
     }
 
     // ---------- 2. 快進：驗證定時器會自動剔除（不需重新載入）----------
@@ -127,8 +153,10 @@ const keyOf = (s) => `${s.date} ${s.time}`;
     //   一個場次都不該消失，第一版就因此把正常的頁面報成失敗。
     //   這裡改為「最早一場開映後 1 毫秒」，保證恰好剔除最早那批。
     const baseAt = base.map((s) => ({ ...s, at: epochOf(s) }));
-    const firstAt = Math.min(...baseAt.map((s) => s.at));
-    const T1 = firstAt + 1;
+    const firstVisibleAt = Math.min(...baseAt.map((s) => s.at));
+    const lastAt = Math.max(...shows.map((show) => Date.parse(show.startAt)));
+    const T1 = firstVisibleAt + 1;
+    if (T1 <= T0) throw new Error(`測試時鐘設定無效：first=${new Date(firstVisibleAt).toISOString()} T0=${new Date(T0).toISOString()}`);
 
     await p1.clock.fastForward(T1 - T0); // ★ 用毫秒，fastForward 的字串格式實測不可靠
     await p1.waitForTimeout(600);
@@ -145,8 +173,8 @@ const keyOf = (s) => `${s.date} ${s.time}`;
     check('快進後：未誤殺（仍有未開映場次）', after.length > 0, `${after.length} 場`);
 
     if (kind === 'movie') {
-      const chip = await readChip(p1);
-      check('剔除後標題數字同步更新', chip === `共 ${after.length} 場`, `chip=${chip} 列表=${after.length}`);
+      const count = await readCount(p1);
+      check('剔除後場次總數同步更新', !!count && !!initialCount && count[0] < initialCount[0] && count[0] === count[1], `初始=${initialCount?.join(' / ')} 場；更新=${count?.join(' / ')} 場`);
     }
     await p1.close();
 

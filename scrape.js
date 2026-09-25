@@ -2,12 +2,13 @@
 /**
  * 香港电影聚合站 · 抓取主流程
  *
- * 数据源（5 条院线）：
+ * 数据源（13 条院线）：
  *  - 百老汇     cinema.com.hk      纯 fetch（Next.js RSC）
  *  - MCL        mclcinema.com      纯 fetch（ASP.NET JSON API）
  *  - 英皇       emperorcinemas.com 纯 fetch（icirena 平台，签名已离线复现）
  *  - Cinema City cinemacity.com.hk 纯 fetch（icirena 平台）
  *  - 星達       bestarfilm.hk      纯 fetch（icirena 平台）
+ *  - CGV / 影藝 / 華懋 / 高先 / Lumen / Lux / 新寶 / 新光
  *
  * 2026-09-18：icirena 系从 Playwright 浏览器改为纯 HTTP。
  *   签名算法已从 webpack 模块提取（详见 scrapers/icirena-http.js），
@@ -38,6 +39,8 @@ import { scrapeBroadway } from './scrapers/broadway.js';
 import { scrapeMcl } from './scrapers/mcl.js';
 import { scrapeIcirena, CHANNELS } from './scrapers/icirena-http.js';
 import { normalizeIcirena } from './scrapers/icirena.js';
+import { scrapeCgv, scrapeCineArt } from './scrapers/grabticks.js';
+import { scrapeChinachem, scrapeGoldenScene, scrapeLumen, scrapeLuxDirectory, scrapeNewport, scrapeSunbeam } from './scrapers/other-circuits.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(__dirname, 'data');
@@ -114,7 +117,7 @@ function collectAll(sources) {
 }
 
 // 全部已知院线（用于合并时补齐本次未运行的源）
-const KNOWN_SOURCES = ['broadway', 'mcl', 'emperor', 'cinemacity', 'bestar'];
+const KNOWN_SOURCES = ['broadway', 'mcl', 'emperor', 'cinemacity', 'bestar', 'cgv', 'chinachem', 'cineart', 'goldenscene', 'lumen', 'lux', 'newport', 'sunbeam'];
 
 // ---------- 增量落盘 ----------
 //
@@ -198,6 +201,13 @@ async function main() {
       log(`  ⚠️ 失敗: ${e.message}`);
       errors.push({ source: 'mcl', error: e.message });
       const fb = loadSource('mcl', STALE_MS);
+      if (!fb) {
+        const directory = loadSource('mcl', Number.POSITIVE_INFINITY);
+        if (directory) {
+          sources.mcl = { movies: [], cinemas: directory.cinemas || [], shows: [] };
+          log('  ↩ 保留 MCL 戲院卡，略過過期場次（' + directory.savedAt + '）');
+        }
+      }
       if (fb) {
         sources.mcl = fb;
         log(`  ↩ 沿用上次快照（${fb.savedAt}）`);
@@ -256,6 +266,36 @@ async function main() {
     }
   }
 
+  const extraScrapers = [
+    ['cgv', () => scrapeCgv({ maxMovies: MAX_MOVIES })],
+    ['chinachem', scrapeChinachem],
+    ['cineart', scrapeCineArt],
+    ['goldenscene', () => scrapeGoldenScene({ maxMovies: MAX_MOVIES })],
+    ['lumen', scrapeLumen],
+    ['lux', scrapeLuxDirectory],
+    ['newport', scrapeNewport],
+    ['sunbeam', scrapeSunbeam],
+  ];
+  for (const [name, scrape] of extraScrapers) {
+    if (!want(name)) continue;
+    log('▶ ' + name + ' ...');
+    try {
+      const data = await scrape();
+      if (!data.cinemas.length || !data.shows.length) throw new Error('incomplete cinema/show data');
+      sources[name] = data;
+      saveSource(name, data);
+      log('  影片 ' + data.movies.length + ' | 影院 ' + data.cinemas.length + ' | 場次 ' + data.shows.length);
+    } catch (error) {
+      log('  ⚠️ 失敗: ' + error.message);
+      errors.push({ source: name, error: error.message });
+      const fallback = loadSource(name, STALE_MS);
+      if (fallback) {
+        sources[name] = fallback;
+        log('  ↩ 沿用上次快照（' + fallback.savedAt + '）');
+      }
+    }
+  }
+
   // ---------- 合并 ----------
   //
   // ★ 关键：把本次没跑的院线也合并进来（读它们的快照）
@@ -267,7 +307,7 @@ async function main() {
   for (const name of KNOWN_SOURCES) {
     if (sources[name]) continue; // 本次已抓到（含失败回退），优先用它
     const snap = loadSource(name, STALE_MS);
-    if (snap && (snap.shows || []).length > 0) {
+    if (snap && ((snap.shows || []).length > 0 || (snap.cinemas || []).length > 0)) {
       sources[name] = snap;
       log(`  ＋ 并入快照 ${name}（${snap.savedAt}）`);
     }

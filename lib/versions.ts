@@ -395,6 +395,7 @@ export function stripFormats(name: string | null | undefined): string {
  */
 const EN_TITLE_NOISE_BRACKETS = [
   // 场次类型
+  'Opening Day Special Screening', 'Early Bird Screening', 'VIP Screening',
   'Seat Cover Special Screening', 'Special Screening', 'Hi Bye Meet & Greet',
   // 语言版本（院线写法：Version 全拼 / Jap. 缩写 / bestar 的 (日))
   'Japanese Version', 'Cantonese Version', 'English Version', 'Mandarin Version', 'Korean Version',
@@ -407,6 +408,7 @@ const EN_TITLE_NOISE_BRACKETS = [
   'RealD', 'THX', 'CINITY', 'Cinity',
   '2D', '3D', '35mm Film', '35mm', '70mm', '16mm',
   // 版本修饰 / 放映轮次
+  '35th Anniversary', '4K digital restored version',
   '4K Restoration', '4K Restored Version', 'Restoration', 'Restored Version',
   'LIMITED', 'Limited', 'Live Viewing',
   //
@@ -434,6 +436,7 @@ const EN_TITLE_NOISE_BRACKETS = [
  *   emperor 的「(Can. Version)」），所以裸词表把它们排除掉，功能不减、风险归零。
  */
 const EN_TITLE_NOISE_BARE = [
+  'Opening Day Special Screening', 'Early Bird Screening', 'VIP Screening',
   'Seat Cover Special Screening', 'Special Screening', 'Hi Bye Meet & Greet',
   'Japanese Version', 'Cantonese Version', 'English Version', 'Mandarin Version', 'Korean Version',
   'Jap. Version', 'Can. Version', 'Cant. Version', 'Eng. Version',
