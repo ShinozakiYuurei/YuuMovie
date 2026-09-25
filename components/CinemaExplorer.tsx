@@ -225,29 +225,22 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
                     <p className="mt-1 text-xs text-fg-muted">{c.address}</p>
                   )}
                   {/*
-                   * 手續費行（原為地址）
+                   * 手續費藥丸：單獨一行
                    *
-                   * ★ 2026-09-21 用戶指定：戲院名下方那行改為手續費（免則標 $0）。
-                   *   與場次頁（components/ShowtimeExplorer.tsx）保持同一視覺語言 ——
-                   *   手續費是選戲院時的決策資訊，地址退到地圖按鈕的 hover 提示。
+                   * ★ 2026-09-26 用戶：「手續費的文字和佈局現在看著突兀不協調」。
+                   *   原本這裡是裸的一行文字（「$6 手續費」/「— 手續費未確認」），
+                   *   沒有容器，跟卡片上其餘藥丸不是同一種東西。
+                   *   現改為藥丸（.hkm-fee），跟規格標籤同語言，才不顯得突兀。
                    *
-                   * ★ 同日再修：「手續費」三字原本用次级色 text-fg-muted，
-                   *   与前面的金额（text-fg）不同色；用户要求两者一致，故整行 text-fg。
+                   * ★ 不併進下方規格標籤那一排：用戶明確要求不要把手續費塞進
+                   *   規格標籤排（兩者是不同性質的資訊，規格是「有什麼廳」、
+                   *   手續費是「要付多少」，混在一排反而分不清）。
                    *
-                   * ★ 同日三修：「（已含）」→「（已含於票價）」—— 三个页面同一文案。
-                   *
-                   * ★ 同日四修：外加的也补上後綴，三处统一。
-                   *
-                   * ★ 同日五修（用户最终定稿）：「算了，還是換成"$xx 手續費"這樣子，
-                   *   然後統一下長度，個位數的 8 元和兩位數的 10 元，最後的長度一樣」
-                   *   —— 後綴全部去掉；長度靠 .hkm-num 对齐。
-                   *   这一行改由 components/FeeLine.tsx 统一渲染。
+                   * ★ 已確認的（新光 $10、華懋 $5、Lumen $10 等）是正常藥丸；
+                   *   未確認的由 .hkm-fee--unknown 只把字色調弱 —— 寧可顯示得弱，
+                   *   也不要猜一個數字出來。
                    */}
-                  <FeeLine
-                    amount={c.fee.amount}
-                    note={c.fee.note}
-                    className="mt-1 text-xs text-fg"
-                  />
+                  <FeeLine amount={c.fee.amount} note={c.fee.note} className="mt-2.5" />
 
                   {/*
                    * 規格標籤：只列出這間戲院真的有的。

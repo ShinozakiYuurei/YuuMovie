@@ -88,26 +88,21 @@ export default async function CinemaPage({ params }: { params: Promise<{ id: str
           )}
         </div>
         {/*
-         * 手續費行（原為戲院地址）
+         * 手續費藥丸（原為戲院地址，再早是裸的一行文字）
          *
          * ★ 用戶 2026-09-21 指定：本行地址改為手續費。
-         *   與場次頁/戲院列表頁同一規則與同一視覺語言（免則標 $0）。
          *   ★ 同日再修：地址不再只存於 hover —— 已放回戲院名右側（上方 header），
          *   手續費獨立成行，兩者互不頂替。
          *
-         * ★ 同日再修：整行改為 text-fg。原先「$10」用 text-fg、「手續費」
-         *   用 text-fg-muted，用戶要求「手續費的字體顏色和前面的金額一致」。
+         * ★ 2026-09-26 用戶：「手續費的文字和佈局現在看著突兀不協調」。
+         *   這裡原本是一行裸文字（「$10 手續費」/「— 手續費未確認」），
+         *   四周沒有容器、跟頁面上其餘藥丸標籤不是同一種東西。
+         *   現改為藥丸（.hkm-fee），字號與顏色由該 class 統一給，
+         *   因此這裡只傳外距 mt-2，不再傳 text-sm / text-fg。
          *
-         * ★ 同日三修：「（已含）」→「（已含於票價）」—— 三個頁面同一文案。
-         *
-         * ★ 同日四修：外加的也補上後綴（結帳另加），三處統一。
-         *
-         * ★ 同日五修（用戶最終定稿）：「算了，還是換成"$xx 手續費"這樣子，
-         *   然後統一下長度，個位數的 8 元和兩位數的 10 元，最後的長度一樣」
-         *   —— 後綴全部去掉；長度靠 .hkm-num 對齊。
-         *   這一行改由 components/FeeLine.tsx 統一渲染。
+         *   文案與狀態（含「待確認」的虛線樣式）統一由 components/FeeLine.tsx 決定。
          */}
-        <FeeLine amount={fee.amount} note={fee.note} className="mt-2 text-sm text-fg" />
+        <FeeLine amount={fee.amount} note={fee.note} className="mt-2" />
         {/*
          * 地圖按鈕（改開彈層，不再外鏈 Google Maps）
          *
