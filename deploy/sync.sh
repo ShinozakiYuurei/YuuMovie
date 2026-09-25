@@ -114,6 +114,7 @@ else
   [ -x "$TSX" ] || { echo "✖ 缺 $TSX，先跑 npm ci --include=dev"; exit 1; }
   "$TSC" --noEmit
   "$TSX" probe/check-danger.mts
+  node --import tsx --test scripts/test-poster-parsers.mjs
   # MCL 官方详情从数字 ID 抓取；片名不符要拒绝，且分类/片长/简介须进组级资料卡。
   "$TSX" probe/check-mcl-details.mts
   "$TSX" probe/check-group-slug-status.mts

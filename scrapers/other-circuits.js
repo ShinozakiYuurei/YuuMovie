@@ -52,7 +52,8 @@ function firstText(html, tag, className) {
 }
 
 function attr(tag, name) {
-  return decode(tag.match(new RegExp('\\b' + name + '="([^"]*)"', 'i'))?.[1] || '');
+  const match = tag.match(new RegExp('\\b' + name + '\\s*=\\s*(?:"([^"]*)"|\'([^\']*)\')', 'i'));
+  return decode(match?.[1] ?? match?.[2] ?? '');
 }
 
 function digest(value) {
@@ -95,9 +96,32 @@ function scrapeDateTabs(html) {
   return out;
 }
 
+function posterTitleKey(title) {
+  return String(title || '')
+    .normalize('NFKC')
+    .replace(/怎麽可能我家的祖先是你家的鬼/g, '怎麼可能我家的祖先是你家的鬼')
+    .toLowerCase()
+    .replace(/[（(【\[]\s*(?:preview|chi|sp|meet\s*&\s*greet|優先|优先)\s*[)）】\]](?:\s*sp\b)?/gi, ' ')
+    .replace(/\s*(?:優先|优先)\s*$/g, ' ')
+    .replace(/[^a-z0-9\u3400-\u9fff]/g, '');
+}
+
+export function parseChinachemPosters(html, base = 'https://www.cel-cinemas.com') {
+  const posters = new Map();
+  for (const slide of blocksByClass(html, 'slide')) {
+    const title = text(slide.match(/<h4\b[^>]*>([\s\S]*?)<\/h4>/i)?.[1] || '');
+    const image = slide.match(/<img\b[^>]*>/i)?.[0] || '';
+    const src = attr(image, 'src') || attr(image, 'data-src');
+    const key = posterTitleKey(title);
+    if (key && src && !/poster-spacer/i.test(src)) posters.set(key, absoluteUrl(base, src));
+  }
+  return posters;
+}
+
 export async function scrapeChinachem() {
   const base = 'https://www.cel-cinemas.com';
   const html = await fetchText(base + '/en/home');
+  const posterByTitle = parseChinachemPosters(html, base);
   const tabs = scrapeDateTabs(html);
   const daySections = [...html.matchAll(/<div id="day-(\d+)"[^>]*class="time-wrap"[^>]*>/gi)];
   const movieMap = new Map();
@@ -113,8 +137,11 @@ export async function scrapeChinachem() {
       if (!title) continue;
       const movieId = 'chinachem-' + digest(title.toLowerCase());
       const image = movieBlock.match(/<img\b[^>]*>/i)?.[0] || '';
-      const poster = image ? absoluteUrl(base, attr(image, 'src')) : null;
-      if (!movieMap.has(movieId)) movieMap.set(movieId, { id: movieId, slug: '', nameZh: '', nameEn: title, openingDate: null, duration: null, category: null, dialect: null, subtitle: null, genres: [], director: null, cast: null, description: '', poster, trailer: null, detailUrl: base + '/en/home', status: 'showing', source: 'chinachem' });
+      const imageSrc = image ? attr(image, 'src') || attr(image, 'data-src') : '';
+      const poster = posterByTitle.get(posterTitleKey(title)) || (imageSrc && !/poster-spacer/i.test(imageSrc) ? absoluteUrl(base, imageSrc) : null);
+      const existingMovie = movieMap.get(movieId);
+      if (!existingMovie) movieMap.set(movieId, { id: movieId, slug: '', nameZh: '', nameEn: title, openingDate: null, duration: null, category: null, dialect: null, subtitle: null, genres: [], director: null, cast: null, description: '', poster, trailer: null, detailUrl: base + '/en/home', status: 'showing', source: 'chinachem' });
+      else if (!existingMovie.poster && poster) existingMovie.poster = poster;
       for (const sessionGroup of blocksByClass(movieBlock, 'session-type')) {
         const typeText = text(sessionGroup.match(/<p[^>]*>([\s\S]*?)<\/p>/i)?.[1] || '');
         const version = typeText.match(/^(2D|3D|IMAX|4DX|ScreenX)\b/i)?.[1] || null;
@@ -138,6 +165,12 @@ export async function scrapeChinachem() {
   return { movies: [...movieMap.values()], cinemas: [{ id: 'chinachem-plnym', code: 'PLNYM', nameZh: '巴黎倫敦紐約米蘭戲院', address: 'G/F Hong Lai Garden, Ho Pong Street, Tuen Mun, N.T.', mapUrl: mapSearch('Paris London New York Milano Cinema', 'Hong Lai Garden, Tuen Mun'), detailUrl: base + '/en/home', source: 'chinachem' }], shows };
 }
 
+export function parseLumenPoster(_html, filmId, base = 'https://www.lumencinema.com.hk') {
+  const id = String(filmId || '').replace(/^f-/i, '');
+  if (!id) return null;
+  return absoluteUrl(base, `/CDN/media/entity/get/FilmPosterGraphic/f-${id}?width=800&height=1200&referenceScheme=Global&allowPlaceHolder=true`);
+}
+
 export async function scrapeLumen() {
   const base = 'https://www.lumencinema.com.hk';
   const routes = [['NowShowing', 'showing'], ['ComingSoon', 'upcoming']];
@@ -155,10 +188,10 @@ export async function scrapeLumen() {
     const name = firstText(html, 'h3', 'boxout-title') || firstText(html, 'h2', 'film-title');
     if (!name) continue;
     const runtime = Number(html.match(/Run Time:\s*<\/label>\s*<span>(\d+)/i)?.[1]) || null;
-    const poster = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i)?.[1] || null;
+    const poster = parseLumenPoster(html, filmId, base);
     const blurb = firstText(html, 'p', 'boxout-blurb');
     const movieId = 'lumen-' + filmId.replace(/^f-/i, '');
-    movies.push({ id: movieId, slug: '', nameZh: '', nameEn: name, openingDate: null, duration: runtime, category: null, dialect: null, subtitle: null, genres: [], director: null, cast: null, description: blurb, poster: poster ? absoluteUrl(base, poster) : null, trailer: null, detailUrl: url, status, source: 'lumen' });
+    movies.push({ id: movieId, slug: '', nameZh: '', nameEn: name, openingDate: null, duration: runtime, category: null, dialect: null, subtitle: null, genres: [], director: null, cast: null, description: blurb, poster, trailer: null, detailUrl: url, status, source: 'lumen' });
     for (const [, anchor] of html.matchAll(/(<a\b[^>]*class="[^"]*\bsession-time\b[^"]*"[^>]*>[\s\S]*?<\/a>)/gi)) {
       const opening = anchor.match(/^<a\b[^>]*>/i)?.[0] || '';
       const href = attr(opening, 'href');
@@ -179,6 +212,13 @@ export async function scrapeLumen() {
 
 function stripScripts(html) {
   return html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ').replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ');
+}
+
+export function parseNewportPoster(block, base = 'https://www.theatre.com.hk') {
+  const images = [...block.matchAll(/<img\b[^>]*>/gi)].map(([tag]) => tag);
+  const posterImage = images.find((tag) => /\bclass\s*=\s*(?:"[^"]*\bmovieImageImg\b[^"]*"|'[^']*\bmovieImageImg\b[^']*')/i.test(tag)) || images[0] || '';
+  const src = attr(posterImage, 'src') || attr(posterImage, 'data-src');
+  return src ? absoluteUrl(base, src) : null;
 }
 
 function dmyDate(day, month) {
@@ -222,10 +262,10 @@ export async function scrapeNewport() {
     const language = info.match(/Language:\s*(.*?)(?:\s+Hyland\s+\(TM\)|\s+\d{1,2}\/\d{2}|$)/i)?.[1]?.trim() || null;
     const dialect = language ? language.replace(/\s*\([^)]*\)/, '').trim() : null;
     const subtitle = language?.match(/\(([^)]*)\)/)?.[1] || null;
-    const poster = block.match(/<img[^>]+class="movieImageImg"[^>]+src="([^"]+)"/i)?.[1] || null;
+    const poster = parseNewportPoster(block, base);
     if (!seenMovies.has(movieId)) {
       seenMovies.add(movieId);
-      movies.push({ id: 'newport-' + movieId, slug: '', nameZh: chineseNames.get(movieId) || '', nameEn: title, openingDate, duration, category, dialect, subtitle, genres: [], director: null, cast: null, description: '', poster: poster ? absoluteUrl(base, poster) : null, trailer: null, detailUrl: movieUrl, status: openingDate && openingDate > todayHkt() ? 'upcoming' : 'showing', source: 'newport' });
+      movies.push({ id: 'newport-' + movieId, slug: '', nameZh: chineseNames.get(movieId) || '', nameEn: title, openingDate, duration, category, dialect, subtitle, genres: [], director: null, cast: null, description: '', poster, trailer: null, detailUrl: movieUrl, status: openingDate && openingDate > todayHkt() ? 'upcoming' : 'showing', source: 'newport' });
     }
     for (const [, sessionId, li] of block.matchAll(/<li\b[^>]*data-index=['"]([^'"]+)['"][^>]*>([\s\S]*?)<\/li>/gi)) {
       const label = text(li);
@@ -288,6 +328,13 @@ function decodeJsString(value) {
   try { return JSON.parse(String.fromCharCode(34) + normalized + String.fromCharCode(34)); } catch { return normalized; }
 }
 
+export function parseSunbeamPoster(eventBody, base = 'https://cdn.sunbeamwhampoa.com') {
+  const raw = eventBody.match(/coverUrl:"((?:\\.|[^"\\])*)"/)?.[1];
+  if (!raw) return null;
+  const coverUrl = decodeJsString(raw);
+  return coverUrl ? absoluteUrl(base, coverUrl) : null;
+}
+
 export async function scrapeSunbeam() {
   const base = 'https://www.sunbeamwhampoa.com';
   const html = await fetchText(base + '/');
@@ -302,7 +349,8 @@ export async function scrapeSunbeam() {
     const movieId = 'sunbeam-' + eventId;
     const nameZh = decodeJsString(event[4]);
     const nameEn = decodeJsString(event[5]);
-    movies.set(movieId, { id: movieId, slug: '', nameZh, nameEn, openingDate: null, duration: null, category: null, dialect: null, subtitle: null, genres: [], director: null, cast: null, description: '', poster: null, trailer: null, detailUrl: base + '/schedule', status: 'showing', source: 'sunbeam' });
+    const poster = parseSunbeamPoster(body);
+    movies.set(movieId, { id: movieId, slug: '', nameZh, nameEn, openingDate: null, duration: null, category: null, dialect: null, subtitle: null, genres: [], director: null, cast: null, description: '', poster, trailer: null, detailUrl: base + '/schedule', status: 'showing', source: 'sunbeam' });
     for (const match of body.matchAll(/id:(\d+),eventId:(\d+),objectId:"([^"]*)",startDate:"(\d{4}-\d{2}-\d{2})",endDate:"[^"]+",startTime:"(\d{2}:\d{2})",startTimestamp:\d+,endTimestamp:\d+,venue:"([^"]+)",status:(!0|!1),ticketPrice:"([^"]*)"/g)) {
       const showId = match[1];
       const date = match[4];

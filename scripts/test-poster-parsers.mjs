@@ -12,10 +12,16 @@ test('Chinachem carousel poster maps titles and accepts either attribute order',
   const html = `
     <div class="slide"><h4 data-id="a">Resident Evil</h4><img src="/posters/re.jpg" class="poster"></div>
     <div class="slide"><img class="poster" src='https://cdn.example/v.jpg'><h4>V</h4></div>
+    <div class="slide"><h4>Oh My Ghost! Oh My God!(SP)</h4><img src="/posters/ghost.jpg"></div>
+    <div class="slide"><h4>怎麽可能我家的祖先是你家的鬼(優先)</h4><img src="/posters/ghost-zh.jpg"></div>
+    <div class="slide"><h4>CHIIKAWA the Movie: The Secret of the Mermaid Island</h4><img src="/posters/chiikawa.jpg"></div>
     <div class="slide"><h4>Placeholder</h4><img src="/images/poster-spacer.png"></div>`;
   const posters = parseChinachemPosters(html, 'https://www.cel-cinemas.com');
   assert.equal(posters.get('residentevil'), 'https://www.cel-cinemas.com/posters/re.jpg');
   assert.equal(posters.get('v'), 'https://cdn.example/v.jpg');
+  assert.equal(posters.get('ohmyghostohmygod'), 'https://www.cel-cinemas.com/posters/ghost.jpg');
+  assert.equal(posters.get('怎麼可能我家的祖先是你家的鬼'), 'https://www.cel-cinemas.com/posters/ghost-zh.jpg');
+  assert.equal(posters.get('chiikawathemoviethesecretofthemermaidisland'), 'https://www.cel-cinemas.com/posters/chiikawa.jpg');
   assert.equal(posters.has('placeholder'), false);
 });
 
@@ -47,6 +53,10 @@ test('Sunbeam resolves event coverUrl relative to its CDN', () => {
     parseSunbeamPoster(`coverUrl:"https://images.example/poster.jpg"`),
     'https://images.example/poster.jpg',
   );
+  assert.equal(
+    parseSunbeamPoster(String.raw`coverUrl:"whampoa\u002fcovers/a.jpg"`),
+    'https://cdn.sunbeamwhampoa.com/whampoa/covers/a.jpg',
+  );
   assert.equal(parseSunbeamPoster('coverUrl:null'), null);
 });
 
@@ -63,4 +73,9 @@ test('known screening suffixes normalize without damaging a one-letter title', (
   assert.equal(stripFormats('V (Meet & Greet)'), 'V');
   assert.equal(stripEnglishTitleNoise('Forgotten Island(Chi)SP'), 'Forgotten Island');
   assert.equal(normalizeTitle('怎麼可能我家的祖先是你家的鬼(優先)'), normalizeTitle('怎麼可能我家的祖先是你家的鬼'));
+  assert.equal(normalizeTitle('怎麽可能我家的祖先是你家的鬼'), normalizeTitle('怎麼可能我家的祖先是你家的鬼'));
+  assert.equal(
+    normalizeTitle('CHIIKAWA the Movie: The Secret of the Mermaid Isla'),
+    normalizeTitle('Chiikawa the Movie: The Secret of the Mermaid Island'),
+  );
 });

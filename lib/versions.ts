@@ -276,6 +276,11 @@ function preprocessTitle(raw: string): string {
     normalizeText(raw)
       // 括号内只包方言缩写：「(日)」「(粵語)」「(日本語)」
       .replace(/[（(【\[]\s*[日粵國英韓台美陸法](?:語|語版|片)?\s*[)）】\]]/g, ' ')
+      // 排片場次註記不是片名，且只移除明確的括號標記。
+      .replace(/[（(【\[]\s*chi\s*[)）】\]]\s*sp\b/gi, ' ')
+      .replace(/[（(【\[]\s*(?:preview|chi|sp|meet\s*&\s*greet|優先|优先)\s*[)）】\]]/gi, ' ')
+      // 新寶偶爾只在片名尾端加空格與「優先」，不帶「場」字。
+      .replace(/\s+(?:優先|优先)\s*$/g, ' ')
       // 括号内只包罗马序号：英皇用「(IV)」标系列第四部
       .replace(/[（(【\[]\s*(?:[IVX]{1,4}|\d{1,2})\s*[)）】\]](?=\s)/g, ' ')
       // 先移掉帶活動主題的整塊括號，避免留下活動名當成片名。
@@ -360,7 +365,13 @@ export function normalizeTitle(name: string | null | undefined): string {
   // 去掉首尾孤立的单字母 / 单字「版」（剥离残留）
   s = s.replace(/^[a-z]\s+|\s+[a-z]$/g, '').replace(/\s+版$/g, '').trim();
 
-  return s;
+  // 只修正完整已知片名，不做一般前綴/模糊比對，避免錯併其他電影。
+  // 新光「怎麽可能…」使用「麽」異體字；Lumen F000001400 則将 Mermaid Island 截成 Isla。
+  const exactTitleAliases: Record<string, string> = {
+    '怎麽可能我家的祖先是你家的鬼': '怎麼可能我家的祖先是你家的鬼',
+    'chiikawa the movie the secret of the mermaid isla': 'chiikawa the movie the secret of the mermaid island',
+  };
+  return exactTitleAliases[s] ?? s;
 }
 
 /**
@@ -410,6 +421,8 @@ export function stripFormats(name: string | null | undefined): string {
  *   （「Trial of Hein (KINO)」），不剥就与中文行对不上。
  */
 const EN_TITLE_NOISE_BRACKETS = [
+  // 院線片名欄位的括號場次註記；不移除作為裸片名的單字。
+  'Preview', 'SP', 'Meet & Greet',
   // 场次类型
   'Opening Day Special Screening', 'Early Bird Screening', 'VIP Screening',
   'Seat Cover Special Screening', 'Special Screening', 'Hi Bye Meet & Greet',
@@ -511,7 +524,7 @@ function isEnglishNoiseToken(inner: string): boolean {
  */
 export function stripEnglishTitleNoise(raw: string | null | undefined): string {
   if (!raw) return '';
-  let s = raw.trim();
+  let s = raw.trim().replace(/[（(\[【]\s*chi\s*[)）\]】]\s*sp\b/gi, ' ');
   for (let i = 0; i < 6; i++) {
     const before = s;
     // 1) 整块剔掉纯噪声的括号（含括号本身）
