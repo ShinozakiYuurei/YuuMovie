@@ -20,6 +20,7 @@ const must = [
   ['復仇者聯盟5：末日降臨', '開畫日特典首場 SCREENX - 復仇者聯盟5: 末日降臨 Infinity Vision'],
   ['復仇者聯盟5：末日降臨', '(IV) (開畫日特典首場) 復仇者聯盟5：末日降臨'],
   ['復仇者聯盟5：末日降臨', '(IV) (早鳥場) 復仇者聯盟5：末日降臨'],
+  ['復仇者聯盟5：末日降臨', '復仇者聯盟5 末日降臨 早鳥'],
 ];
 let bad = 0;
 for (const [a, b] of mustNot) if (normalizeTitle(a) === normalizeTitle(b)) { console.log('✗ 误并:', a, '/', b); bad++; }
