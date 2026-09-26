@@ -375,6 +375,40 @@ eq(
   Object.keys(GUIDE_SPECS).filter((id) => !CINEMA_FACILITIES[id]),
   []
 );
+
+// ============================================================
+// 6c. 「普通影廳」（standard）—— 用戶 2026-09-26 指定補上
+// ============================================================
+// 官方與第三方都沒有公佈設備規格的戲院，卡片本來是空的。這個標籤把
+// 「已查過、官方廳名全是編號廳」這件事說出來，讓卡片不再像漏做。
+//
+// ★ 兩個方向都要鈎死，因為它同時有「漏標」與「多標」兩種靜默失效：
+//   漏標 → 卡片又退回空的（用戶最初投訴的就是這個）
+//   多標 → 跟「4K 放映」同時出現，被讀成矛盾（見 cinema-specs.ts 的說明）
+eq(
+  '沒有戲院是「完全沒有規格標籤」的（否則卡片又會退回空的）',
+  rows.filter((r) => r.specs.length === 0).map((r) => r.id),
+  []
+);
+eq(
+  '「普通影廳」不與其他規格同時出現',
+  rows.filter((r) => r.specs.some((s) => s.key === 'standard') && r.specs.length > 1).map((r) => r.id),
+  []
+);
+// 反方向：官方廳名帶品牌／高階格式的戲院不得被標成「普通影廳」——
+// 這是這個標籤唯一可能說謊的方向（MCL 有品牌廳時一定會寫進廳名，
+// 如「IMAX/12院」「LUXE」「Onyx Cinema LED」；影藝寫「7院 / IMAX」「VIP House」）。
+const brandedHallName = /imax|luxe|onyx|mx4d|4dx|coronet|house fx|white box|black box|family house|festival suite|vivo|oval office|mm plus|mm moments|moviemaxx|cgs|thx|screen\s*x|cinity|real\s*d|k\s*star|sweetbox|vip|兒童影院/i;
+eq(
+  '「普通影廳」只給官方廳名沒有品牌／高階格式的戲院',
+  Object.entries(CINEMA_FACILITIES)
+    .filter(([id, f]) => f.specs.includes('standard') && brandedHallName.test(
+      [...(CINEMA_FACILITIES[id]?.details ?? [])].join(' ') + ' ' + JSON.stringify(GUIDE_SPECS[id] ?? [])
+    ))
+    .map(([id]) => id),
+  []
+);
+eq('「普通影廳」是合法規格 key', HALL_SPECS.some((s) => s.key === 'standard'), true);
 const copy = fixedCinemaSpecs('broadway-4');
 copy.push('fake');
 eq('固定配置回傳副本，不被呼叫方修改', fixedCinemaSpecs('broadway-4'), ['dtsx', 'dolby71']);
@@ -390,8 +424,8 @@ for (const [id, facilities] of Object.entries(CINEMA_FACILITIES)) {
 
 const keys = HALL_SPECS.map((s) => s.key);
 eq('规格 key 无重复', new Set(keys).size, keys.length);
-if (HALL_SPECS.length !== 39) {
-  console.log(`✗ 规格条数变了（${HALL_SPECS.length} ≠ 39）—— 增删规格请同步本测试的期望值`);
+if (HALL_SPECS.length !== 40) {
+  console.log(`✗ 规格条数变了（${HALL_SPECS.length} ≠ 40）—— 增删规格请同步本测试的期望值`);
   bad++;
 }
 // 每个规格都要有 label，且不能出现空 label（空 label 会在下拉里留一个空白行）
@@ -401,11 +435,13 @@ for (const s of HALL_SPECS) {
     bad++;
   }
 }
-// 放映格式必须排在特色影廳之前（下拉里的分组标题才不会来回跳）
-const firstPremium = HALL_SPECS.findIndex((s) => s.group === 'premium');
-const lastFormat = HALL_SPECS.map((s) => s.group).lastIndexOf('format');
-if (firstPremium < lastFormat) {
-  console.log('✗ 放映格式与特色影廳在 HALL_SPECS 里交错，分组标题会重复出现');
+// 分组必须按声明顺序**连续成块**：下拉里靠「与上一个选项 group 不同」插小标题，
+// 一旦交错，同一个标题会在清单里重复出现好几次。
+const GROUP_ORDER = ['format', 'premium', 'hall'];
+const seenGroups = HALL_SPECS.map((s) => s.group);
+const orderedGroups = GROUP_ORDER.filter((g) => seenGroups.includes(g)).flatMap((g) => seenGroups.filter((x) => x === g));
+if (JSON.stringify(seenGroups) !== JSON.stringify(orderedGroups)) {
+  console.log(`✗ HALL_SPECS 的分组不是按 ${GROUP_ORDER.join(' → ')} 连续成块：${seenGroups.join(',')}`);
   bad++;
 }
 

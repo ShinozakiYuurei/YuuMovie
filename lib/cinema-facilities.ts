@@ -183,11 +183,11 @@ export const CINEMA_FACILITIES: Record<string, CinemaFacilities> = {
     '官方固定表列 1–6 院，廳名無品牌標示；官方「設施」表只列影院／座位數目／輪椅座位，未列音響與放映機。',
     '未取得足以確認設備的院方資料，不等同於沒有相關設備。',
   ]),
-  'mcl-003': mcl('003', [], [
+  'mcl-003': mcl('003', ['standard'], [
     '官方固定表列 1–3 院，廳名無品牌標示；官方「設施」表只列影院／座位數目／輪椅座位，未列音響與放映機。',
     '未取得足以確認設備的院方資料，不等同於沒有相關設備。',
   ]),
-  'mcl-009': mcl('009', [], [
+  'mcl-009': mcl('009', ['standard'], [
     '官方固定表列 1–6 院，廳名無品牌標示；官方「設施」表只列影院／座位數目／輪椅座位，未列音響與放映機。',
     '未取得足以確認設備的院方資料，不等同於沒有相關設備。',
   ]),
@@ -199,7 +199,7 @@ export const CINEMA_FACILITIES: Record<string, CinemaFacilities> = {
     '官方固定表列 1–3 院，廳名無品牌標示；官方「設施」表只列影院／座位數目／輪椅座位，未列音響與放映機。',
     '未取得足以確認設備的院方資料，不等同於沒有相關設備。',
   ]),
-  'mcl-015': mcl('015', [], [
+  'mcl-015': mcl('015', ['standard'], [
     '官方固定表列 1–4 院，廳名無品牌標示；官方「設施」表只列影院／座位數目／輪椅座位，未列音響與放映機。',
     '未取得足以確認設備的院方資料，不等同於沒有相關設備。',
   ]),
@@ -216,7 +216,9 @@ export const CINEMA_FACILITIES: Record<string, CinemaFacilities> = {
   'cineart-16': cineart(['imax', 'vip'], [
     '7 院：IMAX；另設 VIP House。固定表未明示 IMAX 激光，不以品牌名稱推定放映機。',
   ]),
-  'cineart-19': cineart([], [
+  // 「普通影廳」的判據見 lib/cinema-specs.ts 的 standard 規則：官方固定表只列編號廳，
+  // 且完全沒有公佈放映／音響規格。用戶 2026-09-26 指定把這幾間補上。
+  'cineart-19': cineart(['standard'], [
     '荷里活分店官方固定表列 1–6 院；官方網站該分店的介紹欄仍是佔位文字（未填寫），本次未取得設備說明。',
   ]),
   // 官網（cinearthouse.com.hk）該分店介紹原文：「影藝戲院 - 青衣城，設六間影廳，
@@ -229,7 +231,7 @@ export const CINEMA_FACILITIES: Record<string, CinemaFacilities> = {
   'cineart-18': cineart([], [
     '銅鑼灣 JP 分店官方固定表列 1–2 院；本次未確認其他設備規格或品牌特色廳。',
   ]),
-  'cineart-23': cineart([], [
+  'cineart-23': cineart(['standard'], [
     '新港城分店官方固定表列 1–4 院；官方網站該分店的介紹欄仍是佔位文字（未填寫），本次未取得設備說明。',
   ]),
   'goldenscene-1': official(['laser', 'dolby71', '3d'], [
@@ -246,14 +248,15 @@ export const CINEMA_FACILITIES: Record<string, CinemaFacilities> = {
   'sunbeam-1': official(['4k', 'laser', 'dolby71'], [
     '官方設備頁列 NEC 4K Laser Projector、Dolby Surround 7.1 及 JBL Cinema Grade Speakers；未逐院限定。',
   ], '新光黃埔官方設備', 'https://www.sunbeamwhampoa.com/facilities'),
-  'chinachem-plnym': official([], [
+  'chinachem-plnym': official(['standard'], [
     '官方介紹確認 4 個影廳、共 1,026 座，僅籠統描述數碼影院設備；未明示 4K、激光或 Atmos 等規格。',
     '官網全部頁面（關於我們／戲院包廂／常見問題／條款等）均無設備規格頁。',
+    '場次資料顯示廳名為 HOUSE 1–4，均為編號廳。',
   ], '華懋官方影院介紹', 'https://www.cel-cinemas.com/en/info/cinema'),
   // 全站唯一既無官方網站、也不在所屬院線官網列表裡的戲院：
   // 新寶院線官網（theatre.com.hk）的戲院列表只有凱都戲院，未列此影院。
   'lux-1': {
-    specs: [],
+    specs: ['standard'],
     details: [
       '單一影廳（House 1）；寶石戲院不設官方網站，新寶院線官網的戲院列表亦未收錄此影院。',
       '本次未取得足以確認放映／音響規格的院方資料，不等同於沒有相關設備。',

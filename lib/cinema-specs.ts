@@ -34,12 +34,13 @@
  * 只是在面板里用分组标题与「放映格式」区分开。
  */
 
-/** 规格分组：放映格式（通用） / 特色影廳（院线自有品牌厅） */
-export type SpecGroup = 'format' | 'premium';
+/** 规格分组：放映格式（通用） / 特色影廳（院线自有品牌厅） / 影廳類型 */
+export type SpecGroup = 'format' | 'premium' | 'hall';
 
 export const SPEC_GROUP_LABEL: Record<SpecGroup, string> = {
   format: '放映／音響規格',
   premium: '特色影廳',
+  hall: '影廳類型',
 };
 
 interface SpecRule {
@@ -112,6 +113,28 @@ const SPEC_RULES: SpecRule[] = [
   { key: 'sweetbox', label: 'SWEETBOX', group: 'premium', re: /\bsweetbox\b/i, fields: ['house'] },
   { key: 'vip', label: 'VIP 影廳', group: 'premium', re: /\bvip\s*(?:house|院|影廳)?\b/i, fields: ['house'] },
   { key: 'kidshouse', label: '兒童影院', group: 'premium', re: /兒童影院|儿童影院/i, fields: ['house'] },
+
+  // ---------- 影廳類型 ----------
+  //
+  // `standard`「普通影廳」只在**一種**情形給出：
+  //   院方完全沒有公佈這間戲院的放映／音響／品牌影廳規格，
+  //   而影廳表裡列出的又全是編號／通用廳名（「1院」「HOUSE 1」）。
+  //
+  // ★ 為什麼範圍故意收窄，不推廣到「官方影廳表沒有品牌廳」的所有戲院：
+  //   百老匯的 USL 8 聲道、英皇黃竹坑的 3D、Cinema City 的 3D 也是「沒有品牌廳」，
+  //   但它們已經有自己的標籤。再加一個「普通影廳」只會讓「這間有沒有特色廳」
+  //   這件事變成要跨兩組標籤讀 —— 而卡片上同時出現「普通影廳」與「4K 放映」
+  //   更容易被讀成矛盾。
+  //
+  // ★ 它是一句**已核實的陳述**，不是「沒有設備」的推論：
+  //   官方影廳表有品牌廳時一定會寫進廳名（MCL 的「IMAX/12院」「LUXE」
+  //   「Onyx Cinema LED」、影藝的「7院 / IMAX」「VIP House」都是證據），
+  //   所以「全部是編號廳」可推得「沒有品牌特色廳」；
+  //   但**推不出**「沒有 Atmos／4K」—— 那些不會改廳名。
+  //   詳情頁的措辭必須跟這個邊界一致（見 CinemaGuideDialog）。
+  //
+  // fields 為空：只能由官方配置表補入（見 CINEMA_FACILITIES），不認片名或場次版本。
+  { key: 'standard', label: '普通影廳', group: 'hall', re: /普通影廳|普通厅/, fields: [] },
 ];
 
 /** 全部规格（展示顺序） */
