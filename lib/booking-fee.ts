@@ -215,10 +215,9 @@ const BY_SOURCE: Partial<Record<Source, BookingFee>> = {
  *   與 CGV / 影藝一致 —— 用戶確認過的金額就寫成肯定句，
  *   原始出處（分店資料 Online Admin Fee、院線 FAQ「$6 起」）留在註解裡供複核。
  *
- * ⚠️ 但有一點與寶石不同、仍未理清：凱都的分店頁註明「目前沒有網上售票」。
- *   寶石遇到同樣情況時用戶選擇改為「不設網上購票」（FEE_NO_ONLINE），
- *   而凱都這裡維持 $6。若日後確認凱都確實無網售，
- *   應比照寶石改為 FEE_NO_ONLINE，否則用戶會以為能在線上買。
+ * ★ 2026-09-26 用戶貼圖確認凱都目前**仍設網上購票**
+ *   （新寶自家售票頁 26/09 17:50 還在賣《我阿爹想旅行》），所以維持 $6 是對的。
+ *   專案舊 memory 裡「凱都目前沒有網上售票」是過期資訊，不要再當依據。
  */
 const BY_CINEMA: Record<string, BookingFee> = {
   'newport-hyland': {
