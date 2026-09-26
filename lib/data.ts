@@ -21,7 +21,7 @@ import { zhGenres, dropParents } from './genre-zh';
 import { zhLanguages, zhSubtitles } from './lang-zh';
 import { inferGeo, districtOrder, REGION_ORDER } from './region';
 import { hallSpecsOf, sortSpecs, HALL_SPECS, specLabel, SPEC_GROUP_LABEL } from './cinema-specs';
-import { fixedCinemaSpecs } from './cinema-facilities';
+import { fixedCinemaSpecs, guideCinemaSpecs } from './cinema-facilities';
 import { bookingFeeOf } from './booking-fee';
 import type { BookingFee } from './booking-fee';
 // 已開映場次的判定：與客戶端（components/CinemaShowtimes.tsx 等）共用同一份規則
@@ -635,9 +635,20 @@ function load() {
 
   // 官方固定配置先入集合，再用場次補充；不能讓影院設備隨檔期消失。
   // 廳號、核對日期及來源都集中在 cinema-facilities.ts，而非散落在讀取邏輯。
-  const specsByCinema = new Map<string, Set<string>>(
-    cinemas.map((c) => [c.id, new Set(fixedCinemaSpecs(c.id))])
-  );
+  //
+  // 三層來源，可信度由高到低：
+  //   1. 院方明示（fixedCinemaSpecs）
+  //   2. 場次證據（hallSpecsOf）
+  //   3. 第三方觀眾指南（guideCinemaSpecs）—— 僅供篩選補齊，非院方公布
+  // 1、2 都沒有的、只有指南支持的規格會記進 guideSpecs，卡片要標明來源
+  // （用戶 2026-09-26 指定：放寬「只採院方明示」的前提是附來源標註）。
+  const officialByCinema = new Map(cinemas.map((c) => [c.id, new Set(fixedCinemaSpecs(c.id))]));
+  const specsByCinema = new Map(cinemas.map((c) => [c.id, new Set(fixedCinemaSpecs(c.id))]));
+  for (const c of cinemas) {
+    const set = specsByCinema.get(c.id);
+    if (set) for (const k of guideCinemaSpecs(c.id)) set.add(k);
+  }
+  const evidenceByCinema = new Map<string, Set<string>>();
   for (const s of shows) {
     const keys = hallSpecsOf({
       houseName: s.houseName,
@@ -647,9 +658,21 @@ function load() {
     if (!keys.length) continue;
     let set = specsByCinema.get(s.cinemaId);
     if (!set) specsByCinema.set(s.cinemaId, (set = new Set()));
-    for (const k of keys) set.add(k);
+    let evidence = evidenceByCinema.get(s.cinemaId);
+    if (!evidence) evidenceByCinema.set(s.cinemaId, (evidence = new Set()));
+    for (const k of keys) {
+      set.add(k);
+      evidence.add(k);
+    }
   }
-  for (const c of cinemas) c.specs = sortSpecs([...(specsByCinema.get(c.id) ?? [])]);
+  for (const c of cinemas) {
+    c.specs = sortSpecs([...(specsByCinema.get(c.id) ?? [])]);
+    c.guideSpecs = sortSpecs(
+      guideCinemaSpecs(c.id).filter(
+        (k) => !(officialByCinema.get(c.id)?.has(k) ?? false) && !(evidenceByCinema.get(c.id)?.has(k) ?? false)
+      )
+    );
+  }
 
   // 海报瘦身：只在载入时做一次，随后进缓存（不重复解析 URL）
   // 命中本地清单则改为同源 /posters/*.webp（见 slimPoster 注释）
@@ -1749,6 +1772,11 @@ export interface CinemaRow {
   region: Region | null;
   district: string | null;
   specs: { key: string; label: string }[];
+  /**
+   * 其中**只有第三方觀眾指南支持**的規格 key（官方表與場次證據都沒有）。
+   * 卡片必須用不同樣式標明來源；詳情頁另開一節說明出處。
+   */
+  guideSpecs: string[];
   /** 網上購票手續費（每張票）；規則見 lib/booking-fee.ts */
   fee: BookingFee;
 }
@@ -1776,6 +1804,7 @@ export function getCinemaRows(): CinemaRow[] {
     region: c.region ?? null,
     district: c.district ?? null,
     specs: (c.specs ?? []).map((k) => ({ key: k, label: specLabel(k) })),
+    guideSpecs: c.guideSpecs ?? [],
     fee: bookingFeeOf(c.id, c.source),
   }));
 }

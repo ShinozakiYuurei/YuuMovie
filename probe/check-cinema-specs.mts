@@ -23,7 +23,8 @@
 import { hallSpecsOf, HALL_SPECS, sortSpecs, specLabel } from '../lib/cinema-specs.ts';
 import { readFileSync } from 'node:fs';
 import { getCinemaRows, getMeta, getCinemaFacets } from '../lib/data.ts';
-import { CINEMA_FACILITIES, fixedCinemaSpecs } from '../lib/cinema-facilities.ts';
+import { CINEMA_FACILITIES, GUIDE_SPECS, fixedCinemaSpecs, guideCinemaSpecs } from '../lib/cinema-facilities.ts';
+import { CINEMA_GUIDES } from '../lib/cinema-guides.ts';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -293,13 +294,87 @@ try {
   if (result.status === 0) {
     const fixtureRows = JSON.parse(result.stdout.trim()) as { id: string; specs: string[] }[];
     for (const [id, facilities] of Object.entries(CINEMA_FACILITIES)) {
-      eq(`沒有排片仍保留固定配置：${id}`, fixtureRows.find((c) => c.id === id)?.specs, sortSpecs(facilities.specs));
+      eq(`沒有排片仍保留固定配置：${id}`, fixtureRows.find((c) => c.id === id)?.specs, sortSpecs([...facilities.specs, ...guideCinemaSpecs(id)]));
     }
   } else console.log(result.stderr);
 } finally {
   rmSync(fixtureDir, { recursive: true, force: true });
 }
 eq('未確認影院不硬補規格', fixedCinemaSpecs('unverified-cinema'), []);
+eq('未確認影院不硬補指南規格', guideCinemaSpecs('unverified-cinema'), []);
+
+// ============================================================
+// 6b. 觀眾指南層（第三方）的來源完整性
+// ============================================================
+// 這一層是 2026-09-26 用戶指定放寬「只採院方明示」後新增的，代價是可信度較低，
+// 因此必須用程式把兩件事鈎死：
+//   1. 指南標籤必須真的能在指南原文裡找到依據（防止這一層脫離原文、變成杜撰）
+//   2. 只有指南支持、官方與場次都沒有的規格，必須記進 guideSpecs（卡片要標來源）
+const GUIDE_KEYWORD: Record<string, RegExp> = {
+  imax: /imax/i,
+  atmos: /atmos|全景聲/i,
+  '4dx': /4dx/i,
+  mx4d: /mx4d/i,
+  luxe: /luxe/i,
+  onyx: /onyx/i,
+  dtsx: /dts\s*:?\s*x/i,
+  auromax: /auromax/i,
+  dolby71: /dolby\s*(?:sls\s*)?7\.1|杜比\s*7\.1/i,
+  usl8: /usl\s*8/i,
+  '4k': /4k/i,
+  laser: /激光|鐳射|雷射|laser/i,
+  masterimage: /masterimage/i,
+  srdex: /srd\s*-\s*ex/i,
+  thx: /thx/i,
+  cgs: /cgs/i,
+  screenx: /screen\s*x/i,
+  cinity: /cinity/i,
+  reald: /reald/i,
+  dbox: /d-?box/i,
+  '3d': /3d/i,
+};
+for (const [id, keys] of Object.entries(GUIDE_SPECS)) {
+  eq(`指南規格 ${id} 的 key 全部有效`, keys.every((k) => HALL_SPECS.some((s) => s.key === k)), true);
+  eq(`指南規格 ${id} 不重複`, new Set(keys).size, keys.length);
+  const guide = CINEMA_GUIDES[id];
+  eq(`指南規格 ${id} 有對應的指南條目`, guide !== undefined, true);
+  if (!guide) continue;
+  const text = JSON.stringify(guide);
+  const unsupported = keys.filter((k) => !GUIDE_KEYWORD[k] || !GUIDE_KEYWORD[k].test(text));
+  eq(`指南規格 ${id} 每條都能在指南原文找到依據`, unsupported, []);
+}
+
+// 指南層確實把「官方不公布設備」的戲院救回來了：這三間在 2026-09-26 前是空的。
+for (const [id, key] of [['mcl-002', 'dolby71'], ['mcl-013', 'dolby71'], ['mcl-021', '4k']]) {
+  eq(`官方不公布設備的戲院由指南補齊：${id} / ${key}`, fixedCinemaSpecs(id).concat(guideCinemaSpecs(id)).includes(key), true);
+}
+// 官方已有的規格不得被記成「僅指南支持」（否則卡片會把院方公布的事實標成指南來源）。
+eq(
+  '官方已公布的規格不會被標成指南來源',
+  Object.keys(GUIDE_SPECS).filter((id) => guideCinemaSpecs(id).some((k) => fixedCinemaSpecs(id).includes(k))),
+  []
+);
+// 全表断言，不依賴本地 data/ 裡剛好有哪些戲院（本機只有 40 間，服務器更多）。
+eq(
+  'guideSpecs 只裝指南來源的規格（不得含官方已公布或查不到的 key）',
+  rows.filter((r) => r.guideSpecs.some((k) => !guideCinemaSpecs(r.id).includes(k))).map((r) => r.id),
+  []
+);
+eq(
+  '指南規格全部進了戲院頁的規格集合（否則篩選看不到）',
+  rows.filter((r) => guideCinemaSpecs(r.id).some((k) => !r.specs.some((s) => s.key === k))).map((r) => r.id),
+  []
+);
+eq(
+  '官方已公布的規格不會被標成「僅指南支持」',
+  rows.filter((r) => r.guideSpecs.some((k) => fixedCinemaSpecs(r.id).includes(k))).map((r) => r.id),
+  []
+);
+eq(
+  '指南規格都有對應的戲院配置條目（否則 fixture 與戲院頁都覆蓋不到）',
+  Object.keys(GUIDE_SPECS).filter((id) => !CINEMA_FACILITIES[id]),
+  []
+);
 const copy = fixedCinemaSpecs('broadway-4');
 copy.push('fake');
 eq('固定配置回傳副本，不被呼叫方修改', fixedCinemaSpecs('broadway-4'), ['dtsx', 'dolby71']);

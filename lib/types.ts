@@ -123,11 +123,17 @@ export interface Cinema {
   /**
    * 影廳規格（如 ['imax','atmos'] / ['luxe']）
    *
-   * 讀取層合併官方固定配置（lib/cinema-facilities.ts）與
-   * 「影廳名 + 場次版本 + 片名」證據（lib/cinema-specs.ts），非抓取字段。
+   * 讀取層合併三層來源：官方固定配置（lib/cinema-facilities.ts 的 specs）、
+   * 「影廳名 + 場次版本 + 片名」證據（lib/cinema-specs.ts）、
+   * 以及第三方觀眾指南整理（同檔的 GUIDE_SPECS），非抓取字段。
    * 空陣列只表示暫未確認規格，不代表影院沒有相關設備；不因沒有排片而移除固定配置。
    */
   specs?: string[];
+  /**
+   * 其中**只有第三方觀眾指南支持**的規格 key（官方表與場次證據都沒有）。
+   * 與 specs 分開存，因為 UI 必須標明來源 —— 指南整理不是院方公布。
+   */
+  guideSpecs?: string[];
 }
 
 /** 香港大區（与 hkmovie6 的「所有地區」一致） */

@@ -8,12 +8,18 @@ export function CinemaGuideDialog({
   name,
   address,
   guide,
+  guideSpecs = [],
   onClose,
 }: {
   cinemaId: string;
   name: string;
   address: string;
   guide: CinemaGuideContent;
+  /**
+   * 只有第三方觀眾指南支持、院方未公布的規格。
+   * 必須與「已核實規格」分開顯示 —— 兩者的可信度不同（見 GUIDE_SPECS 註釋）。
+   */
+  guideSpecs?: { key: string; label: string }[];
   onClose: () => void;
 }) {
   const facilities = CINEMA_FACILITIES[cinemaId];
@@ -60,6 +66,22 @@ export function CinemaGuideDialog({
               </div>
               <p className="mt-2 text-xs leading-relaxed text-fg-muted">
                 核對日期：{facilities.verifiedOn}。規格按影廳而異，不代表每廳或每場均提供；場次格式以售票頁為準。
+              </p>
+            </section>
+          )}
+          {guideSpecs.length > 0 && (
+            <section>
+              <h4 className="text-sm font-semibold text-fg">觀眾指南整理的規格</h4>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {guideSpecs.map((spec) => (
+                  <span key={spec.key} className="hkm-chip hkm-chip-guide">{spec.label}</span>
+                ))}
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-fg-muted">
+                以上規格來自第三方《觀眾指南》整理，
+                <strong className="font-semibold text-fg-soft">並非院方公布</strong>
+                。院方未公開此戲院的放映／音響規格，因此不列入上一節的「已核實規格」；
+                同一戲院可能只有部分影廳具備這些規格，以現場及售票頁為準。
               </p>
             </section>
           )}

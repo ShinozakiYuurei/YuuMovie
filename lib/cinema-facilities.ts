@@ -267,3 +267,65 @@ export const CINEMA_FACILITIES: Record<string, CinemaFacilities> = {
 export function fixedCinemaSpecs(cinemaId: string): string[] {
   return [...(CINEMA_FACILITIES[cinemaId]?.specs ?? [])];
 }
+
+/**
+ * 第三方《觀眾指南》整理的設備摘要 → 規格 key。
+ *
+ * ★ 與 CINEMA_FACILITIES.specs 是**兩層**，不可混為一談：
+ *     CINEMA_FACILITIES.specs  院方明示（官網／官方 API），可作事實引用
+ *     GUIDE_SPECS              第三方觀眾指南整理，**非院方公布**，UI 必須標明來源
+ *
+ * ===== 為什麼要這一層（2026-09-26 用戶指定）=====
+ *
+ * 這些戲院的放映／音響規格院方根本不公布：MCL 官方「設施」表只有
+ * 影院／座位數目／輪椅座位三欄；影藝、華懋官網沒有設備欄。
+ * 只採院方明示的話，用戶篩「4K」看不到這些戲院 —— 跟
+ * 「篩 IMAX 看不到 K11」是同一類靜默失效（頁面照樣 200，只是清單少幾家）。
+ *
+ * 用戶明確要求放寬「只採院方明示」的規則，**條件是附來源標註**：
+ * 卡片上這層規格用虛線標籤 + 「指南」註記，詳情頁另開一節說明出處。
+ *
+ * 每條都必須能在 CINEMA_GUIDES 的文字裡找到對應依據；
+ * probe/check-cinema-specs.mts 逐條回查，防止這一層偏離指南原文。
+ */
+export const GUIDE_SPECS: Record<string, string[]> = {
+  // 英皇：官方固定表只給廳型（Atmos／IMAX／CORONET），放映機與音響靠指南補。
+  'emperor-57002': ['4k'],
+  'emperor-57003': ['dolby71'],
+  'emperor-57004': ['4k', 'dolby71'],
+  'emperor-57005': ['4k', 'laser', 'dolby71'],
+  'emperor-57006': ['4k', 'laser'],
+  'emperor-57007': ['4k', 'laser', 'dolby71'],
+  'emperor-57008': ['4k', 'laser', 'dolby71'],
+  // 屯門新都：指南明寫「並非全激光」，故只取 4K，不取激光。
+  'emperor-57010': ['4k'],
+  'emperor-57011': ['4k', 'laser'],
+
+  // 百老匯：官方固定表只有廳型，放映機／音響由指南補。
+  'broadway-1': ['4k', 'laser'],
+  'broadway-2': ['4k', 'laser'],
+  'broadway-6': ['4k', 'laser'],
+  'broadway-7': ['cgs', '4k', 'laser'],
+  'broadway-10': ['4k', 'laser'],
+
+  // Cinema City
+  'cinemacity-55001': ['dolby71'],
+  'cinemacity-55002': ['4k', 'dolby71'],
+
+  // MCL：官方「設施」表只有影院／座位數／輪椅座位，設備全靠指南。
+  'mcl-002': ['4k', 'laser', 'dolby71'],
+  'mcl-005': ['4k', 'mx4d', 'atmos'],
+  'mcl-012': ['dolby71'],
+  'mcl-013': ['dolby71'],
+  'mcl-014': ['4k', 'laser', 'atmos'],
+  'mcl-016': ['4k', 'laser', 'atmos'],
+  'mcl-017': ['4k', 'laser', 'atmos', 'dolby71'],
+  'mcl-018': ['4k', 'laser', 'atmos', 'dolby71'],
+  'mcl-021': ['4k', 'laser', 'dolby71'],
+  'mcl-022': ['laser', 'atmos', 'dolby71'],
+};
+
+/** 觀眾指南整理的規格（非院方公布）。回傳副本。 */
+export function guideCinemaSpecs(cinemaId: string): string[] {
+  return [...(GUIDE_SPECS[cinemaId] ?? [])];
+}

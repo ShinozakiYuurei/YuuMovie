@@ -1602,6 +1602,23 @@ html[data-theme='pink'] .hkm-accent-panel {
 }
 
 /*
+ * 觀眾指南來源的規格標籤（hkm-chip 的變體）
+ *
+ * ★ 為什麼必須長得跟 hkm-chip 不一樣：
+ *   這一層規格來自第三方《觀眾指南》整理，**不是院方公布**。
+ *   若長得一樣，用戶會把它當成與「已核實規格」同等的事實 ——
+ *   而這正是「放寬只採院方明示」這個決定的代價，必須在視覺上付清。
+ *   虛線邊框是通用語彙裡的「非正式／來源較軟」標記，且不佔用顏色 ——
+ *   顏色在本站是「餘座」的專屬語義，別處不許佔用（見 CinemaExplorer 註釋）。
+ *
+ * 文字降到 --hkm-fg-muted（仍在 AA 線以上，見 probe/check-contrast.mts）。
+ */
+.hkm-chip-guide {
+  border-style: dashed;
+  color: var(--hkm-fg-muted);
+}
+
+/*
  * 手續費是一般次要文字，不使用 hkm-chip，也不加玻璃底、描邊或高光。
  * align-self 避免它在 flex column 卡片中被預設拉伸成一整行的膠囊寬度。
  */
