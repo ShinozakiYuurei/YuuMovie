@@ -183,6 +183,59 @@ export function cinemaCoord(id: string): [number, number] | null {
   return CINEMA_COORD[id] ?? null;
 }
 
+// ---------- GCJ-02 坐标转换（瓦片用高德，WGS-84 坐标需偏移 ~595m） ----------
+
+const GCJ_AXIS = 6378245.0;
+const GCJ_EE = 0.00669342162296594323;
+
+/** 判断坐标是否在中国大陆范围（在此范围内 WGS-84 ↔ GCJ-02 才有意义；HK/MO/TW 也算） */
+function outOfGcjChina(lat: number, lon: number): boolean {
+  // 包含港澳台一并偏移：HK 在 lon 113.8–114.5，lat 22.1–22.6 落在范围内
+  if (lon < 72.004 || lon > 137.8347) return true;
+  if (lat < 0.8293 || lat > 55.8271) return true;
+  return false;
+}
+
+/**
+ * WGS-84 → GCJ-02（高德/腾讯/百度坐标系）
+ *
+ * 香港实测偏移约 595m（不转换则标记会落在 6 个街口之外）。
+ * 公式来自测绘局公开算法；若坐标不在大陆/港澳/台湾范围，原样返回。
+ */
+export function wgs84ToGcj02(lat: number, lon: number): [number, number] {
+  if (outOfGcjChina(lat, lon)) return [lat, lon];
+  const dLat = transformLat(lon - 105, lat - 35);
+  const dLon = transformLon(lon - 105, lat - 35);
+  const rad = (lat / 180) * Math.PI;
+  let magic = Math.sin(rad);
+  magic = 1 - GCJ_EE * magic * magic;
+  const sqrtMagic = Math.sqrt(magic);
+  const adjLat = (dLat * 180) / (((GCJ_AXIS * (1 - GCJ_EE)) / (magic * sqrtMagic)) * Math.PI);
+  const adjLon = (dLon * 180) / ((GCJ_AXIS / sqrtMagic) * Math.cos(rad) * Math.PI);
+  return [lat + adjLat, lon + adjLon];
+}
+
+function transformLat(x: number, y: number): number {
+  let r = -100 + 2 * x + 3 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x));
+  r += ((20 * Math.sin(6 * x * Math.PI) + 20 * Math.sin(2 * x * Math.PI)) * 2) / 3;
+  r += ((20 * Math.sin(y * Math.PI) + 40 * Math.sin((y / 3) * Math.PI)) * 2) / 3;
+  r += ((160 * Math.sin((y / 12) * Math.PI) + 320 * Math.sin((y * Math.PI) / 30)) * 2) / 3;
+  return r;
+}
+
+function transformLon(x: number, y: number): number {
+  let r = 300 + x + 2 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x));
+  r += ((20 * Math.sin(6 * x * Math.PI) + 20 * Math.sin(2 * x * Math.PI)) * 2) / 3;
+  r += ((20 * Math.sin(x * Math.PI) + 40 * Math.sin((x / 3) * Math.PI)) * 2) / 3;
+  r += ((150 * Math.sin((x / 12) * Math.PI) + 300 * Math.sin((x / 30) * Math.PI)) * 2) / 3;
+  return r;
+}
+
+/** 地圖外鏈（高德地圖網頁版） */
+export function amapUrl(lat: number, lon: number): string {
+  return `https://uri.amap.com/marker?position=${lon.toFixed(6)},${lat.toFixed(6)}&name=戲院&src=hkmovie&coordinate=gaode&callnative=1`;
+}
+
 /**
  * 地圖外鏈（OpenStreetMap）
  *

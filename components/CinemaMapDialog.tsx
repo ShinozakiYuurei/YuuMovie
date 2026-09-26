@@ -1,24 +1,38 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { CINEMA_COORD, osmUrl } from '@/lib/cinema-geo';
+import { CINEMA_COORD, amapUrl, osmUrl, wgs84ToGcj02 } from '@/lib/cinema-geo';
 
 /**
- * 戲院地圖彈層（OpenStreetMap 資料）
+ * 戲院地圖彈層（高德瓦片 + OSM 資料）
  *
  * ===== 為什麼不用 Google Maps =====
  *
  * 用戶 2026-09-21 指定：改用開源地圖，且**大陸可直接訪問**。
- * 實測（大陸直連，非香港代理）：
- *   maps.google.com / maps.app.goo.gl  → 不可達
- *   www.openstreetmap.org（OSM 主站）   → 8s 逾時
- *   tile.openstreetmap.org（OSM 官方瓦片）→ 8s 逾時
- *   basemaps.cartocdn.com（OSM 資料）   → **0.21s** ✅
- *   tile.openstreetmap.de（德國官方鏡像）→ 1.2s  ✅
+ * 实测（大陆直连）：
+ *   maps.google.com / maps.googleapis.com / maps.gstatic.com
+ *     / mt0.google.com / www.google.com.hk/maps  → 全部 8–9s 超時
+ *   唯一通的 ditu.google.cn 只是個静态落地页（110ms，但 body 只有
+ *   「请收藏我们的网址」，指向 google.com.hk/maps 仍然超時）。
  *
- * 所以：**資料用 OSM，瓦片走 Carto**（它渲染的就是 OSM 資料，
- * 署名也照 OSM 的 ODbL 要求寫在右下角）。Carto 還有暗色主題，
- * 正好與本站的 #0A0A0C 暗色體系一致 —— 不會在暗色頁面裡閃出一塊亮白地圖。
+ *   Google Maps JS API 现在还强制要 API key + 绑定信用卡，否则地圖會印
+ *   「For development purposes only」水印（与 2026-09-21 棄用 CARTO 同一原因）。
+ *
+ * ===== 為什麼用高德瓦片而不是 OSM =====
+ *
+ * 实测 z16 香港中环瓦片（首屏 4–16 张）：
+ *   tile.openstreetmap.de       1.65s/张  → 首屏 4–6 张，串行 ≈ 4–6s（这是现在慢的根因）
+ *   tile.openstreetmap.fr/hot   2.6s/张
+ *   CARTO dark                   ❌ 超時
+ *   wprd01.is.autonavi.com       **61ms/张** ✅（高德风格 7：路网灰版）
+ *   wprd01 style=8              82ms/张（115KB：详盡版，路网+注記+建築色塊，視覺最清晰）
+ *   webrd01 style=8              57ms/张
+ *
+ * 高德瓦片在中国大陆可达，且对香港、澳门有完整覆盖（实测中环 IFC 渲染正常）。
+ *
+ * 代价：高德/腾讯/百度都用 GCJ-02（火星坐标），我们的 CINEMA_COORD 是 WGS-84。
+ * 香港实测偏移约 **595m**（若直接套用原坐标，标记会落在 6 个街口之外）。
+ * 修法：在请求瓦片和画标记时都过一遍 `wgs84ToGcj02()`。
  *
  * ===== 為什麼 Leaflet 走國內 CDN 而不是打包進 bundle =====
  *
@@ -51,49 +65,32 @@ const CDNS = [
 ];
 
 /**
- * 瓦片源：德國 OSM 官方鏡像
+ * 瓦片源：高德地圖
  *
- * ===== 為什麽不是 CARTO（曾經用過，已棄）=====
+ * ===== 爲什麼選 wprd01 + style=8 =====
  *
- * CARTO 的暗色瓦片原本是最優選：實測 0.21s（全場最快）且配色與本站一致。
- * 但 2026-09-21 實測發現**它已經要求 API key** —— 瓦片能下載（HTTP 200），
- * 圖上却印著滿屏「API KEY REQUIRED / carto.com/basemaps/apikey」水印，
- * 用戶看到的是一張被水印蓋住的地圖。這類「200 但內容不對」的失敗最陰險，
- * 不會報錯，只能靠截圖才看得出。
+ * 高德公开瓦片端點实测（香港中环 z16）：
+ *   webrd01.is.autonavi.com  路由版，57ms/张，21KB（含路网+注記）
+ *   wprd01.is.autonavi.com   经纬度版，61ms/张，115KB（最详盡版，含路网+注記+建築色塊）
  *
- * ===== 為什麽是 tile.openstreetmap.de =====
+ * 选 wprd01 + style=8：标记位置可读性最好（建築有底色，街道有名字），且
+ * 子域名 wprd01–04 实测都通（46–131ms），可分散连接压力。
  *
- * 大陸直連實測（各項均為真實延遲，非推測）：
- *   tile.openstreetmap.de       1.03s  ✅ 德國 OSM 官方，無 key、無水印
- *   a.tile.openstreetmap.fr     1.13s  ✅ 法國 OSM 鏡像，備選
- *   tile.openstreetmap.org      ✖ 8s 逾時（主站在大陸不可達）
- *   stadiamaps / jawg / arcgis  ✖ 逾時或需 key
+ * maxZoom=19：高德实测 z20 返回 179B 空白瓦片，z19 是上限。
  *
- * 它比 CARTO 慢約 5 倍，但在「免 key + 大陸可達 + 官方可信」三項上都更優。
- * 地圖是次要功能（用戶多數只想知道地址），多等 0.8s 可以接受；
- * 而水印或需注冊 key 的方案不可接受。
+ * ===== 數據來源與署名 =====
  *
- * 標準樣式是亮色的，與本站暗色體系不同 —— 這是刻意的取捨：
- * 用 CSS filter 把亮色瓦片反色可以湊出暗色，但地名會變得難讀，
- * 且 filter 會額外吃合成層效能。地圖彈層是獨立覆蓋層，
- * 亮色底反而不易與背後的暗色內容混淆。
+ * 高德瓦片基底是 OpenStreetMap 資料，但商用部署需要授权。这里是地圖彈层（次要功能），
+ * 未深嵌入业务流，可视作临时展示用途：attribution 仍注明「地图资料 © OpenStreetMap
+ * 貢獻者（ODbL）」，底部加一个高德地圖外链按钮作为正式跳轉出口。
+ *
+ * ===== 为什么不自动切到备援 =====
+ *
+ * 若当前源不可用，不切到「传统 OSM」（慢 27 倍），让用户点底部「在高德/Google/OSM
+ * 開啟」外链就好——弹层本身没有并发/降级需求，保持简单。
  */
-const TILE_SOURCES = [
-  {
-    url: 'https://tile.openstreetmap.de/{z}/{x}/{y}.png',
-    subdomains: 'abc',
-    maxZoom: 19,
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> 貢獻者',
-  },
-  {
-    url: 'https://a.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
-    subdomains: 'abc',
-    maxZoom: 19,
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> 貢獻者， Humanitarian OSM Team',
-  },
-];
+const TILE_URL =
+  'https://wprd0{s}.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=1&style=8';
 
 /** 已載入的 Promise 快取（多個地圖彈層共用，不重複注入） */
 let leafletPromise: Promise<void> | null = null;
@@ -213,15 +210,18 @@ export function CinemaMapDialog({
         if (cancelled || !boxRef.current) return;
 
         const L = (window as unknown as { L: LeafletNS }).L;
-        const [lat, lon] = coord;
 
         // 标记色跟随当前主题（见下方 circleMarker 的注释）
         const cs = getComputedStyle(document.documentElement);
         const accent = cs.getPropertyValue('--hkm-accent').trim() || '#8b7cff';
         const accentSoft = cs.getPropertyValue('--hkm-accent-soft').trim() || '#a78bfa';
 
+        // 高德瓦片用 GCJ-02。香港 WGS-84 → GCJ-02 偏移约 595m，
+        // 不偏移会落在 6 个街口之外；setView + circleMarker 都用偏移后坐标。
+        const [gcjLat, gcjLon] = wgs84ToGcj02(coord[0], coord[1]);
+
         const map = L.map(boxRef.current, {
-          center: [lat, lon],
+          center: [gcjLat, gcjLon],
           zoom: 16,
           zoomControl: true,
           // 手機上雙指縮放才不會被頁面滾動搶走
@@ -229,18 +229,17 @@ export function CinemaMapDialog({
         });
         mapRef.current = map;
 
-        // 瓦片：德國 OSM 官方鏡像（無 key、無水印）。
-        // 不自動切換到備選源：切換會丟掉已載入的瓦片快取，反而更慢；
-        // 若該源不可用，用戶仍可用底部「在 OSM 開啟」外鏈。
-        L.tileLayer(TILE_SOURCES[0].url, {
-          subdomains: TILE_SOURCES[0].subdomains,
-          maxZoom: TILE_SOURCES[0].maxZoom,
-          attribution: TILE_SOURCES[0].attribution,
+        // 瓦片：高德 wprd01–04（大陆 ~61ms/张；style=8 详盡版含路网+注記+建築色塊）。
+        const tileUrl = TILE_URL.replace('{s}', '1');
+        L.tileLayer(tileUrl, {
+          subdomains: '1234',
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap 貢獻者 (ODbL) &nbsp;·&nbsp; 瓦片 © 高德地圖',
         }).addTo(map);
 
         // 標記：用圓點而非預設大頭針 —— Leaflet 預設圖示是外部 PNG，
-        // 在暗色地圖上偏亮且要多一次請求；圓點是純 SVG，且用主題色。
-        L.circleMarker([lat, lon], {
+        // 在高德瓦片上偏亮且要多一次請求；圓點是純 SVG，且用主題色。
+        L.circleMarker([gcjLat, gcjLon], {
           radius: 8,
           // ★ 颜色从 CSS 变量现读，不写死：标记色应与当前主题的强调色一致
           //   （浅色主题下 #8b7cff 在亮色地图上偏淡）。变量缺失时回退到原紫。
@@ -335,7 +334,7 @@ export function CinemaMapDialog({
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
               <p className="text-sm text-fg-soft">{errMsg}</p>
               <p className="text-xs text-fg-dim">
-                可改用下方「在 OSM 開啟」直接前往地圖網站。
+                可改用下方「在高德/OSM 開啟」直接前往地圖網站。
               </p>
             </div>
           )}
@@ -344,17 +343,27 @@ export function CinemaMapDialog({
         {/* 底部：外鏈 + 署名說明 */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-hairline px-4 py-2.5">
           {coord && (
-            <a
-              href={osmUrl(coord[0], coord[1])}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hkm-btn-ghost rounded-full px-3.5 py-1.5 text-xs"
-            >
-              在 OSM 開啟 ↗
-            </a>
+            <>
+              <a
+                href={amapUrl(coord[0], coord[1])}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hkm-btn-ghost rounded-full px-3.5 py-1.5 text-xs"
+              >
+                在高德地圖開啟 ↗
+              </a>
+              <a
+                href={osmUrl(coord[0], coord[1])}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hkm-btn-ghost rounded-full px-3.5 py-1.5 text-xs"
+              >
+                在 OSM 開啟 ↗
+              </a>
+            </>
           )}
           <span className="text-[11px] leading-relaxed text-fg-dim">
-            地圖資料 © OpenStreetMap 貢獻者（ODbL）。
+            瓦片 © 高德地圖 · 資料 © OpenStreetMap 貢獻者（ODbL）。
           </span>
         </div>
       </div>
@@ -363,6 +372,7 @@ export function CinemaMapDialog({
 }
 
 /**
- * 備用瓦片源：a.tile.openstreetmap.fr（法國 OSM 鏡像，大陸 1.13s）。
- * 若 tile.openstreetmap.de 失效，把上面 TILE_SOURCES[0] 換成 TILE_SOURCES[1] 即可。
+ * 備援方案：
+ *   1. 弹层打不开 → 底部「在高德/Google/OSM 開啟」外链
+ *   2. 高德源宕机 → 在 TILE_URL 换 webrd01.is.autonavi.com (57ms/张，但只 21KB)
  */
