@@ -245,6 +245,10 @@ export function CinemaMapDialog({
           center: [gcjLat, gcjLon],
           zoom: 16,
           zoomControl: true,
+          // 不使用 Leaflet 自带的 attribution 控件（它会拼一个「Leaflet | 」前缀），
+          // 右下角角标交给弹层自己的 DOM 渲染（见下方底部署名区），
+          // 保证右下角只有「© 高德地圖」这一行，不混入 Leaflet 标识。
+          attributionControl: false,
           // 手機上雙指縮放才不會被頁面滾動搶走
           tap: true,
         });
@@ -255,8 +259,7 @@ export function CinemaMapDialog({
         L.tileLayer(tileUrl, {
           subdomains: '1234',
           maxZoom: 19,
-          attribution: '&copy; 高德地圖',
-        }).addTo(map);
+          }).addTo(map);
 
         // 標記：用圓點而非預設大頭針 —— Leaflet 預設圖示是外部 PNG，
         // 在高德瓦片上偏亮且要多一次請求；圓點是純 SVG，且用主題色。
