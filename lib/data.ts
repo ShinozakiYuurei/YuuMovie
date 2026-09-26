@@ -21,6 +21,7 @@ import { zhGenres, dropParents } from './genre-zh';
 import { zhLanguages, zhSubtitles } from './lang-zh';
 import { inferGeo, districtOrder, REGION_ORDER } from './region';
 import { hallSpecsOf, sortSpecs, HALL_SPECS, specLabel, SPEC_GROUP_LABEL } from './cinema-specs';
+import { fixedCinemaSpecs } from './cinema-facilities';
 import { bookingFeeOf } from './booking-fee';
 import type { BookingFee } from './booking-fee';
 // 已開映場次的判定：與客戶端（components/CinemaShowtimes.tsx 等）共用同一份規則
@@ -632,12 +633,11 @@ function load() {
   const movieTitleById = new Map<string, string>();
   for (const m of movies) movieTitleById.set(m.id, m.nameZh || m.nameEn || '');
 
-  const specsByCinema = new Map<string, Set<string>>();
-  // 官方戲院資料列明電影中心 1 院採用 SR、2–4 院採用 SRD；此規格不會出現在場次欄位，
-  // 以穩定戲院 ID 注入，不能從普通場次名稱或電影名猜測。
-  specsByCinema.set('broadway-8', new Set(['sr', 'srd']));
-  // PALACE ifc 官方影廳資料列明 H5 採用 DTS:X；其餘影廳為 Dolby 7.1。
-  specsByCinema.set('broadway-4', new Set(['dtsx']));
+  // 官方固定配置先入集合，再用場次補充；不能讓影院設備隨檔期消失。
+  // 廳號、核對日期及來源都集中在 cinema-facilities.ts，而非散落在讀取邏輯。
+  const specsByCinema = new Map<string, Set<string>>(
+    cinemas.map((c) => [c.id, new Set(fixedCinemaSpecs(c.id))])
+  );
   for (const s of shows) {
     const keys = hallSpecsOf({
       houseName: s.houseName,

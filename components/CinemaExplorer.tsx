@@ -26,10 +26,10 @@ import type { CinemaFacets, CinemaRow } from '@/lib/data';
  *
  * hkmovie6 的戲院頁只有三層：大區 tab / 院線 / 區域。
  * 本站多出「影廳規格」，是因為用戶的需求就是「想找有 IMAX / 4DX 的戲院」——
- * 而這個資訊五個抓取源都不直接提供，得從影厅名 + 場次版本 + 片名合成
- * （推斷規則與依據見 lib/cinema-specs.ts）。
+ * 而這個資訊抓取源不一定提供，需合併院方固定配置與影廳名／場次版本／片名。
+ * （官方配置及來源見 lib/cinema-facilities.ts，識別規則見 lib/cinema-specs.ts）。
  *
- * 規格為空的戲院（普通廳）不會出現在規格篩選裡；反過來，
+ * 暫未確認規格的戲院不會出現在規格篩選裡；反過來，
  * 一旦用戶勾了任一規格，這些戲院自然被排除 —— 這正是用戶想要的。
  */
 /** 有座標才顯示地圖按鈕（座標表見 lib/cinema-geo.ts） */
@@ -232,7 +232,7 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
                    * 用 hkm-chip 與場次頁的版本標籤保持同一視覺語言，
                    * 不加顏色 —— 顏色在本站是「餘座」的專屬語義，別處不許佔用。
                    */}
-                  {c.specs.length > 0 && (
+                  {c.specs.length > 0 ? (
                     <div className="mt-2.5 flex flex-wrap gap-1.5">
                       {c.specs.map((s) => (
                         <span key={s.key} className="hkm-chip">
@@ -240,6 +240,8 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
                         </span>
                       ))}
                     </div>
+                  ) : (
+                    <p className="mt-2.5 text-xs text-fg-muted">規格資料待確認</p>
                   )}
 
                   <div className="mt-auto flex gap-2 pt-3.5">
@@ -306,6 +308,7 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
           const guide = CINEMA_GUIDES[guideId];
           return c && guide ? (
             <CinemaGuideDialog
+              cinemaId={c.id}
               name={c.nameZh}
               address={c.address}
               guide={guide}

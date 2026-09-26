@@ -1,5 +1,8 @@
 /**
- * 戲院「影廳規格」推斷
+ * 戲院「影廳規格」識別（官方固定配置 + 場次證據）
+ *
+ * 固定配置及來源見 lib/cinema-facilities.ts。它不依賴當期排片，
+ * 所以沒有 Atmos / IMAX 場次時，也不會讓影院的硬件標籤消失。
  *
  * ===== 为什么需要推断，而不是读字段 =====
  *
@@ -35,7 +38,7 @@
 export type SpecGroup = 'format' | 'premium';
 
 export const SPEC_GROUP_LABEL: Record<SpecGroup, string> = {
-  format: '放映格式',
+  format: '放映／音響規格',
   premium: '特色影廳',
 };
 
@@ -62,25 +65,35 @@ const SPEC_RULES: SpecRule[] = [
     key: 'atmos',
     label: '杜比全景聲',
     group: 'format',
-    // 三源写法：ATMOS2D（英皇/星達）、全景聲（MCL）、杜比（片名）
-    re: /atmos|全景聲|全景声|杜比/i,
+    // 只認 Atmos / 全景聲或獨立「杜比」格式標記，不把 Dolby 7.1 / Vision 當 Atmos。
+    re: /atmos|全景聲|全景声|(?:^|[（(\s])杜比(?:[）)]|$)|^杜比\s+(?!\d|vision)/i,
     fields: ['house', 'version', 'title'],
   },
   { key: '4dx', label: '4DX', group: 'format', re: /4dx/i, fields: ['house', 'version', 'title'] },
   { key: 'mx4d', label: 'MX4D', group: 'format', re: /mx4d/i, fields: ['house', 'version', 'title'] },
   { key: 'luxe', label: 'LUXE', group: 'format', re: /luxe/i, fields: ['house', 'version', 'title'] },
   { key: 'onyx', label: 'Onyx LED', group: 'format', re: /onyx/i, fields: ['house', 'version', 'title'] },
-  { key: 'reald', label: 'RealD 3D', group: 'format', re: /reald/i, fields: ['house', 'version', 'title'] },
+  { key: 'reald', label: 'RealD 3D', group: 'format', re: /\breald\b(?!\s*(?:cinema|cine)\b)/i, fields: ['house', 'version', 'title'] },
   { key: 'dbox', label: 'D-BOX', group: 'format', re: /d-?box/i, fields: ['house', 'version', 'title'] },
   { key: 'thx', label: 'THX', group: 'format', re: /\bthx\b/i, fields: ['house', 'version', 'title'] },
   { key: 'cgs', label: 'CGS', group: 'format', re: /\bcgs\b/i, fields: ['house', 'version', 'title'] },
-  { key: 'screenx', label: 'ScreenX', group: 'format', re: /screenx/i, fields: ['house', 'version', 'title'] },
-  { key: 'cinity', label: 'Cinity', group: 'format', re: /cinity/i, fields: ['house', 'version', 'title'] },
+  { key: 'screenx', label: 'ScreenX', group: 'format', re: /screen\s*x/i, fields: ['house', 'version', 'title'] },
+  { key: 'cinity', label: 'CINITY LED', group: 'format', re: /cinity/i, fields: ['house', 'version', 'title'] },
   { key: 'dtsx', label: 'DTS:X', group: 'format', re: /dts\s*:?\s*x/i, fields: ['house', 'version', 'title'] },
+  // 普通音響與放映設備也可篩選，但不能從影片的「4K 修復版」推斷影院硬件。
+  { key: 'auromax', label: 'AuroMax 3D', group: 'format', re: /\bauromax\b/i, fields: ['house'] },
+  { key: 'dolby71', label: 'Dolby 7.1', group: 'format', re: /dolby\s*(?:sls\s*)?7\.1|杜比\s*7\.1/i, fields: ['house'] },
+  { key: 'usl8', label: 'USL 8 聲道', group: 'format', re: /\busl\s*8\b/i, fields: ['house'] },
+  // 固定設備只由官方配置表補入（fields 為空），絕不測試片名或場次版本。
+  { key: '4k', label: '4K 放映', group: 'format', re: /4k/i, fields: [] },
+  { key: 'laser', label: '激光放映', group: 'format', re: /laser|激光/i, fields: [] },
   // Broadway Cinema Centre officially identifies Hall 1 as SR and Halls 2–4 as SRD.
-  // These are not included in show metadata, so cinema-level evidence is added in data.ts.
+  // These are not included in show metadata, so cinema-level evidence is in cinema-facilities.ts.
   { key: 'sr', label: 'SR', group: 'format', re: /^sr$/i, fields: ['house'] },
   { key: 'srd', label: 'SRD', group: 'format', re: /^srd$/i, fields: ['house'] },
+  { key: 'srdex', label: 'SRD-EX', group: 'format', re: /^srd\s*-\s*ex$/i, fields: ['house'] },
+  { key: 'masterimage', label: 'MasterImage 3D', group: 'format', re: /\bmasterimage\b/i, fields: ['house'] },
+  { key: '3d', label: '3D 放映', group: 'format', re: /3d/i, fields: [] },
 
   // ---------- 特色影廳（只认影厅名） ----------
   { key: 'coronet', label: 'the CORONET', group: 'premium', re: /coronet/i, fields: ['house'] },
@@ -94,6 +107,11 @@ const SPEC_RULES: SpecRule[] = [
   { key: 'vivo', label: 'Vivo', group: 'premium', re: /\bvivo\b/i, fields: ['house'] },
   { key: 'ovaloffice', label: 'The Oval Office', group: 'premium', re: /the oval office/i, fields: ['house'] },
   { key: 'mmmoments', label: 'MM MOMENTS', group: 'premium', re: /\bmm moments\b/i, fields: ['house'] },
+  { key: 'realdcinema', label: 'RealD Cinema', group: 'premium', re: /\breald\s*(?:cinema|cine)\b/i, fields: ['house'] },
+  { key: 'kstar', label: 'K Star', group: 'premium', re: /\bk\s*star\b/i, fields: ['house'] },
+  { key: 'sweetbox', label: 'SWEETBOX', group: 'premium', re: /\bsweetbox\b/i, fields: ['house'] },
+  { key: 'vip', label: 'VIP 影廳', group: 'premium', re: /\bvip\s*(?:house|院|影廳)?\b/i, fields: ['house'] },
+  { key: 'kidshouse', label: '兒童影院', group: 'premium', re: /兒童影院|儿童影院/i, fields: ['house'] },
 ];
 
 /** 全部规格（展示顺序） */

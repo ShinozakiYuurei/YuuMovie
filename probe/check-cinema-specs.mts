@@ -16,13 +16,18 @@
  *   3. **正则边界** —— 少了词界，「THX」会命中片名里的任意 thx 子串，
  *      「CGS」同理。这里用 THX/CGS 的反例把它钉住。
  *
- * 只依赖仓库内代码，不读 data/、不联网，服务器上也能跑。
+ * 規則測試離線；另外掃描本機 data/sources 驗真實廳名，並用空場次 fixture 驗固定配置。
  *
  * 跑法：node_modules/.bin/tsx probe/check-cinema-specs.mts
  */
 import { hallSpecsOf, HALL_SPECS, sortSpecs, specLabel } from '../lib/cinema-specs.ts';
 import { readFileSync } from 'node:fs';
-import { getCinemaRows, getMeta } from '../lib/data.ts';
+import { getCinemaRows, getMeta, getCinemaFacets } from '../lib/data.ts';
+import { CINEMA_FACILITIES, fixedCinemaSpecs } from '../lib/cinema-facilities.ts';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 let bad = 0;
 
@@ -114,6 +119,16 @@ eq(
   hallSpecsOf({ houseName: '4院', version: null, title: '花樣年華 4K修復版' }),
   []
 );
+
+eq('Dolby 7.1 不誤標 Atmos', hallSpecsOf({ houseName: 'Dolby 7.1' }), ['dolby71']);
+eq('杜比 7.1 不誤標 Atmos', hallSpecsOf({ houseName: '杜比 7.1' }), ['dolby71']);
+eq('Dolby Vision 不誤標 Atmos', hallSpecsOf({ version: '杜比 Vision' }), []);
+eq('舊片名獨立杜比格式標記仍可識別', hallSpecsOf({ title: '電影 (杜比)' }), ['atmos']);
+eq('4K 激光硬件不能從片名／版本推斷', hallSpecsOf({ title: '4K 修復電影', version: '4K Laser' }), []);
+eq('Screen X 廳名有空格也能識別', hallSpecsOf({ houseName: '影院 4–Screen X' }), ['screenx']);
+eq('RealD Cinema 是品牌廳，不誤當 RealD 3D 場次', hallSpecsOf({ houseName: 'RealD Cinema' }), ['realdcinema']);
+eq('RealD 3D 格式仍可識別', hallSpecsOf({ version: 'RealD 3D' }), ['reald']);
+eq('AuroMax 3D 音響不等同於 3D 電影片源', hallSpecsOf({ houseName: 'AuroMax 3D' }), ['auromax']);
 
 // ============================================================
 // 3. 品牌影廳只认影厅名（片名/版本里出现同名词不算）
@@ -213,8 +228,8 @@ eq('多规格集合正确', [...many].sort(), ['4dx', 'atmos', 'imax', 'luxe'].s
 
 // 各抓取源会更新影厅名格式；对实际存档源逐条扫描，任何未识别的非编号厅
 // 都需要人工判断是否是新特色厅，以免出现「规则单测通过、真实数据仍漏标签」。
-const sourceFiles = ['broadway', 'mcl', 'emperor', 'cinemacity', 'bestar'];
-const normalHall = /^(?:house\s*\d+(?:\s*\(\s*\d+\s*院\s*\))?|\d+院)$/i;
+const sourceFiles = ['broadway', 'mcl', 'emperor', 'cinemacity', 'bestar', 'cgv', 'cineart', 'chinachem', 'goldenscene', 'lumen', 'lux', 'newport', 'sunbeam'];
+const normalHall = /^(?:house\s*\d+(?:\s*\(\s*\d+\s*院\s*\))?|\d+\s*(?:號\s*)?院|影院\s*\d+)$/i;
 const unknownHalls = new Set<string>();
 for (const source of sourceFiles) {
   const data = JSON.parse(readFileSync(new URL(`../data/sources/${source}.json`, import.meta.url), 'utf8'));
@@ -231,9 +246,51 @@ eq('實際院線資料中沒有未識別的特色影廳名稱', [...unknownHalls
 const cinemaCentre = getCinemaRows().find((cinema) => cinema.id === 'broadway-8');
 eq('戲院頁實際標籤：百老匯電影中心有 SR 與 SRD', cinemaCentre?.specs.map((spec) => spec.key), ['sr', 'srd']);
 const palaceIfc = getCinemaRows().find((cinema) => cinema.id === 'broadway-4');
-eq('戲院頁實際標籤：PALACE ifc 有 DTS:X', palaceIfc?.specs.map((spec) => spec.key), ['dtsx']);
+eq('戲院頁實際標籤：PALACE ifc 有 DTS:X 及 Dolby 7.1', palaceIfc?.specs.map((spec) => spec.key), ['dtsx', 'dolby71']);
 eq('英皇總部辦公地址不列為放映戲院', getCinemaRows().some((cinema) => cinema.id === 'emperor-57001'), false);
 eq('首頁和頁尾的戲院總數與戲院列表一致', getMeta().counts.cinemas, getCinemaRows().length);
+
+// 固定配置的關鍵漏標：即使近期沒排該格式，也必須可篩選。
+const rows = getCinemaRows();
+for (const [id, key] of [['broadway-2', 'atmos'], ['broadway-5', 'atmos'], ['broadway-10', 'dtsx'], ['broadway-3', 'cinity'], ['broadway-11', 'usl8']]) {
+  eq(`影院固定設備補齊：${id} / ${key}`, rows.find((c) => c.id === id)?.specs.some((s) => s.key === key), true);
+}
+const facets = getCinemaFacets(rows);
+for (const { value, count } of facets.specs) {
+  eq(`規格篩選計數一致：${value}`, count, rows.filter((c) => c.specs.some((s) => s.key === value)).length);
+}
+
+// 用完全沒有場次的獨立讀取進程驗整條資料管線，避免只測表、不測 data.ts 接入。
+const fixtureDir = mkdtempSync(join(tmpdir(), 'hkmovie-fixed-specs-'));
+try {
+  writeFileSync(join(fixtureDir, 'cinemas.json'), JSON.stringify(Object.keys(CINEMA_FACILITIES).map((id) => ({
+    id, code: id, nameZh: id, address: '', mapUrl: '', detailUrl: '', source: id.split('-')[0],
+  }))));
+  writeFileSync(join(fixtureDir, 'movies.json'), '[]');
+  writeFileSync(join(fixtureDir, 'shows.json'), '[]');
+  const result = spawnSync(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', `
+    import { getCinemaRows } from ${JSON.stringify(new URL('../lib/data.ts', import.meta.url).href)};
+    console.log(JSON.stringify(getCinemaRows().map(c => ({id:c.id, specs:c.specs.map(s=>s.key)}))));
+  `], { env: { ...process.env, DATA_DIR: fixtureDir }, encoding: 'utf8' });
+  eq('空場次 fixture 讀取成功', result.status, 0);
+  if (result.status === 0) {
+    const fixtureRows = JSON.parse(result.stdout.trim()) as { id: string; specs: string[] }[];
+    for (const [id, facilities] of Object.entries(CINEMA_FACILITIES)) {
+      eq(`沒有排片仍保留固定配置：${id}`, fixtureRows.find((c) => c.id === id)?.specs, sortSpecs(facilities.specs));
+    }
+  } else console.log(result.stderr);
+} finally {
+  rmSync(fixtureDir, { recursive: true, force: true });
+}
+eq('未確認影院不硬補規格', fixedCinemaSpecs('unverified-cinema'), []);
+const copy = fixedCinemaSpecs('broadway-4');
+copy.push('fake');
+eq('固定配置回傳副本，不被呼叫方修改', fixedCinemaSpecs('broadway-4'), ['dtsx', 'dolby71']);
+for (const [id, facilities] of Object.entries(CINEMA_FACILITIES)) {
+  eq(`${id} 配置鍵全部有效`, facilities.specs.every((key) => HALL_SPECS.some((spec) => spec.key === key)), true);
+  eq(`${id} 固定規格不重複`, new Set(facilities.specs).size, facilities.specs.length);
+  eq(`${id} 有配置摘要與 HTTPS 來源`, facilities.details.length > 0 && facilities.sources.length > 0 && facilities.sources.every((s) => s.url.startsWith('https://')), true);
+}
 
 // ============================================================
 // 7. 表格自身的完整性
@@ -241,8 +298,8 @@ eq('首頁和頁尾的戲院總數與戲院列表一致', getMeta().counts.cinem
 
 const keys = HALL_SPECS.map((s) => s.key);
 eq('规格 key 无重复', new Set(keys).size, keys.length);
-if (HALL_SPECS.length !== 26) {
-  console.log(`✗ 规格条数变了（${HALL_SPECS.length} ≠ 26）—— 增删规格请同步本测试的期望值`);
+if (HALL_SPECS.length !== 39) {
+  console.log(`✗ 规格条数变了（${HALL_SPECS.length} ≠ 39）—— 增删规格请同步本测试的期望值`);
   bad++;
 }
 // 每个规格都要有 label，且不能出现空 label（空 label 会在下拉里留一个空白行）
