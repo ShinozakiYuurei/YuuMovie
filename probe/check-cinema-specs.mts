@@ -255,6 +255,23 @@ const rows = getCinemaRows();
 for (const [id, key] of [['broadway-2', 'atmos'], ['broadway-5', 'atmos'], ['broadway-10', 'dtsx'], ['broadway-3', 'cinity'], ['broadway-11', 'usl8']]) {
   eq(`影院固定設備補齊：${id} / ${key}`, rows.find((c) => c.id === id)?.specs.some((s) => s.key === key), true);
 }
+
+// ★ 每間戲院都必須有配置條目。
+//   缺條目的後果是**靜默**的：卡片照樣顯示「規格資料待確認」，而詳情頁
+//   連「已核實規格與特色影廳」一節都不會出現 —— 看起來就像忘了做，
+//   而不是「已核實、官方沒有公佈」。2026-09-26 的寶石戲院（lux-1）正是這樣。
+eq(
+  '每間戲院都有官方配置條目（缺者詳情頁會少一整節）',
+  rows.filter((c) => !CINEMA_FACILITIES[c.id]).map((c) => c.id),
+  []
+);
+// 官方介紹已給出設備原文的分店，規格不得退回空集合（回退了不會報錯）。
+eq(
+  '影藝青衣城官方介紹的 4K／激光／杜比 7.1／ATMOS 已入表',
+  sortSpecs(fixedCinemaSpecs('cineart-17')),
+  sortSpecs(['4k', 'laser', 'dolby71', 'atmos'])
+);
+eq('寶石戲院有配置條目（詳情頁不再整節缺失）', CINEMA_FACILITIES['lux-1'] !== undefined, true);
 const facets = getCinemaFacets(rows);
 for (const { value, count } of facets.specs) {
   eq(`規格篩選計數一致：${value}`, count, rows.filter((c) => c.specs.some((s) => s.key === value)).length);
