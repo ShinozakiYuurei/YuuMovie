@@ -325,7 +325,7 @@
   --hkm-btn-primary-1: #8b7cff;
   --hkm-btn-primary-2: #6d5cf0;
 
-  /* 评分统一用亮黄；可读性由深玫瑰色徽章底保证。 */
+  /* 暗色卡片上的评分用柔和亮黄文字，不再依赖彩色胶囊底色。 */
   --hkm-score-fg: #facc15;
 
   /*
@@ -1068,16 +1068,12 @@ a {
 
 .hkm-poster-card__score {
   display: inline-flex;
-  min-width: 2.5rem;
   align-items: center;
   justify-content: center;
-  padding: 0.25rem 0.5rem;
-  border: 1px solid rgb(232 160 184 / 0.35);
-  border-radius: 9999px;
   color: var(--hkm-score-fg);
-  background-color: #5b3948;
   font-size: 1rem;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 
@@ -1650,18 +1646,11 @@ html[data-theme='pink'] .hkm-accent-panel {
 }
 
 /* ============================================================
-   卡片评分徽章（纯黄数字）
+   卡片评分（纯数字文字，不加胶囊底）
 
-   ★ 2026-09-21 删除了 .hkm-score / -value / -label / -imdb / -douban
-   五条规则。卡片只显示评分数值，不显示「綜合 / IMDb / 豆瓣」来源小字。
-
-   那套 CSS 只被 MovieGroupCard 使用，现在评分改为一个纯黄数字徽章
-   （来源与算法仍在 tooltip 里），
-   留着这五条就是死代码 —— 而且它们按来源切换紫/琥珀/绿三套配色，
-   与「不要注明来源」的要求正好相反，容易让后人误以为还能用。
-
-   黄色选 #facc15，与座位色的橙 #f59e0b 保持区分；深玫瑰底让它在
-   浅色卡片上也清晰，因此所有主题统一使用同一亮黄色值。
+   评分来源与算法仍放在 tooltip 里；卡片只显示数值。
+   评分沿用纯黄文字规范，不再加胶囊底色、边框或内边距，
+   让分数融入信息行，而不是像额外状态标签一样跳出来。
    ============================================================ */
 
 /*

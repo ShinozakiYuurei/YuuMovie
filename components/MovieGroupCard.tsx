@@ -15,7 +15,7 @@ import { computeCardRating, ratingTitle } from '@/lib/rating';
  *   标题（中文，单行截断）
  *   上映中：时长 · 起价
  *   待映：相对天数 + 上映日期
- *   右侧：评分（深玫瑰底 + 纯黄数字）
+ *   右侧：评分（纯黄数字，不加底色）
  *
  * ★ 2026-09-21 用户要求去掉的四个元素及理由：
  *   1. 格式标签（IMAX / 4DX / 原版…）—— 卡片上最占位、却最不影响
@@ -28,7 +28,7 @@ import { computeCardRating, ratingTitle } from '@/lib/rating';
  *   原先是两行徽章（数值 + 來源小字）+ 按来源变化的三套配色（紫/琥珀/绿）。
  *   但卡片上用户只需要知道「这片分高不高」，不需要知道分从哪来 ——
  *   来源与算法是 hover 才需要的信息，放在 tooltip 里即可。
- *   现在用单一深玫瑰底承接纯黄分数，作为轻量的视觉锚点。
+ *   评分保留纯黄强调色，但不加胶囊底色，让它融入信息行而非像状态标签。
  */
 export function MovieGroupCard({
   group,
