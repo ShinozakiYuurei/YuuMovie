@@ -41,7 +41,6 @@ export function CinemaGuideDialog({
         </div>
 
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:px-5">
-          <p className="text-sm font-semibold text-accent">{guide.sectionTitle}</p>
           <section>
             <h4 className="text-sm font-semibold text-fg">場地概況與設備</h4>
             <ul className="mt-2 list-disc space-y-2 pl-5 text-sm leading-relaxed text-fg-soft">

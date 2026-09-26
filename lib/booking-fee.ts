@@ -188,6 +188,11 @@ const BY_SOURCE: Partial<Record<Source, BookingFee>> = {
     note: '寶石戲院目前不設網上購票，須於戲院票房現場購票。',
     included: false,
   },
+  // ⚠️ 這筆目前用不到：新寶院線在 data/cinemas.json 裡只有凱都一間戲院，
+  //   而凱都已由下方 BY_CINEMA 覆寫，所以這裡的院線預設永遠不會命中。
+  //   保留它是為了「日後新寶若開第二間戲院」時有個安全的兜底（不亂給數字），
+  //   不要因為現在看不到就刪掉 —— 刪了就會 fallback 到 UNKNOWN，
+  //   一樣是未確認，但失去「新寶 FAQ 只寫 $6 起」這條脈絡。
   newport: {
     amount: FEE_UNKNOWN,
     note: '新寶官方 FAQ 只列網上訂票每票 HK$6 或以上，未有確切固定金額；請以結帳金額為準。',
@@ -205,16 +210,30 @@ const BY_SOURCE: Partial<Record<Source, BookingFee>> = {
  *
  * 新寶院線 FAQ 的「HK$6 或以上」不作全線固定額；凱都戲院（屯門）分店資料
  * 明列 Online Admin Fee: HK$6，故只對這間戲院記錄固定 $6，不外推到其他分店。
+ *
+ * ★ note 採實測／確定口徑（「網上購票每張收 HK$6」）：
+ *   與 CGV / 影藝一致 —— 用戶確認過的金額就寫成肯定句，
+ *   原始出處（分店資料 Online Admin Fee、院線 FAQ「$6 起」）留在註解裡供複核。
+ *
+ * ⚠️ 但有一點與寶石不同、仍未理清：凱都的分店頁註明「目前沒有網上售票」。
+ *   寶石遇到同樣情況時用戶選擇改為「不設網上購票」（FEE_NO_ONLINE），
+ *   而凱都這裡維持 $6。若日後確認凱都確實無網售，
+ *   應比照寶石改為 FEE_NO_ONLINE，否則用戶會以為能在線上買。
  */
 const BY_CINEMA: Record<string, BookingFee> = {
   'newport-hyland': {
     amount: 6,
-    note: '凱都戲院（屯門）分店資料列 Online Admin Fee: HK$6；院線 FAQ 列網上購票每票 HK$6 起。分店頁亦註明目前沒有網上售票，實際收取方式以院方公布為準。',
+    note: '凱都戲院（屯門）：網上購票每張戲票收 HK$6 手續費（結帳時外加）。',
     included: false,
   },
 };
 
-/** 未知院線的兜底：不顯示數字比顯示錯的數字好 */
+/**
+ * 未知院線的兜底：不顯示數字比顯示錯的數字好
+ *
+ * ★ 這條文案只在「出現了 data/cinemas.json 裡沒見過的 source」時才會用到，
+ *   目前 13 個院線全數已覆蓋、用不到；保留作為安全網。
+ */
 const UNKNOWN: BookingFee = {
   amount: FEE_UNKNOWN,
   note: '未確認手續費；請以院線官方購票頁結帳金額為準。',
