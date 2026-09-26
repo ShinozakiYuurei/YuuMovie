@@ -1,10 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { CINEMA_COORD, amapUrl, osmUrl, wgs84ToGcj02 } from '@/lib/cinema-geo';
+import { CINEMA_COORD, amapUrl, googleMapsUrl, wgs84ToGcj02 } from '@/lib/cinema-geo';
 
 /**
- * 戲院地圖彈層（高德瓦片 + OSM 資料）
+ * 戲院地圖彈層（高德瓦片）
+ *
+ * ⚠️ 授權狀態：本站**沒有高德開發者 key**，目前直接引用高德網頁版用的公開瓦片
+ *   端點（hotlinking）。這不是正規用法，詳見下方「數據來源與署名」。
+ *   待辦：申請高德開放平台 key（免費額度足夠），把未授權引用換成正規調用。
  *
  * ===== 為什麼不用 Google Maps =====
  *
@@ -80,14 +84,22 @@ const CDNS = [
  *
  * ===== 數據來源與署名 =====
  *
- * 高德瓦片基底是 OpenStreetMap 資料，但商用部署需要授权。这里是地圖彈层（次要功能），
- * 未深嵌入业务流，可视作临时展示用途：attribution 仍注明「地图资料 © OpenStreetMap
- * 貢獻者（ODbL）」，底部加一个高德地圖外链按钮作为正式跳轉出口。
+ * ⚠️ 重要更正（上一版寫錯了）：
+ *
+ *   上一版註釋與 UI 都寫「高德瓦片基底是 OSM 資料」——那是**我的推測，未經證實，
+ *   而且是錯的**。高德的地圖數據來自自家採集與官方測繪授權，與 OSM 是兩套獨立
+ *   體系（最直接的證據：高德用 GCJ-02 火星坐標，OSM 用 WGS-84）。
+ *   高德瓦片商用需要授權，本站目前**沒有開發者 key**，是直接引用高德網頁版用的
+ *   公開瓦片端點（hotlinking）。所以：
+ *     - 署名只寫「© 高德地圖」，**不再虛假標註 OpenStreetMap / ODbL**
+ *       （ODbL 是有法律約束力的許可證，亂署比不署更糟）
+ *     - 底部保留「在高德地圖開啟 ↗」跳官方，作為正規出口
+ *     - 待辦：申請高德開放平台 key（免費額度足夠本站用量），把未授權引用換成正規調用
  *
  * ===== 为什么不自动切到备援 =====
  *
- * 若当前源不可用，不切到「传统 OSM」（慢 27 倍），让用户点底部「在高德/Google/OSM
- * 開啟」外链就好——弹层本身没有并发/降级需求，保持简单。
+ * 若当前源不可用，不切到「传统 OSM」（慢 27 倍），让用户点底部「在高德／Google
+ * 地圖開啟」外链就好——弹层本身没有并发/降级需求，保持简单。
  */
 const TILE_URL =
   'https://wprd0{s}.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=1&style=8';
@@ -178,6 +190,16 @@ export function CinemaMapDialog({
 
   const coord = CINEMA_COORD[cinemaId] ?? null;
 
+  /**
+   * GCJ-02（火星坐標）版本座標 —— 高德瓦片與高德外鏈都要用它。
+   *
+   * 香港 WGS-84 → GCJ-02 偏移約 595m：不偏移的話，地圖標記與高德外鏈
+   * 都會落在 6 個街口之外。Google 外鏈則用 WGS-84 原值（下方 googleMapsUrl）。
+   */
+  const gcjCoord: [number, number] | null = coord
+    ? wgs84ToGcj02(coord[0], coord[1])
+    : null;
+
   // Esc 關閉
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -197,7 +219,7 @@ export function CinemaMapDialog({
   }, []);
 
   useEffect(() => {
-    if (!coord) {
+    if (!coord || !gcjCoord) {
       setState('error');
       setErrMsg('這間戲院暫無座標資料');
       return;
@@ -216,9 +238,8 @@ export function CinemaMapDialog({
         const accent = cs.getPropertyValue('--hkm-accent').trim() || '#8b7cff';
         const accentSoft = cs.getPropertyValue('--hkm-accent-soft').trim() || '#a78bfa';
 
-        // 高德瓦片用 GCJ-02。香港 WGS-84 → GCJ-02 偏移约 595m，
-        // 不偏移会落在 6 个街口之外；setView + circleMarker 都用偏移后坐标。
-        const [gcjLat, gcjLon] = wgs84ToGcj02(coord[0], coord[1]);
+        // 高德瓦片用 GCJ-02（偏移在下方 gcjCoord 統算）。
+        const [gcjLat, gcjLon] = gcjCoord;
 
         const map = L.map(boxRef.current, {
           center: [gcjLat, gcjLon],
@@ -234,7 +255,7 @@ export function CinemaMapDialog({
         L.tileLayer(tileUrl, {
           subdomains: '1234',
           maxZoom: 19,
-          attribution: '&copy; OpenStreetMap 貢獻者 (ODbL) &nbsp;·&nbsp; 瓦片 © 高德地圖',
+          attribution: '&copy; 高德地圖',
         }).addTo(map);
 
         // 標記：用圓點而非預設大頭針 —— Leaflet 預設圖示是外部 PNG，
@@ -334,7 +355,7 @@ export function CinemaMapDialog({
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
               <p className="text-sm text-fg-soft">{errMsg}</p>
               <p className="text-xs text-fg-dim">
-                可改用下方「在高德/OSM 開啟」直接前往地圖網站。
+                可改用下方「在高德／Google 地圖開啟」直接前往地圖網站。
               </p>
             </div>
           )}
@@ -342,28 +363,38 @@ export function CinemaMapDialog({
 
         {/* 底部：外鏈 + 署名說明 */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-hairline px-4 py-2.5">
-          {coord && (
+          {coord && gcjCoord && (
             <>
+              {/*
+                高德外鏈必須傳 GCJ-02（URL 帶 coordinate=gaode，高德不做二次偏移），
+                傳 WGS-84 原值會讓標記落在 ~595m 外。
+              */}
               <a
-                href={amapUrl(coord[0], coord[1])}
+                href={amapUrl(gcjCoord[0], gcjCoord[1])}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hkm-btn-ghost rounded-full px-3.5 py-1.5 text-xs"
               >
                 在高德地圖開啟 ↗
               </a>
+              {/*
+                谷歌外鏈用 WGS-84 原座標（不是 GCJ-02）：
+                Google 用 WGS-84，傳偏移後座標會讓標記落在 ~595m 外。
+                大陸用戶點了打不開（maps.google.com 8–9s 逾時），
+                但香港／海外訪客有用。
+              */}
               <a
-                href={osmUrl(coord[0], coord[1])}
+                href={googleMapsUrl(coord[0], coord[1])}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hkm-btn-ghost rounded-full px-3.5 py-1.5 text-xs"
               >
-                在 OSM 開啟 ↗
+                在 Google 地圖開啟 ↗
               </a>
             </>
           )}
           <span className="text-[11px] leading-relaxed text-fg-dim">
-            瓦片 © 高德地圖 · 資料 © OpenStreetMap 貢獻者（ODbL）。
+            &copy; 高德地圖
           </span>
         </div>
       </div>
@@ -373,6 +404,6 @@ export function CinemaMapDialog({
 
 /**
  * 備援方案：
- *   1. 弹层打不开 → 底部「在高德/Google/OSM 開啟」外链
+ *   1. 弹层打不开 → 底部「在高德／Google 地圖開啟」外链
  *   2. 高德源宕机 → 在 TILE_URL 换 webrd01.is.autonavi.com (57ms/张，但只 21KB)
  */

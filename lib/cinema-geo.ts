@@ -231,13 +231,36 @@ function transformLon(x: number, y: number): number {
   return r;
 }
 
-/** 地圖外鏈（高德地圖網頁版） */
-export function amapUrl(lat: number, lon: number): string {
-  return `https://uri.amap.com/marker?position=${lon.toFixed(6)},${lat.toFixed(6)}&name=戲院&src=hkmovie&coordinate=gaode&callnative=1`;
+/**
+ * 地圖外鏈（高德地圖網頁版）
+ *
+ * ⚠️ 參數必須是 **GCJ-02**（高德坐標系），不能傳 WGS-84：
+ *   URL 帶了 coordinate=gaode，高德會把收到的值當 GCJ-02 直接用；
+ *   若傳 WGS-84 原值，高德不會再偏移，標記就落在 ~595m 外。
+ *   調用方請先過 wgs84ToGcj02()。
+ */
+export function amapUrl(gcjLat: number, gcjLon: number): string {
+  return `https://uri.amap.com/marker?position=${gcjLon.toFixed(6)},${gcjLat.toFixed(6)}&name=戲院&src=hkmovie&coordinate=gaode&callnative=1`;
 }
 
 /**
- * 地圖外鏈（OpenStreetMap）
+ * 地圖外鏈（Google 地圖）
+ *
+ * ⚠️ 座標必須是 WGS-84，不能傳 GCJ-02：Google 用 WGS-84，
+ *    傳偏移後的座標會讓標記落在 ~595m 外。
+ *
+ * 大陸用戶點了打不開（實測 maps.google.com 8–9s 逾時），
+ * 但香港/海外訪客有用 —— 這是次要出口，不影響彈層載入。
+ */
+export function googleMapsUrl(lat: number, lon: number): string {
+  return `https://www.google.com/maps/search/?api=1&query=${lat.toFixed(6)},${lon.toFixed(6)}`;
+}
+
+/**
+ * 地圖外鏈（OpenStreetMap）—— **目前無人引用，保留為備用**
+ *
+ * 2026-09-26 起彈層瓦片改用高德，UI 已移除 OSM 外鏈按鈕（用戶指定）。
+ * 此函數保留，以便日後高德 key 出問題時快速切回 OSM 出口。
  *
  * ★ 為什麼是 openstreetmap.de 而不是 openstreetmap.org
  *
