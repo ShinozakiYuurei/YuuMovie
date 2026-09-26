@@ -232,32 +232,19 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
                    * 用 hkm-chip 與場次頁的版本標籤保持同一視覺語言，
                    * 不加顏色 —— 顏色在本站是「餘座」的專屬語義，別處不許佔用。
                    *
-                   * 其中只有第三方觀眾指南支持的規格（c.guideSpecs）用**虛線**標籤，
-                   * 並在下方加一行註記 —— 用戶 2026-09-26 指定放寬「只採院方明示」
-                   * 時的前提就是附來源標註（見 lib/cinema-facilities.ts 的 GUIDE_SPECS）。
+                   * ★ 官方規格與觀眾指南整理的規格**用同一種標籤**（2026-09-26 用戶指定）。
+                   *   曾經用虛線邊框 + 一行註記區分來源，用戶認為太花：
+                   *   卡片的標籤區只需回答「這間有什麼」，來源追蹤放在詳情頁的
+                   *   「觀眾指南整理的規格」一節（見 CinemaGuideDialog）。
                    */}
                   {c.specs.length > 0 ? (
-                    <>
-                      <div className="mt-2.5 flex flex-wrap gap-1.5">
-                        {c.specs.map((s) => {
-                          const fromGuide = c.guideSpecs.includes(s.key);
-                          return (
-                            <span
-                              key={s.key}
-                              className={fromGuide ? 'hkm-chip hkm-chip-guide' : 'hkm-chip'}
-                              title={fromGuide ? '來源：觀眾指南整理，非院方公布' : undefined}
-                            >
-                              {s.label}
-                            </span>
-                          );
-                        })}
-                      </div>
-                      {c.guideSpecs.length > 0 && (
-                        <p className="mt-1.5 text-[11px] leading-relaxed text-fg-dim">
-                          虛線標籤來自觀眾指南整理，非院方公布
-                        </p>
-                      )}
-                    </>
+                    <div className="mt-2.5 flex flex-wrap gap-1.5">
+                      {c.specs.map((s) => (
+                        <span key={s.key} className="hkm-chip">
+                          {s.label}
+                        </span>
+                      ))}
+                    </div>
                   ) : (
                     /*
                      * ★ 沒有規格標籤時，文案不能寫「待確認」（2026-09-26 用戶要求改）。

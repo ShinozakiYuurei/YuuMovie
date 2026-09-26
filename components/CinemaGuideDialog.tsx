@@ -74,7 +74,7 @@ export function CinemaGuideDialog({
               <h4 className="text-sm font-semibold text-fg">觀眾指南整理的規格</h4>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {guideSpecs.map((spec) => (
-                  <span key={spec.key} className="hkm-chip hkm-chip-guide">{spec.label}</span>
+                  <span key={spec.key} className="hkm-chip">{spec.label}</span>
                 ))}
               </div>
               <p className="mt-2 text-xs leading-relaxed text-fg-muted">
