@@ -2,6 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { CINEMA_COORD, amapUrl, googleMapsUrl, wgs84ToGcj02 } from '@/lib/cinema-geo';
+import { createAMapTile } from '@/lib/amap-tiles';
+import type { TileCoords, TileDone } from '@/lib/amap-tiles';
+import { loadLeaflet } from '@/lib/leaflet-loader';
+export { preloadLeaflet } from '@/lib/leaflet-loader';
 
 /**
  * 戲院地圖彈層（高德瓦片）
@@ -48,7 +52,7 @@ import { CINEMA_COORD, amapUrl, googleMapsUrl, wgs84ToGcj02 } from '@/lib/cinema
  *   cdn.staticfile.org           平均 187ms，TLS 僅 65ms
  *
  * 把 41.7KB(gzip) 的 Leaflet 塞進同源 bundle，等於讓它陪著一起走
- * 西雅圖那條 0.8–2.4 秒的鏈路；走國內 CDN 反而快 4 倍。
+ * 西雅圖那條 0.8–2.4 秒的鏈路；保留 CDN，CSS/JS 並行且逾時自動換鏡像。
  *
  * 安全：兩個鏡像的 leaflet.js / leaflet.css 都與 npm 包 **sha256 完全一致**
  * （實測比對通過），故可放心用。
@@ -57,28 +61,17 @@ import { CINEMA_COORD, amapUrl, googleMapsUrl, wgs84ToGcj02 } from '@/lib/cinema
  *
  * 地圖是次要功能（用戶多數只想知道地址），不該讓全部訪客都下載 Leaflet。
  * 用動態注入 → 只有真的點開地圖的人付這 41.7KB。
- * 也因此不裝 leaflet 的 npm 型別（只在需要時載入全域 L）。
+ * 也因此只在需要時載入全域 L。
  */
-
-const CDNS = [
-  // 依序嘗試：staticfile 實測最快（187ms），baomitu 次之（204ms）
-  'https://cdn.staticfile.org/leaflet/1.9.4/',
-  'https://lib.baomitu.com/leaflet/1.9.4/',
-  // 兜底：jsdelivr（864ms，但全球可用性最好）
-  'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/',
-];
 
 /**
  * 瓦片源：高德地圖
  *
  * ===== 爲什麼選 wprd01 + style=7 =====
  *
- * 高德公开瓦片端點实测（香港中环 z16）：
- *   webrd01.is.autonavi.com  路由版，57ms/张，21KB（含路网+注記）
- *   wprd01.is.autonavi.com   经纬度版，61ms/张，115KB（最详盡版，含路网+注記+建築色塊）
- *
- * 选 wprd01 + style=7：海面与陆地底色明显区分，改善香港地图的水域辨识度；
- * 子域名 wprd01–04 实测都通（46–131ms），可分散连接压力。
+ * 选 wprd01–04 + style=7：海面与陆地底色明显区分，改善香港地图的水域辨识度。
+ * 单张测速不代表首屏体验；初始请求按坐标分散到四个节点，失败或 3 秒逾时后
+ * 换高德节点重试，最多三次。实现见 lib/amap-tiles.ts。
  *
  * maxZoom=19：高德实测 z20 返回 179B 空白瓦片，z19 是上限。
  *
@@ -96,73 +89,8 @@ const CDNS = [
  *     - 底部保留「在高德地圖開啟 ↗」跳官方，作為正規出口
  *     - 待辦：申請高德開放平台 key（免費額度足夠本站用量），把未授權引用換成正規調用
  *
- * ===== 为什么不自动切到备援 =====
- *
- * 若当前源不可用，不切到「传统 OSM」（慢 27 倍），让用户点底部「在高德／Google
- * 地圖開啟」外链就好——弹层本身没有并发/降级需求，保持简单。
+ * 不自动换地图供应商：重试仍然使用高德同一 style=7，保留外链作最后兜底。
  */
-const TILE_URL =
-  'https://wprd0{s}.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=1&style=7';
-
-/** 已載入的 Promise 快取（多個地圖彈層共用，不重複注入） */
-let leafletPromise: Promise<void> | null = null;
-
-/** 依序嘗試各 CDN，全部失敗才 reject */
-function loadLeaflet(): Promise<void> {
-  if (leafletPromise) return leafletPromise;
-
-  leafletPromise = (async () => {
-    const w = window as unknown as { L?: unknown };
-    if (w.L) return; // 已經有了（例如使用者開過兩個地圖）
-
-    for (const base of CDNS) {
-      try {
-        await injectCss(`${base}leaflet.css`);
-        await injectScript(`${base}leaflet.js`);
-        if ((window as unknown as { L?: unknown }).L) return;
-      } catch {
-        /* 換下一個 CDN */
-      }
-    }
-    throw new Error('Leaflet 載入失敗（所有 CDN 均不可用）');
-  })();
-
-  // 失敗後清掉快取，讓使用者再點一次能重試（例如網路剛好斷了）
-  leafletPromise.catch(() => {
-    leafletPromise = null;
-  });
-
-  return leafletPromise;
-}
-
-/** Warm Leaflet on map-button hover/focus without surfacing preload failures. */
-export function preloadLeaflet(): void {
-  void loadLeaflet().catch(() => {});
-}
-
-function injectScript(src: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const el = document.createElement('script');
-    el.src = src;
-    el.async = true;
-    el.onload = () => resolve();
-    el.onerror = () => reject(new Error(`script 載入失敗: ${src}`));
-    document.head.appendChild(el);
-  });
-}
-
-function injectCss(href: string): Promise<void> {
-  return new Promise((resolve) => {
-    // CSS 失敗不阻塞地圖（只是樣式醜一點），故不 reject
-    if (document.querySelector(`link[href="${href}"]`)) return resolve();
-    const el = document.createElement('link');
-    el.rel = 'stylesheet';
-    el.href = href;
-    el.onload = () => resolve();
-    el.onerror = () => resolve();
-    document.head.appendChild(el);
-  });
-}
 
 /** Leaflet 的最小型別（只用到這幾個成員，不為它裝 300KB 的 @types） */
 interface LeafletMap {
@@ -171,12 +99,14 @@ interface LeafletMap {
   setView(center: [number, number], zoom: number): void;
 }
 interface LeafletTileLayer {
+  createTile(coords: TileCoords, done: TileDone): HTMLElement;
   addTo(map: LeafletMap): LeafletTileLayer;
-  on(eventName: string, callback: () => void): LeafletTileLayer;
+  on(eventName: string, callback: (event: { tile: HTMLElement }) => void): LeafletTileLayer;
+  redraw(): void;
 }
 interface LeafletNS {
   map(el: HTMLElement, opts?: Record<string, unknown>): LeafletMap;
-  tileLayer(url: string, opts?: Record<string, unknown>): LeafletTileLayer;
+  gridLayer(opts?: Record<string, unknown>): LeafletTileLayer;
   circleMarker(center: [number, number], opts?: Record<string, unknown>): { addTo(m: LeafletMap): void };
   control: { attribution(opts: Record<string, unknown>): { addTo(m: LeafletMap): void } };
 }
@@ -194,8 +124,10 @@ export function CinemaMapDialog({
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
+  const retryTilesRef = useRef<(() => void) | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [errMsg, setErrMsg] = useState('');
+  const [missingTileCount, setMissingTileCount] = useState(0);
 
   const coord = CINEMA_COORD[cinemaId] ?? null;
 
@@ -235,6 +167,11 @@ export function CinemaMapDialog({
     }
     let cancelled = false;
     let loadingTimer: number | undefined;
+    let resizeTimer: number | undefined;
+    let resizeFrame: number | undefined;
+    const pendingTiles = new Map<HTMLElement, () => void>();
+    const missingTiles = new Set<HTMLElement>();
+    setMissingTileCount(0);
     setState('loading');
     // Keep the map visible while tiles load, but never leave a loading badge indefinitely.
     loadingTimer = window.setTimeout(() => {
@@ -269,16 +206,32 @@ export function CinemaMapDialog({
         });
         mapRef.current = map;
 
-        // 瓦片：高德 wprd01–04 style=7（水面浅蓝、陆地浅色，二者易于区分）。
-        const tileUrl = TILE_URL.replace('{s}', '1');
-        const tiles = L.tileLayer(tileUrl, {
-          subdomains: '1234',
-          maxZoom: 19,
+        // GridLayer lets retries finish before Leaflet marks a tile complete.
+        const tiles = L.gridLayer({ maxZoom: 19 });
+        tiles.createTile = (coords, done) => {
+          const { tile, cancel } = createAMapTile(coords, (error, element) => {
+            pendingTiles.delete(element);
+            if (!cancelled) done(error, element);
+          });
+          pendingTiles.set(tile, cancel);
+          return tile;
+        };
+        tiles.on('tileunload', ({ tile }) => {
+          pendingTiles.get(tile)?.();
+          pendingTiles.delete(tile);
+          if (missingTiles.delete(tile) && !cancelled) setMissingTileCount(missingTiles.size);
+        });
+        tiles.on('tileerror', ({ tile }) => {
+          if (cancelled) return;
+          missingTiles.add(tile);
+          setMissingTileCount(missingTiles.size);
         });
         tiles.on('load', () => {
           if (loadingTimer !== undefined) window.clearTimeout(loadingTimer);
+          // load includes failed tiles; failures have a separate, non-blocking retry notice.
           if (!cancelled) setState('ready');
         });
+        retryTilesRef.current = () => tiles.redraw();
         tiles.addTo(map);
 
         // 標記：用圓點而非預設大頭針 —— Leaflet 預設圖示是外部 PNG，
@@ -294,9 +247,8 @@ export function CinemaMapDialog({
         }).addTo(map);
 
         // 容器在彈層動畫中尺寸可能未定，強制量一次
-        requestAnimationFrame(() => map.invalidateSize());
-        setTimeout(() => map.invalidateSize(), 220);
-
+        resizeFrame = requestAnimationFrame(() => { if (!cancelled) map.invalidateSize(); });
+        resizeTimer = window.setTimeout(() => { if (!cancelled) map.invalidateSize(); }, 220);
       } catch (e) {
         if (loadingTimer !== undefined) window.clearTimeout(loadingTimer);
         if (!cancelled) {
@@ -309,6 +261,11 @@ export function CinemaMapDialog({
     return () => {
       cancelled = true;
       if (loadingTimer !== undefined) window.clearTimeout(loadingTimer);
+      if (resizeTimer !== undefined) window.clearTimeout(resizeTimer);
+      if (resizeFrame !== undefined) cancelAnimationFrame(resizeFrame);
+      for (const cancel of pendingTiles.values()) cancel();
+      pendingTiles.clear();
+      retryTilesRef.current = null;
       mapRef.current?.remove();
       mapRef.current = null;
     };
@@ -375,8 +332,16 @@ export function CinemaMapDialog({
               地圖載入中…
             </div>
           )}
+          {missingTileCount > 0 && (
+            <div className="absolute left-1/2 top-3 z-[500] flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full border border-hairline bg-[var(--hkm-panel)]/90 px-3 py-1.5 text-xs text-fg-soft shadow-lg backdrop-blur-md" role="status">
+              <span>部分地圖未載入</span>
+              <button type="button" className="font-semibold text-accent" onClick={() => retryTilesRef.current?.()}>
+                重試
+              </button>
+            </div>
+          )}
           {state === 'error' && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
+            <div className="absolute inset-0 z-[500] flex flex-col items-center justify-center gap-2 px-6 text-center">
               <p className="text-sm text-fg-soft">{errMsg}</p>
               <p className="text-xs text-fg-dim">
                 可改用下方「在高德／Google 地圖開啟」直接前往地圖網站。
@@ -429,5 +394,5 @@ export function CinemaMapDialog({
 /**
  * 備援方案：
  *   1. 弹层打不开 → 底部「在高德／Google 地圖開啟」外链
- *   2. 高德源宕机 → 在 TILE_URL 换 webrd01.is.autonavi.com (57ms/张，但只 21KB)
+ *   2. 高德节点异常 → 自动换节点重试；最终失败时可点「重試」或使用外链。
  */
