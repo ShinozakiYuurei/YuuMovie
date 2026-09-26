@@ -1602,21 +1602,15 @@ html[data-theme='pink'] .hkm-accent-panel {
 }
 
 /*
- * 手續費藥丸
- *
- * ★ 2026-09-26 用戶：「手續費的文字和佈局現在看著突兀不協調」。
- *   原先是一行裸文字（「$6 手續費」/「— 手續費未確認」）夾在地址與按鈕之間，
- *   沒有容器、跟卡片上其餘的藥丸標籤不是同一種東西，所以顯得突兀。
- *   現在收進 .hkm-chip 的藥丸裡，並用下面的「待確認」樣式區分狀態。
- *
- * 字號與顏色由這裡統一給（不再由各頁面傳 text-sm / text-fg）：
- *   三處出現如果各自帶字號，改一次設計就要改三處 —— 正是這個組件存在要避免的事。
- *   藥丸本來就是小字，跟規格標籤同級，不該跟正文一樣大。
- *
- * ★ 不上任何主題色：本站的顏色是「餘座」的專屬語義（見 .hkm-seat-*），
- *   手續費不能佔用；它與規格標一樣走中性色。
+ * 手續費是一般次要文字，不使用 hkm-chip，也不加玻璃底、描邊或高光。
+ * align-self 避免它在 flex column 卡片中被預設拉伸成一整行的膠囊寬度。
  */
 .hkm-fee {
+  align-self: flex-start;
+  width: max-content;
+  color: var(--hkm-fg-soft);
+  font-size: 0.75rem;
+  line-height: 1.5;
   font-variant-numeric: tabular-nums;
 }
 

@@ -87,21 +87,7 @@ export default async function CinemaPage({ params }: { params: Promise<{ id: str
             <span className="text-sm text-fg-muted">{cinema.address}</span>
           )}
         </div>
-        {/*
-         * 手續費藥丸（原為戲院地址，再早是裸的一行文字）
-         *
-         * ★ 用戶 2026-09-21 指定：本行地址改為手續費。
-         *   ★ 同日再修：地址不再只存於 hover —— 已放回戲院名右側（上方 header），
-         *   手續費獨立成行，兩者互不頂替。
-         *
-         * ★ 2026-09-26 用戶：「手續費的文字和佈局現在看著突兀不協調」。
-         *   這裡原本是一行裸文字（「$10 手續費」/「— 手續費未確認」），
-         *   四周沒有容器、跟頁面上其餘藥丸標籤不是同一種東西。
-         *   現改為藥丸（.hkm-fee），字號與顏色由該 class 統一給，
-         *   因此這裡只傳外距 mt-2，不再傳 text-sm / text-fg。
-         *
-         *   文案與狀態（含「待確認」的虛線樣式）統一由 components/FeeLine.tsx 決定。
-         */}
+        {/* 手續費獨立一行，以一般次要文字顯示，不套用玻璃或標籤樣式。 */}
         <FeeLine amount={fee.amount} note={fee.note} className="mt-2" />
         {/*
          * 地圖按鈕（改開彈層，不再外鏈 Google Maps）

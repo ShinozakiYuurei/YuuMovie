@@ -28,8 +28,8 @@ import { CINEMA_COORD, amapUrl, googleMapsUrl, wgs84ToGcj02 } from '@/lib/cinema
  *   tile.openstreetmap.de       1.65s/张  → 首屏 4–6 张，串行 ≈ 4–6s（这是现在慢的根因）
  *   tile.openstreetmap.fr/hot   2.6s/张
  *   CARTO dark                   ❌ 超時
- *   wprd01.is.autonavi.com       **61ms/张** ✅（高德风格 7：路网灰版）
- *   wprd01 style=8              82ms/张（115KB：详盡版，路网+注記+建築色塊，視覺最清晰）
+ *   wprd01 style=7              **61ms/张** ✅（浅蓝水面，与浅色陆地底色区分明显）
+ *   wprd01 style=8              82ms/张（115KB：详尽版，但水面和陆地近似同色）
  *   webrd01 style=8              57ms/张
  *
  * 高德瓦片在中国大陆可达，且对香港、澳门有完整覆盖（实测中环 IFC 渲染正常）。
@@ -71,13 +71,13 @@ const CDNS = [
 /**
  * 瓦片源：高德地圖
  *
- * ===== 爲什麼選 wprd01 + style=8 =====
+ * ===== 爲什麼選 wprd01 + style=7 =====
  *
  * 高德公开瓦片端點实测（香港中环 z16）：
  *   webrd01.is.autonavi.com  路由版，57ms/张，21KB（含路网+注記）
  *   wprd01.is.autonavi.com   经纬度版，61ms/张，115KB（最详盡版，含路网+注記+建築色塊）
  *
- * 选 wprd01 + style=8：标记位置可读性最好（建築有底色，街道有名字），且
+ * 选 wprd01 + style=7：海面与陆地底色明显区分，改善香港地图的水域辨识度；
  * 子域名 wprd01–04 实测都通（46–131ms），可分散连接压力。
  *
  * maxZoom=19：高德实测 z20 返回 179B 空白瓦片，z19 是上限。
@@ -102,7 +102,7 @@ const CDNS = [
  * 地圖開啟」外链就好——弹层本身没有并发/降级需求，保持简单。
  */
 const TILE_URL =
-  'https://wprd0{s}.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=1&style=8';
+  'https://wprd0{s}.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=1&style=7';
 
 /** 已載入的 Promise 快取（多個地圖彈層共用，不重複注入） */
 let leafletPromise: Promise<void> | null = null;
@@ -269,7 +269,7 @@ export function CinemaMapDialog({
         });
         mapRef.current = map;
 
-        // 瓦片：高德 wprd01–04（大陆 ~61ms/张；style=8 详盡版含路网+注記+建築色塊）。
+        // 瓦片：高德 wprd01–04 style=7（水面浅蓝、陆地浅色，二者易于区分）。
         const tileUrl = TILE_URL.replace('{s}', '1');
         const tiles = L.tileLayer(tileUrl, {
           subdomains: '1234',

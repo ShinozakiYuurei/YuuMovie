@@ -260,13 +260,11 @@ export function bookingFeeOf(cinemaId: string, source: Source): BookingFee {
  *   文案改為「標籤在前、金額在後」，未確認不再顯示破折號：
  *     「手續費 $10」/「手續費 $0」/「手續費待確認」
  *
- *   這同時取代了 2026-09-21 定稿的「$xx 手續費」（金額在前）——
- *   藥丸排在一起時，標籤起點一致才掃得快。
+ *   這同時取代了 2026-09-21 定稿的「$xx 手續費」（金額在前）。
  *
- * ★ 頁面渲染請用 components/FeeLine.tsx，不要直接用這個函數。
- *   原因：藥丸是 inline-flex 的盒子（.hkm-chip + .hkm-fee），
- *   未確認還要另外掛 .hkm-fee--unknown 的虛線樣式，純字串做不到。
- *   這個函數只給需要「一行文字」的場合（如 SEO 描述、測試斷言）。
+ * ★ 頁面渲染請用 components/FeeLine.tsx，不要直接用這個函數，
+ *   以共用未確認狀態的弱化文字樣式；這個函數只給 SEO 描述、測試斷言等
+ *   需要純文字的場合。
  */
 export function feeText(amount: number): string {
   if (amount === FEE_NO_ONLINE) return '不設網上購票';
