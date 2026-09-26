@@ -259,7 +259,24 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
                       )}
                     </>
                   ) : (
-                    <p className="mt-2.5 text-xs text-fg-muted">規格資料待確認</p>
+                    /*
+                     * ★ 沒有規格標籤時，文案不能寫「待確認」（2026-09-26 用戶要求改）。
+                     *
+                     * 這幾間是**查過、而院方沒有公佈**，不是我們漏了做：
+                     *   - MCL 官方「設施」表只有影院／座位數目／輪椅座位三欄
+                     *     （見 custom-mcl-cinema-common.js 的 Facilities 渲染）
+                     *   - 影藝官網該分店的介紹欄是佔位文字（Test Site／.／1）
+                     *   - 華懋官網只有「配備先進的數碼影音設備」這種籠統句
+                     *   - 寶石戲院連官網都沒有，新寶院線官網也不列此影院
+                     * 第三方觀眾指南對這幾間亦只記選座與路線。
+                     * 寫「待確認」會讓用戶以為是我們還沒查（用戶就是這樣誤讀的）。
+                     */
+                    <p
+                      className="mt-2.5 text-xs text-fg-muted"
+                      title="已查核院方官網／官方 API 與第三方觀眾指南；院方未公佈這間戲院的放映與音響規格。不代表現場沒有相關設備。"
+                    >
+                      已核實：院方未公佈放映／音響規格
+                    </p>
                   )}
 
                   <div className="mt-auto flex gap-2 pt-3.5">
