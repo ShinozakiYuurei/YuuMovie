@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { FilterDropdown } from './FilterDropdown';
 import { FeeLine } from './FeeLine';
-import { CinemaMapDialog } from './CinemaMapDialog';
+import { CinemaMapDialog, preloadLeaflet } from './CinemaMapDialog';
 import { CinemaGuideDialog } from './CinemaGuideDialog';
 import { CINEMA_GUIDES } from '@/lib/cinema-guides';
 import { CINEMA_COORD } from '@/lib/cinema-geo';
@@ -208,9 +208,9 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
               {g.label}
               <span className="hkm-chip">{g.cinemas.length} 間</span>
             </h2>
-            <div className="grid gap-3.5 sm:grid-cols-2">
+            <div className="grid gap-3.5 lg:grid-cols-2">
               {g.cinemas.map((c) => (
-                <div key={c.id} className="hkm-glass rounded-2xl p-4">
+                <div key={c.id} className="hkm-glass flex min-h-[184px] flex-col rounded-2xl p-4">
                   {/*
                    * 戲院名 + 完整地址
                    *
@@ -257,7 +257,7 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
                     </div>
                   )}
 
-                  <div className="mt-3.5 flex gap-2">
+                  <div className="mt-auto flex gap-2 pt-3.5">
                     <Link
                       href={`/cinema/${c.id}`}
                       className="hkm-btn-primary rounded-full px-3.5 py-1.5 text-xs font-semibold"
@@ -277,6 +277,8 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
                     {hasCoord(c.id) && (
                       <button
                         type="button"
+                        onMouseEnter={preloadLeaflet}
+                        onFocus={preloadLeaflet}
                         onClick={() => setMapId(c.id)}
                         className="hkm-btn-ghost rounded-full px-3.5 py-1.5 text-xs"
                       >

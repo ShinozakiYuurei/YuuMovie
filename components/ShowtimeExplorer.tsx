@@ -9,7 +9,7 @@ import { FeeLine } from './FeeLine';
 import type { CompactRows } from '@/lib/compact';
 import type { Facets, ShowRow } from '@/lib/data';
 import { FilterDropdown } from './FilterDropdown';
-import { CinemaMapDialog } from './CinemaMapDialog';
+import { CinemaMapDialog, preloadLeaflet } from './CinemaMapDialog';
 import { CINEMA_COORD } from '@/lib/cinema-geo';
 
 /**
@@ -609,6 +609,8 @@ export function ShowtimeExplorer({
                       {hasCoord(cinemaId) && (
                         <button
                           type="button"
+                          onMouseEnter={preloadLeaflet}
+                          onFocus={preloadLeaflet}
                           onClick={() => setMapCinemaId(cinemaId)}
                           className="ml-auto shrink-0 text-xs text-fg-muted transition hover:text-fg"
                         >

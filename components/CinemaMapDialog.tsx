@@ -135,6 +135,11 @@ function loadLeaflet(): Promise<void> {
   return leafletPromise;
 }
 
+/** Warm Leaflet on map-button hover/focus without surfacing preload failures. */
+export function preloadLeaflet(): void {
+  void loadLeaflet().catch(() => {});
+}
+
 function injectScript(src: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const el = document.createElement('script');
@@ -165,9 +170,13 @@ interface LeafletMap {
   invalidateSize(): void;
   setView(center: [number, number], zoom: number): void;
 }
+interface LeafletTileLayer {
+  addTo(map: LeafletMap): LeafletTileLayer;
+  on(eventName: string, callback: () => void): LeafletTileLayer;
+}
 interface LeafletNS {
   map(el: HTMLElement, opts?: Record<string, unknown>): LeafletMap;
-  tileLayer(url: string, opts?: Record<string, unknown>): { addTo(m: LeafletMap): void };
+  tileLayer(url: string, opts?: Record<string, unknown>): LeafletTileLayer;
   circleMarker(center: [number, number], opts?: Record<string, unknown>): { addTo(m: LeafletMap): void };
   control: { attribution(opts: Record<string, unknown>): { addTo(m: LeafletMap): void } };
 }
@@ -225,6 +234,12 @@ export function CinemaMapDialog({
       return;
     }
     let cancelled = false;
+    let loadingTimer: number | undefined;
+    setState('loading');
+    // Keep the map visible while tiles load, but never leave a loading badge indefinitely.
+    loadingTimer = window.setTimeout(() => {
+      if (!cancelled) setState('ready');
+    }, 5000);
 
     (async () => {
       try {
@@ -256,10 +271,15 @@ export function CinemaMapDialog({
 
         // 瓦片：高德 wprd01–04（大陆 ~61ms/张；style=8 详盡版含路网+注記+建築色塊）。
         const tileUrl = TILE_URL.replace('{s}', '1');
-        L.tileLayer(tileUrl, {
+        const tiles = L.tileLayer(tileUrl, {
           subdomains: '1234',
           maxZoom: 19,
-          }).addTo(map);
+        });
+        tiles.on('load', () => {
+          if (loadingTimer !== undefined) window.clearTimeout(loadingTimer);
+          if (!cancelled) setState('ready');
+        });
+        tiles.addTo(map);
 
         // 標記：用圓點而非預設大頭針 —— Leaflet 預設圖示是外部 PNG，
         // 在高德瓦片上偏亮且要多一次請求；圓點是純 SVG，且用主題色。
@@ -277,8 +297,8 @@ export function CinemaMapDialog({
         requestAnimationFrame(() => map.invalidateSize());
         setTimeout(() => map.invalidateSize(), 220);
 
-        if (!cancelled) setState('ready');
       } catch (e) {
+        if (loadingTimer !== undefined) window.clearTimeout(loadingTimer);
         if (!cancelled) {
           setState('error');
           setErrMsg(e instanceof Error ? e.message : '地圖載入失敗');
@@ -288,6 +308,7 @@ export function CinemaMapDialog({
 
     return () => {
       cancelled = true;
+      if (loadingTimer !== undefined) window.clearTimeout(loadingTimer);
       mapRef.current?.remove();
       mapRef.current = null;
     };
@@ -350,7 +371,7 @@ export function CinemaMapDialog({
           <div ref={boxRef} className="absolute inset-0" />
 
           {state === 'loading' && (
-            <div className="absolute inset-0 flex items-center justify-center text-sm text-fg-muted">
+            <div className="pointer-events-none absolute left-1/2 top-3 z-[500] -translate-x-1/2 rounded-full border border-hairline bg-[var(--hkm-panel)]/90 px-3 py-1.5 text-sm text-fg-muted shadow-lg backdrop-blur-md">
               地圖載入中…
             </div>
           )}

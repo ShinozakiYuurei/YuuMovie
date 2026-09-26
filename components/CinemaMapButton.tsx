@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { CinemaMapDialog } from './CinemaMapDialog';
+import { CinemaMapDialog, preloadLeaflet } from './CinemaMapDialog';
 
 /**
  * 戲院詳情頁的地圖按鈕 + 彈層
@@ -32,6 +32,8 @@ export function CinemaMapButton({
     <>
       <button
         type="button"
+        onMouseEnter={preloadLeaflet}
+        onFocus={preloadLeaflet}
         onClick={() => setOpen(true)}
         className="hkm-btn-ghost mt-3 inline-block rounded-full px-3.5 py-1.5 text-xs"
       >
