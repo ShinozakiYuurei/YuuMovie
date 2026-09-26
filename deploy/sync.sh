@@ -133,6 +133,10 @@ else
   # 场次卡片的「版本·语言」文案：两个正交维度拼出来，边界碎，
   # 写错了只是标签变得莫名其妙（「IMAX·加碼重映·英語」），不报错。
   "$TSX" probe/check-version-text.mts
+  # 高德圖磚：逾時即 abort 的寫法下，慢請求會被親手砍掉、換節點又要重做 TLS
+  # 握手 —— 頁面照樣 200，只是地圖靜默變一片空白 +「部分地圖未載入」。
+  # 2026-09-26 線上實測：首屏 8 張瓦片 24 次請求全用盡仍不出圖。
+  node --import tsx --test scripts/test-amap-tiles.mjs
   # 戲院影廳規格：推断了错了页面照样 200，只是「有 IMAX 的戲院」
   # 静默少几家 / 多几家 —— 用户筛 IMAX 看不到 K11 也只会以为它没有。
   "$TSX" probe/check-cinema-specs.mts
