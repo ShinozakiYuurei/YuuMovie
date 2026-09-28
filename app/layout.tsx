@@ -93,6 +93,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     minute: '2-digit',
     hourCycle: 'h23',
   }).format(new Date(meta.lastUpdated));
+  const year = new Date().getFullYear();
   return (
     <html
       lang="zh-HK"
@@ -198,21 +199,120 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
          */}
         <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
 
-        <footer className="mt-16 border-t border-hairline px-4 py-8 text-xs leading-relaxed text-fg-dim">
-          <div className="mx-auto max-w-6xl space-y-2">
-            <p>
-              本網站僅提供電影資訊聚合服務，所有場次及票價資料來自各院線官方網站，僅供參考。
-              實際放映時間及票價以院線官方公佈為準，購票請前往院線官方網站。
-            </p>
-            <p>本站與各院線無隸屬關係。如權利人認為內容不當，請聯絡我們移除。</p>
-            <p className="pt-2 text-fg-dim">
-              資料來源：
-              {meta.sources
-                .map((s) => SOURCE_LABEL[s as Source] ?? s)
-                .join('、')}{' '}
-              · 最後更新 {updated} · 共 {movieCount} 部電影 /{' '}
-              {meta.counts.cinemas} 間戲院 / {meta.counts.shows} 場次
-            </p>
+        {/*
+         * 页脚（2026-09-28 按用户给的参考样式改版）
+         *
+         * 参考样式的三段结构照搬：
+         *   1) 三列：品牌 + 说明（左，最宽）｜ 瀏覽（中）｜ 資料（右）
+         *   2) 一条发丝分隔线
+         *   3) 底栏：左版权，右「服务状态圆点 + 免责说明」
+         *
+         * ★ 为什么「資料」列不做成链接：
+         *   站内只有 /showing、/upcoming、/cinema 三个落地页（见 NavLinks.tsx），
+         *   資料 / 免責没有独立页面。硬做成 <a> 会得到点了没反应的假链接，
+         *   不如老实做成纯文本行 —— 视觉上与链接同款，但不骗人。
+         *
+         * ★ 为什么保留 border-t 而不加底色：
+         *   参考图的页脚底色比上方略深，但本站明暗两套主题的「更深/更浅」
+         *   方向相反（暗色 veil 是变亮、明色 veil 是变暗），用同一个 veil
+         *   会有一套主题走向不对。发丝线足以分隔，也更贴合本站克制的观感。
+         *
+         * ★ 版权年份用构建期时间：
+         *   本站是静态导出（next.config.ts），页面每 2–6 小时随抓取重建，
+         *   年份在构建时定格即可，不需要为此引入客户端 JS。
+         */}
+        <footer className="mt-16 border-t border-hairline">
+          <div className="mx-auto max-w-6xl px-4 py-10 sm:py-12">
+            {/*
+             * 三列栅格
+             * ★ 左列在手机上独占一行（sm:col-span-2）：说明文字是成段的，
+             *   与导航项并排会被挤成窄条，读起来更费劲。
+             * ★ lg 下 1.7fr / 1fr / 1fr：与参考图一致，左列明显更宽。
+             */}
+            <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.7fr_1fr_1fr] lg:gap-8">
+              {/* 列 1：品牌 + 免责说明 */}
+              <div className="max-w-md sm:col-span-2 lg:col-span-1">
+                <Link href="/" className="text-lg font-bold tracking-tight">
+                  Yuu<span className="text-accent">Movie</span>
+                </Link>
+                <p className="mt-4 text-xs leading-relaxed text-fg-dim">
+                  本網站僅提供電影資訊聚合服務，所有場次及票價資料來自各院線官方網站，僅供參考。
+                  實際放映時間及票價以院線官方公佈為準，購票請前往院線官方網站。
+                </p>
+                <p className="mt-3 text-xs leading-relaxed text-fg-dim">
+                  本站與各院線無隸屬關係。如權利人認為內容不當，請聯絡我們移除。
+                </p>
+              </div>
+
+              {/* 列 2：瀏覽（站内三个落地页，与顶栏一致） */}
+              <nav aria-label="頁腳導覽">
+                <h2 className="text-sm font-semibold text-fg">瀏覽</h2>
+                <ul className="mt-4 space-y-2.5 text-xs">
+                  {[
+                    { href: '/showing', label: '現正上映' },
+                    { href: '/upcoming', label: '即將上映' },
+                    { href: '/cinema', label: '戲院' },
+                  ].map(({ href, label }) => (
+                    <li key={href}>
+                      <Link href={href} className="text-fg-muted transition hover:text-fg">
+                        {label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+
+              {/* 列 3：資料（纯文本，不做假链接，理由见上方注释） */}
+              <div>
+                <h2 className="text-sm font-semibold text-fg">資料</h2>
+                <ul className="mt-4 space-y-2.5 text-xs text-fg-muted">
+                  {/*
+                   * 每個來源單獨包一層 whitespace-nowrap：
+                   * 中文沒有「詞」的概念，瀏覽器會在任何兩字之間斷行，
+                   * 於是在窄欄裡「星達」會被拆成「星」/「達」兩行。
+                   * 分隔符「、」跟在名稱**同一個** span 內，避免行首只剩一個頓號。
+                   */}
+                  <li>
+                    資料來源：
+                    {meta.sources.map((s, i) => (
+                      <span key={s} className="whitespace-nowrap">
+                        {SOURCE_LABEL[s as Source] ?? s}
+                        {i < meta.sources.length - 1 ? '、' : ''}
+                      </span>
+                    ))}
+                  </li>
+                  <li>
+                    收錄：{movieCount} 部電影 · {meta.counts.cinemas} 間戲院 ·{' '}
+                    {meta.counts.shows} 場次
+                  </li>
+                  <li>最後更新：{updated}</li>
+                </ul>
+              </div>
+            </div>
+
+            {/*
+             * 底栏
+             * ★ 左侧版权 + 右侧「三个状态点 + 免责说明」，与参考图同构。
+             * ★ 状态点用 bg-status-ok（见 globals.css 的 --hkm-status-ok）：
+             *   它是**服务状态**指示（场次/票价/链接三条数据链），不是余座档位，
+             *   故不复用 --hkm-seat-plenty-dot。
+             * ★ 最后一句不带圆点：它只是说明，不是状态。
+             */}
+            <div className="mt-10 flex flex-col gap-4 border-t border-hairline pt-6 text-xs text-fg-dim sm:mt-12 sm:flex-row sm:items-center sm:justify-between">
+              <p>© {year} YuuMovie</p>
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                {['場次同步', '票價', '官方購票連結'].map((label) => (
+                  <span key={label} className="inline-flex items-center gap-1.5">
+                    <span
+                      className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-status-ok"
+                      aria-hidden
+                    />
+                    {label}
+                  </span>
+                ))}
+                <span>場次與票價以院線官方為準</span>
+              </div>
+            </div>
           </div>
         </footer>
       </body>

@@ -278,6 +278,11 @@
   --hkm-rating-imdb-bg: rgb(46 40 20);
   --hkm-rating-imdb-fg: #f0c040;
 
+  /* 页脚底栏的「服务正常」圆点（2026-09-28 随页脚改版新增）。
+     语义与 seat-plenty-dot 不同（那是余座档位，会随数据变），故单列一个令牌，
+     免得日后调余座配色时误伤页脚。两套主题取值见 html[data-theme='light']。 */
+  --hkm-status-ok: #22c55e;
+
   /* 场次卡：余座档位（值取自 lib/seat.ts 的实测结论，此处只是搬进来） */
   --hkm-seat-plenty-bg: rgb(3 151 4 / 0.16);
   --hkm-seat-plenty-border: rgb(34 197 94 / 0.42);
@@ -546,6 +551,9 @@ html[data-theme='pink'] {
   --hkm-rating-douban-fg: #166534;
   --hkm-rating-imdb-bg: #fdf4dc;
   --hkm-rating-imdb-fg: #92400e;
+
+  /* 页脚底栏状态点：明底上 #22c55e 偏荧光，收深一档到 #16a34a */
+  --hkm-status-ok: #16a34a;
 
   /* 余座档位：色相不变（绿/橙/红/深红，辨识度与暗色一致），
      但淡彩底改成「浅底 + 深字」—— 暗色那组亮字（#86efac 等）在浅底上只有 1.3:1，
@@ -1851,6 +1859,9 @@ details > summary::-webkit-details-marker {
 
   --color-accent2: var(--hkm-accent2);
   --color-accent-soft: var(--hkm-accent-soft);
+
+  /* 页脚底栏「服务正常」圆点，见 :root 的 --hkm-status-ok */
+  --color-status-ok: var(--hkm-status-ok);
 }
 
 @theme inline {
