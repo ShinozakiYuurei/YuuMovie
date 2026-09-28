@@ -13,6 +13,7 @@
 
 import type { Region, Source } from './types';
 import type { ShowRow } from './data';
+import type { PaymentMethod } from './cinema-payments';
 
 // ★ 只做类型引入（import type），编译后会被完全擦除，
 //   不会把 lib/data.ts 的 node:fs / node:path 拖进浏览器包。
@@ -57,6 +58,14 @@ export interface CompactRows {
     fee: number;
     feeNote: string;
     feeIncluded: boolean;
+    /**
+     * 支付方式（每間戲院一份）
+     *
+     * ★ 支付方式是戲院級屬性（同一間戲院的所有場次支付方式相同），
+     *   放在字典中避免每行重複存儲。
+     */
+    payments: string[];
+    paymentsVerified: boolean;
   }[];
   /** 影厅名字典 */
   houses: string[];
@@ -121,6 +130,8 @@ export function toCompact(rows: ShowRow[]): CompactRows {
       fee: r.cinemaFee,
       feeNote: r.cinemaFeeNote,
       feeIncluded: r.cinemaFeeIncluded,
+      payments: r.cinemaPayments,
+      paymentsVerified: r.cinemaPaymentsVerified,
     }));
     const h = dictIx(hIx, houses, r.houseName, () => r.houseName);
     const d = dictIx(dIx, dates, r.date, () => r.date);
@@ -182,6 +193,8 @@ export function fromCompact(c: CompactRows): ShowRow[] {
       cinemaFee: cin.fee,
       cinemaFeeNote: cin.feeNote,
       cinemaFeeIncluded: cin.feeIncluded,
+      cinemaPayments: cin.payments as PaymentMethod[],
+      cinemaPaymentsVerified: cin.paymentsVerified,
       versionKey: ver.key,
       versionLabel: ver.label,
       versionText: ver.text,

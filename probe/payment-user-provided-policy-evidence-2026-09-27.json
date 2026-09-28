@@ -1,0 +1,36 @@
+{
+  "recordedAt": "2026-09-27",
+  "evidenceType": "User-provided payment-page screenshots and explicit user attestation of official-cinema provenance and channel scope; not independently captured by this audit.",
+  "userAttestation": "These are all from each cinema's official payment page, with the same channel (web ticket purchase on desktop and mobile web).",
+  "scope": {
+    "appliesTo": ["desktop web ticket purchase", "mobile web ticket purchase"],
+    "doesNotEstablish": ["native app", "box office", "self-service kiosk"],
+    "transactionActionsTakenByAssistant": false,
+    "exactPaymentPageUrlsProvided": false
+  },
+  "cinemas": {
+    "emperor": {
+      "image": null,
+      "sourceForm": "Payment methods explicitly typed by the user, then included in the user's explicit attestation that all listed evidence came from each cinema's official payment page.",
+      "geographicScope": "Hong Kong Emperor web-ticketing only; Macau Emperor cinema is not verified by this evidence.",
+      "methods": ["visa", "mastercard", "unionpay", "american_express", "alipayhk", "wechat_pay_hk", "apple_pay"],
+      "userListedLabels": ["Visa", "Mastercard", "銀聯（UnionPay）", "美國運通", "AlipayHK（支付寶香港）", "WeChat Pay HK（微信支付香港）", "Apple Pay"]
+    },
+    "cinemacity": {
+      "image": "cindy-media://blobs/e0e29e45f691bc1248bcf042399123f6935fbad55e36dd9db365f46816792cb9.png",
+      "methods": ["visa", "mastercard", "unionpay", "jcb", "alipay", "alipayhk", "octopus"],
+      "visuallyInterpretedLabels": ["信用卡或提款卡：Visa、Mastercard、UnionPay、JCB", "支付寶", "支付寶香港", "八達通"]
+    },
+    "goldenscene": {
+      "image": "cindy-media://blobs/4d12584ae4226e04ed24fb082e7260ea0b8a6af13d8241c4b83624f1da7d030b.png",
+      "methods": ["visa", "mastercard", "payme"],
+      "visuallyInterpretedLabels": ["信用卡（VISA/MASTER）", "PayMe"]
+    },
+    "lumen": {
+      "image": "cindy-media://blobs/7bca52f2c7b1a8ebf48502b5bcb8182f374b14b85d8b721a10ca7f7ef278fe63.png",
+      "methods": ["visa", "mastercard", "unionpay", "alipayhk", "alipay", "wechat_pay"],
+      "visuallyInterpretedLabels": ["Visa", "Mastercard", "UnionPay", "AlipayHK", "支付寶", "WeChat Pay"]
+    }
+  },
+  "provenanceLimit": "The assistant has not independently verified the screenshots' original URLs or captured the payment pages live. Official-domain home URLs in cinema-payments.ts identify each operator only; the actual screenshot page URL remains unknown. The verified entries rely on the user's explicit provenance/channel attestation, not on the earlier public-only investigation."
+}

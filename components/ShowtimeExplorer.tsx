@@ -69,6 +69,7 @@ const FILTER_LABELS = {
   languages: '所有語言',
   regions: '所有地區',
   districts: '所有區域',
+  payments: '所有支付方式',
 } as const;
 
 type FilterDim = keyof typeof FILTER_LABELS;
@@ -272,6 +273,7 @@ export function ShowtimeExplorer({
     languages: [],
     regions: [],
     districts: [],
+    payments: [],
   });
   const [sortRules, setSortRules] = useState<SortRule[]>([{ key: 'time', dir: 'asc' }]);
   /** 用户点选的日期；null = 尚未选（跟随筛选结果的第一天） */
@@ -321,7 +323,7 @@ export function ShowtimeExplorer({
       .map((option) => ({ ...option, count: counts.get(option.value)! }));
   }, [facets.districts, rows, sel.regions]);
 
-  /** 多选筛选：同维度内 OR，维度之间 AND */
+  /** 多選篩選：同維度內 OR，維度間 AND */
   const filtered = useMemo(() => {
     const pass = (dim: FilterDim, v: string | null) => {
       const s = sel[dim];
@@ -333,7 +335,11 @@ export function ShowtimeExplorer({
         pass('versions', r.versionKey) &&
         pass('languages', r.languageLabel) &&
         pass('regions', r.region) &&
-        pass('districts', r.district)
+        pass('districts', r.district) &&
+        // 支付方式：行上帶的是戲院支持的支付方式列表，
+        // 選中任一即匹配（OR）；未選則全部保留
+        (sel.payments.length === 0 ||
+          r.cinemaPayments.some((p) => sel.payments.includes(p)))
     );
   }, [rows, sel]);
 
@@ -400,13 +406,14 @@ export function ShowtimeExplorer({
     sel.versions.length +
     sel.languages.length +
     sel.regions.length +
-    sel.districts.length;
+    sel.districts.length +
+    sel.payments.length;
 
   /** 彈層要顯示的戲院（從已展平的行裡現查，避免額外狀態） */
   const mapCinema = mapCinemaId ? rows.find((r) => r.cinemaId === mapCinemaId) : undefined;
 
   const clearAll = () => {
-    setSel({ sources: [], versions: [], languages: [], regions: [], districts: [] });
+    setSel({ sources: [], versions: [], languages: [], regions: [], districts: [], payments: [] });
     setSortRules([{ key: 'time', dir: 'asc' }]);
     setPickedDate(null);
   };
@@ -459,12 +466,15 @@ export function ShowtimeExplorer({
           )}
         </LayerHeader>
 
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
           <FilterDropdown placeholder={FILTER_LABELS.sources} options={facets.sources} selected={sel.sources} onChange={setDim('sources')} />
           <FilterDropdown placeholder={FILTER_LABELS.versions} options={facets.versions} selected={sel.versions} onChange={setDim('versions')} />
           <FilterDropdown placeholder={FILTER_LABELS.languages} options={facets.languages} selected={sel.languages} onChange={setDim('languages')} />
           <FilterDropdown placeholder={FILTER_LABELS.regions} options={facets.regions} selected={sel.regions} onChange={setDim('regions')} />
           <FilterDropdown placeholder={FILTER_LABELS.districts} options={districtOptions} selected={sel.districts} onChange={setDim('districts')} />
+          {facets.payments.length > 0 && (
+            <FilterDropdown placeholder={FILTER_LABELS.payments} options={facets.payments} selected={sel.payments} onChange={setDim('payments')} />
+          )}
         </div>
 
         {/* 排序（可多键叠加） */}

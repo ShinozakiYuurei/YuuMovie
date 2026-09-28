@@ -115,6 +115,8 @@ else
   "$TSC" --noEmit
   "$TSX" probe/check-danger.mts
   node --import tsx --test scripts/test-poster-parsers.mjs
+  # 支付方式是展示／篩選政策；防止 key、來源範圍或英皇香港／澳門覆寫回歸。
+  "$TSX" --test scripts/test-cinema-payments.ts
   # MCL 官方详情从数字 ID 抓取；片名不符要拒绝，且分类/片长/简介须进组级资料卡。
   "$TSX" probe/check-mcl-details.mts
   "$TSX" probe/check-group-slug-status.mts

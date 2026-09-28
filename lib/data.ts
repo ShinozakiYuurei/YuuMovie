@@ -24,6 +24,7 @@ import { hallSpecsOf, sortSpecs, HALL_SPECS, specLabel, SPEC_GROUP_LABEL } from 
 import { fixedCinemaSpecs, guideCinemaSpecs } from './cinema-facilities';
 import { bookingFeeOf } from './booking-fee';
 import type { BookingFee } from './booking-fee';
+import { paymentMethodsOf, PAYMENT_LABEL, type PaymentMethod } from './cinema-payments';
 // 已開映場次的判定：與客戶端（components/CinemaShowtimes.tsx 等）共用同一份規則
 import { isLiveShow } from './live';
 import { CINEMA_DISPLAY_NAME } from './cinema-names';
@@ -1779,6 +1780,10 @@ export interface CinemaRow {
   guideSpecs: string[];
   /** 網上購票手續費（每張票）；規則見 lib/booking-fee.ts */
   fee: BookingFee;
+  /** 接受的支付方式（僅 verified 的院線有數據） */
+  payments: PaymentMethod[];
+  /** 支付方式是否已從院方官網確認 */
+  paymentsVerified: boolean;
 }
 
 /**
@@ -1795,18 +1800,23 @@ export interface CinemaFacets {
 }
 
 export function getCinemaRows(): CinemaRow[] {
-  return getAllCinemas().map((c) => ({
-    id: c.id,
-    nameZh: c.nameZh,
-    address: c.address,
-    mapUrl: c.mapUrl,
-    source: c.source,
-    region: c.region ?? null,
-    district: c.district ?? null,
-    specs: (c.specs ?? []).map((k) => ({ key: k, label: specLabel(k) })),
-    guideSpecs: c.guideSpecs ?? [],
-    fee: bookingFeeOf(c.id, c.source),
-  }));
+  return getAllCinemas().map((c) => {
+    const paymentInfo = paymentMethodsOf(c.id, c.source);
+    return {
+      id: c.id,
+      nameZh: c.nameZh,
+      address: c.address,
+      mapUrl: c.mapUrl,
+      source: c.source,
+      region: c.region ?? null,
+      district: c.district ?? null,
+      specs: (c.specs ?? []).map((k) => ({ key: k, label: specLabel(k) })),
+      guideSpecs: c.guideSpecs ?? [],
+      fee: bookingFeeOf(c.id, c.source),
+      payments: paymentInfo.methods,
+      paymentsVerified: paymentInfo.verified,
+    };
+  });
 }
 
 export function getCinemaFacets(rows: CinemaRow[]): CinemaFacets {
@@ -1929,6 +1939,15 @@ export interface ShowRow {
   cinemaFeeNote: string;
   /** 顯示票價是否已含手續費（決定文案寫「$8 手續費」還是「$8 手續費（已含於票價）」） */
   cinemaFeeIncluded: boolean;
+  /**
+   * 戲院接受的支付方式（僅 verified 的院線有數據）
+   *
+   * ★ 支付方式是戲院級常量，與 cinemaFee 一樣挂在 ShowRow 上供篩選使用。
+   *   規則見 lib/cinema-payments.ts。
+   */
+  cinemaPayments: PaymentMethod[];
+  /** 支付方式是否已從院方官網確認 */
+  cinemaPaymentsVerified: boolean;
   /** 版本 key（如 'imax' / '__base__'），用于筛选 */
   versionKey: string;
   /** 版本展示名（如 'IMAX' / '原版'） */
@@ -1984,6 +2003,7 @@ export function getShowRowsForGroup(group: MovieGroup): ShowRow[] {
     const cinema = cinemaById.get(s.cinemaId);
     // 手續費是戲院級常量，逐場重算一次純函數查表（無 IO，可忽略）
     const fee = bookingFeeOf(s.cinemaId, s.source);
+    const paymentInfo = paymentMethodsOf(s.cinemaId, s.source);
 
     rows.push({
       id: s.id,
@@ -2006,6 +2026,8 @@ export function getShowRowsForGroup(group: MovieGroup): ShowRow[] {
       cinemaFee: fee.amount,
       cinemaFeeNote: fee.note,
       cinemaFeeIncluded: fee.included,
+      cinemaPayments: paymentInfo.methods,
+      cinemaPaymentsVerified: paymentInfo.verified,
       versionKey: formats.length ? formats.join('|').toLowerCase() : '__base__',
       versionLabel: formats.length ? formats.map(formatLabel).join(' + ') : '原版',
       versionText: formatVersionText(formats, filmLang),
@@ -2030,6 +2052,7 @@ export interface Facets {
   languages: { value: string; label: string; count: number }[];
   regions: { value: string; label: string; count: number }[];
   districts: { value: string; label: string; count: number }[];
+  payments: { value: string; label: string; count: number }[];
 }
 
 export function getFacets(rows: ShowRow[]): Facets {
@@ -2049,9 +2072,28 @@ export function getFacets(rows: ShowRow[]): Facets {
   const regCount = count((r) => r.region);
   const disCount = count((r) => r.district);
 
+  // 支付方式：統計每個支付方式被多少場次支持
+  // 一個場次可能支持多個支付方式，所以每個支付方式獨立計數
+  const payCount = new Map<string, number>();
+  for (const r of rows) {
+    if (!r.cinemaPaymentsVerified || r.cinemaPayments.length === 0) continue;
+    for (const p of r.cinemaPayments) {
+      payCount.set(p, (payCount.get(p) ?? 0) + 1);
+    }
+  }
+
   // 版本展示名：取该 key 下任意一行的 label
   const verLabel = new Map<string, string>();
   for (const r of rows) if (!verLabel.has(r.versionKey)) verLabel.set(r.versionKey, r.versionLabel);
+
+  // 支付方式標籤：從 PAYMENT_LABEL 取
+  const payLabel = new Map<string, string>();
+  for (const r of rows) {
+    if (!r.cinemaPaymentsVerified) continue;
+    for (const p of r.cinemaPayments) {
+      if (!payLabel.has(p)) payLabel.set(p, PAYMENT_LABEL[p] ?? p);
+    }
+  }
 
   return {
     sources: SOURCE_ORDER.filter((s) => srcCount.has(s)).map((s) => ({
@@ -2078,5 +2120,8 @@ export function getFacets(rows: ShowRow[]): Facets {
     districts: [...disCount.entries()]
       .sort((a, b) => districtOrder(a[0]) - districtOrder(b[0]) || a[0].localeCompare(b[0]))
       .map(([value, c]) => ({ value, label: value, count: c })),
+    payments: [...payCount.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([value, c]) => ({ value, label: payLabel.get(value) ?? value, count: c })),
   };
 }
