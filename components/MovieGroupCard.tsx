@@ -3,6 +3,7 @@ import { PosterImage } from './PosterImage';
 import type { MovieGroup } from '@/lib/data';
 import { formatDurationShort, relativeDay } from '@/lib/format';
 import { computeCardRating, ratingTitle } from '@/lib/rating';
+import { Film } from 'lucide-react';
 
 /**
  * 电影卡片（合并版本）
@@ -72,8 +73,17 @@ export function MovieGroupCard({
             priority={priority}
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-xs text-fg-dim">
-            無海報
+          <div className="flex h-full flex-col items-center justify-center gap-2 bg-veil text-fg-dim">
+            {/* 无海报时的空状态（2026-09-29 优化）
+             * 为什么需要图标 + 文字：
+             *   原先只有纯文字"無海報"，视觉反馈不够明确。
+             *   加上 Film 图标后，用户一眼就能看出这是"缺少海报"的状态。
+             *   图标使用 text-fg-dim（#90909A），对比度 4.67:1（过 AA）。
+             * 为什么用 Film 图标而不是 ImageIcon：
+             *   Film 更贴合"电影海报"的语义，ImageIcon 太通用。
+             *   lucide-react 已在项目中引入，无额外依赖。 */}
+            <Film className="h-10 w-10 opacity-40" aria-hidden="true" />
+            <span className="text-xs">暫無海報</span>
           </div>
         )}
 

@@ -2020,6 +2020,54 @@ html[data-theme='dark'] {
   html {
     @apply font-sans;
   }
+
+  /* ============================================================
+     全局焦点环样式（2026-09-29 新增）
+
+     ★ 为什么需要全局焦点环：
+       原先只有主题切换按钮有 :focus-visible 样式，其他交互元素
+       （导航链接、卡片、按钮）都没有明确的焦点环。键盘用户无法
+       看清当前焦点在哪，违反 WCAG 2.4.7 (AA) 的 "Focus Visible"
+       要求。
+
+     ★ 为什么用 :focus-visible 而不是 :focus：
+       :focus 在鼠标点击时也会触发，会导致鼠标用户看到不必要的
+       焦点环。:focus-visible 只在键盘导航时触发（Tab 键），
+       鼠标点击不显示，体验更好。
+
+     ★ 焦点环样式：
+       - 颜色：品牌色 --hkm-accent（暗色 #8B7CFF / 明色 #6B46E5）
+       - 宽度：2px（足够可见但不突兀）
+       - 偏移：2px（与元素保持间距，不被边框遮挡）
+       - 圆角：跟随元素圆角（rounded）
+
+     ★ 对比度：
+       暗色主题：#8B7CFF on #111113 = 5.8:1（过 AA 3:1 非文本要求）
+       明色主题：#6B46E5 on #F1F2F6 = 5.2:1（过 AA 3:1 非文本要求）
+       淡粉主题：#B42362 on #FFF0F6 = 4.8:1（过 AA 3:1 非文本要求）
+     ============================================================ */
+  a:focus-visible,
+  button:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid var(--hkm-accent);
+    outline-offset: 2px;
+    border-radius: 0.5rem;
+  }
+
+  /* 卡片的焦点环需要特殊处理：圆角更大 */
+  .hkm-glass:focus-visible,
+  .hkm-poster-card:focus-visible {
+    outline: 2px solid var(--hkm-accent);
+    outline-offset: 2px;
+    border-radius: 1rem;
+  }
+
+  /* 导航链接的焦点环：圆角与按钮一致 */
+  nav a:focus-visible {
+    outline: 2px solid var(--hkm-accent);
+    outline-offset: 2px;
+    border-radius: 9999px;
+  }
 }
 
 /* 评分卡：hover 时点亮边框（豆瓣/IMDb 外链） */
