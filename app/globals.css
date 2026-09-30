@@ -2082,6 +2082,64 @@ html[data-theme='dark'] {
 }
 
 /* ============================================================
+   戲院地圖彈層的底色與控件（見 components/CinemaMapDialog.tsx）
+
+   ★ 為什麼容器底色要自己寫：
+     Leaflet 的 leaflet.css 給 .leaflet-container 上了 #ddd 的淺灰底，
+     而我們的地圖在深色主題下是「街道圖 + 反色濾鏡」——
+     濾鏡只作用在瓦片 <img> 上，容器底仍是 Leaflet 那層淺灰。
+     瓦片未載入、或容器比瓦片網格大時，露出的就是那圈淺灰，
+     在近黑的彈層裡格外刺眼。
+
+   ★ 為什麼選擇器要帶 html[data-theme=…] 前綴：
+     leaflet.css 是執行期由 lib/leaflet-loader.ts 動態插到 <head> 的，
+     一定排在打包後的 CSS 之後 —— 同權重下它會贏。
+     加上主題前綴後權重 (0,2,1) 高於 leaflet 的 (0,1,0)，
+     與檔案裡其他主題覆寫同一個思路（見頂部對 :root 的說明）。
+
+   ★ 取值：亮色 #F2EFE9 是街道圖瓦片的米白底色；
+     深色 #131411 是同一張瓦片過 DARK_TILE_FILTER 後的實測底色
+     （旺角 z16 九宮格取樣，見 lib/map-tiles.ts）。
+     兩者都讓「還沒畫出來的瓦片」與「已畫出來的」看不出接縫。
+   ============================================================ */
+html[data-theme='light'] .hkm-map-canvas,
+html[data-theme='pink'] .hkm-map-canvas {
+  background-color: #f2efe9;
+}
+
+html[data-theme='dark'] .hkm-map-canvas,
+html:not([data-theme='light']):not([data-theme='pink']) .hkm-map-canvas {
+  background-color: #131411;
+}
+
+/*
+ * 縮放鈕（+/−）在深色主題下跟著變深。
+ *
+ * leaflet.css 把它做成白底黑字的小方塊，在深色地圖上是一塊突兀的白。
+ * 用與站點面板同一組顏色（#1F1F23 底 / #F4F4F5 字 / 白色髮絲分隔線），
+ * hover 再亮一檔 —— 與 .hkm-panel 的語言一致。
+ */
+html[data-theme='dark'] .hkm-map-canvas .leaflet-bar a,
+html:not([data-theme='light']):not([data-theme='pink']) .hkm-map-canvas .leaflet-bar a {
+  background-color: #1f1f23;
+  color: #f4f4f5;
+  border-bottom-color: rgb(255 255 255 / 0.14);
+}
+
+html[data-theme='dark'] .hkm-map-canvas .leaflet-bar a:hover,
+html:not([data-theme='light']):not([data-theme='pink']) .hkm-map-canvas .leaflet-bar a:hover {
+  background-color: #2a2a30;
+  color: #ffffff;
+}
+
+/* 深色下縮放鈕的邊框（leaflet 用 rgba(0,0,0,.2) 的陰影做邊） */
+html[data-theme='dark'] .hkm-map-canvas .leaflet-bar,
+html:not([data-theme='light']):not([data-theme='pink']) .hkm-map-canvas .leaflet-bar {
+  border-color: rgb(255 255 255 / 0.14);
+  box-shadow: 0 1px 5px rgb(0 0 0 / 0.5);
+}
+
+/* ============================================================
    頂欄導航的高亮（含詳情頁）
 
    ★ 2026-09-23 用戶回報：「即将上映的电影，点进去子目录显示在現正上映；

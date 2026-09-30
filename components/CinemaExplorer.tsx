@@ -11,7 +11,7 @@ import { CINEMA_COORD } from '@/lib/cinema-geo';
 import type { CinemaFacets, CinemaRow } from '@/lib/data';
 
 /**
- * 戲院瀏覽器：多選篩選（院線 / 影廳規格 / 大區 / 區域）
+ * 戲院瀏覽器：多選篩選（院線 / 影廳規格 / 大區 / 區域 / 支付方式）
  *
  * ===== 為什麼是客戶端組件 =====
  *
@@ -42,6 +42,7 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
   const [specs, setSpecs] = useState<string[]>([]);
   const [regions, setRegions] = useState<string[]>([]);
   const [districts, setDistricts] = useState<string[]>([]);
+  const [payments, setPayments] = useState<string[]>([]);
   /** 目前開啟地圖彈層的戲院 id（null = 未開啟） */
   const [mapId, setMapId] = useState<string | null>(null);
   const [guideId, setGuideId] = useState<string | null>(null);
@@ -56,9 +57,17 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
         pass(regions, r.region) &&
         pass(districts, r.district) &&
         // 規格是「任一命中即可」：勾了 IMAX + 4DX，兩種戲院都要留下
-        (specs.length === 0 || r.specs.some((x) => specs.includes(x.key)))
+        (specs.length === 0 || r.specs.some((x) => specs.includes(x.key))) &&
+        /*
+         * 支付方式：行上帶的是該戲院支持的支付方式列表，選中任一即匹配（OR）。
+         *
+         * ★ 未確認（paymentsVerified:false）的戲院 payments 是空陣列，
+         *   勾了任何支付方式都不會命中它們 —— 這是刻意的：
+         *   我們不知道它們收什麼，不能假裝它們支持（見 lib/cinema-payments.ts）。
+         */
+        (payments.length === 0 || r.payments.some((x) => payments.includes(x)))
     );
-  }, [rows, sources, specs, regions, districts]);
+  }, [rows, sources, specs, regions, districts, payments]);
 
   const districtOptions = useMemo(() => {
     const selectedRegions = new Set(regions);
@@ -120,12 +129,14 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
       }));
   }, [filtered, facets.sources]);
 
-  const active = sources.length + specs.length + regions.length + districts.length;
+  const active =
+    sources.length + specs.length + regions.length + districts.length + payments.length;
   const clearAll = () => {
     setSources([]);
     setSpecs([]);
     setRegions([]);
     setDistricts([]);
+    setPayments([]);
   };
 
   return (
@@ -168,7 +179,13 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
           </span>
         </div>
 
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+        {/*
+         * ★ 五個維度用 lg:grid-cols-5（原為 sm:grid-cols-4）：
+         *   多出支付方式後若仍用 4 欄，第五個下拉會獨自折到第二行、
+         *   右側空出三格。sm 降到 3 欄是為了 640px 寬時每個下拉仍有
+         *   約 190px（「所有支付方式」放得下），lg 才鋪滿一行。
+         */}
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
           <FilterDropdown
             placeholder="所有院線"
             options={facets.sources}
@@ -193,6 +210,21 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
             selected={districts}
             onChange={setDistricts}
           />
+          {/*
+           * 支付方式（院線級，2026-09-30 用戶要求新增）
+           *
+           * ★ 條件渲染與場次頁一致：facets.payments 為空時整顆下拉不出現，
+           *   而不是顯示一個「無可選項」的空盒子。
+           *   選項本身只收集已確認院線的方式（見 getCinemaFacets）。
+           */}
+          {facets.payments.length > 0 && (
+            <FilterDropdown
+              placeholder="所有支付方式"
+              options={facets.payments}
+              selected={payments}
+              onChange={setPayments}
+            />
+          )}
         </div>
       </section>
 
@@ -311,7 +343,7 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
         ))
       )}
 
-      {/* 地圖彈層（OpenStreetMap）；選型與大陸可達性實測見 CinemaMapDialog.tsx */}
+      {/* 地圖彈層（Esri World Street Map）；選型、語言與大陸可達性實測見 CinemaMapDialog.tsx */}
       {mapId &&
         (() => {
           const c = rows.find((x) => x.id === mapId);

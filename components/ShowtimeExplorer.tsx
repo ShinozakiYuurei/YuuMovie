@@ -669,10 +669,11 @@ export function ShowtimeExplorer({
       )}
 
       {/*
-       * 地圖彈層（OpenStreetMap）
+       * 地圖彈層（Esri World Street Map）
        *
        * ★ 用戶 2026-09-21 指定：把 Google Maps 換成開源地圖，且大陸可直接訪問。
-       *   選型與實測數據見 components/CinemaMapDialog.tsx 的註釋。
+       * ★ 2026-09-30 起底圖為 Esri（繁體標註），深色主題下以濾鏡轉深色。
+       *   選型、語言與實測數據見 components/CinemaMapDialog.tsx 的註釋。
        *
        * 放在最外層（不是每個戲院卡片裡）：彈層是 fixed 定位，
        * 若寫在卡片內會隨卡片的 hover / 層疊上下文受影響。

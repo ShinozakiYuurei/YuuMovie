@@ -1797,6 +1797,15 @@ export interface CinemaFacets {
   specs: { value: string; label: string; count: number; group: string }[];
   regions: { value: string; label: string; count: number }[];
   districts: { value: string; label: string; count: number }[];
+  /**
+   * 支付方式（院線級）
+   *
+   * ★ 只收集**已確認**（verified）院線的方式，與場次頁 getFacets 同一條規則：
+   *   未確認的院線連「支持哪些方式」都未知（見 lib/cinema-payments.ts），
+   *   放進篩選器只會給出錯誤答案 —— 用戶篩「八達通」卻篩出未確認的戲院，
+   *   等於憑空發明資料。
+   */
+  payments: { value: string; label: string; count: number }[];
 }
 
 export function getCinemaRows(): CinemaRow[] {
@@ -1838,6 +1847,15 @@ export function getCinemaFacets(rows: CinemaRow[]): CinemaFacets {
   const specCount = new Map<string, number>();
   for (const r of rows) for (const s of r.specs) specCount.set(s.key, (specCount.get(s.key) ?? 0) + 1);
 
+  // 支付方式：一間戲院支持多個方式，各自獨立計數。
+  // ★ 只算 paymentsVerified 的戲院 —— 未確認院線不得混進篩選器，
+  //   與場次頁 getFacets 的 payCount 同一條規則。
+  const payCount = new Map<string, number>();
+  for (const r of rows) {
+    if (!r.paymentsVerified) continue;
+    for (const p of r.payments) payCount.set(p, (payCount.get(p) ?? 0) + 1);
+  }
+
   return {
     sources: SOURCE_ORDER.filter((s) => srcCount.has(s)).map((s) => ({
       value: s,
@@ -1859,6 +1877,14 @@ export function getCinemaFacets(rows: CinemaRow[]): CinemaFacets {
     districts: [...disCount.entries()]
       .sort((a, b) => districtOrder(a[0]) - districtOrder(b[0]) || a[0].localeCompare(b[0]))
       .map(([value, c]) => ({ value, label: value, count: c })),
+    // 支付方式：按「支持的戲院數」由多到少，與場次頁的排序規則一致
+    payments: [...payCount.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([value, c]) => ({
+        value,
+        label: PAYMENT_LABEL[value as PaymentMethod] ?? value,
+        count: c,
+      })),
   };
 }
 

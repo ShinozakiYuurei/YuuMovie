@@ -93,10 +93,11 @@ export default async function CinemaPage({ params }: { params: Promise<{ id: str
          * 地圖按鈕（改開彈層，不再外鏈 Google Maps）
          *
          * ★ 用戶 2026-09-21：改用開源地圖，且大陸可直接訪問。
-         *   選型與實測數據見 components/CinemaMapDialog.tsx。
+         * ★ 2026-09-30 起底圖為 Esri World Street Map（繁體標註），
+         *   深色主題下以濾鏡轉深色。選型與實測見 components/CinemaMapDialog.tsx。
          *
          * 按鈕文案去掉了「↗」——它不再開新視窗（本來的箭頭會誤導），
-         * 彈層內有「在 OSM 開啟 ↗」才是真正的外鏈。
+         * 彈層內的高德／Google 連結才是真正的外鏈。
          *
          * 只在有座標時渲染：英皇戲院總部是辦公地址、不放映，
          * 座標表裡沒有它（見 lib/cinema-geo.ts 的已知缺項說明）。

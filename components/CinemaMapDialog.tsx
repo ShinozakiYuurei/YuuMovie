@@ -2,94 +2,27 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { CINEMA_COORD, amapUrl, googleMapsUrl, wgs84ToGcj02 } from '@/lib/cinema-geo';
-import { createAMapTile } from '@/lib/amap-tiles';
-import type { TileCoords, TileDone } from '@/lib/amap-tiles';
+import { createMapTile } from '@/lib/map-tiles';
+import type { MapTileStyle, TileCoords, TileDone } from '@/lib/map-tiles';
 import { loadLeaflet } from '@/lib/leaflet-loader';
 export { preloadLeaflet } from '@/lib/leaflet-loader';
 
 /**
- * 戲院地圖彈層（高德瓦片）
+ * 戲院地圖彈層（Esri World Street Map）
  *
- * ⚠️ 授權狀態：本站**沒有高德開發者 key**，目前直接引用高德網頁版用的公開瓦片
- *   端點（hotlinking）。這不是正規用法，詳見下方「數據來源與署名」。
- *   待辦：申請高德開放平台 key（免費額度足夠），把未授權引用換成正規調用。
+ * Esri 瓦片使用 WGS-84 / Web Mercator，與戲院座標相同；地圖標記不需座標偏移。
+ * 瓦片網路錯誤時會並行對沖至另一個官方節點，避免慢連線留下空白。
+ * Leaflet 只在打開地圖時載入，避免把次要功能加入每位訪客的初始下載。
  *
- * ===== 為什麼不用 Google Maps =====
+ * ★ 深色主題（2026-09-30 用戶要求）：
+ *   站點是深色 / 淡粉雙主題（見 ThemeToggle.tsx），而地圖原本永遠是亮色 ——
+ *   深色頁面上彈出一塊白底地圖，跟整個介面格格不入。
  *
- * 用戶 2026-09-21 指定：改用開源地圖，且**大陸可直接訪問**。
- * 实测（大陆直连）：
- *   maps.google.com / maps.googleapis.com / maps.gstatic.com
- *     / mt0.google.com / www.google.com.hk/maps  → 全部 8–9s 超時
- *   唯一通的 ditu.google.cn 只是個静态落地页（110ms，但 body 只有
- *   「请收藏我们的网址」，指向 google.com.hk/maps 仍然超時）。
- *
- *   Google Maps JS API 现在还强制要 API key + 绑定信用卡，否则地圖會印
- *   「For development purposes only」水印（与 2026-09-21 棄用 CARTO 同一原因）。
- *
- * ===== 為什麼用高德瓦片而不是 OSM =====
- *
- * 实测 z16 香港中环瓦片（首屏 4–16 张）：
- *   tile.openstreetmap.de       1.65s/张  → 首屏 4–6 张，串行 ≈ 4–6s（这是现在慢的根因）
- *   tile.openstreetmap.fr/hot   2.6s/张
- *   CARTO dark                   ❌ 超時
- *   wprd01 style=7              **61ms/张** ✅（浅蓝水面，与浅色陆地底色区分明显）
- *   wprd01 style=8              82ms/张（115KB：详尽版，但水面和陆地近似同色）
- *   webrd01 style=8              57ms/张
- *
- * 高德瓦片在中国大陆可达，且对香港、澳门有完整覆盖（实测中环 IFC 渲染正常）。
- *
- * 代价：高德/腾讯/百度都用 GCJ-02（火星坐标），我们的 CINEMA_COORD 是 WGS-84。
- * 香港实测偏移约 **595m**（若直接套用原坐标，标记会落在 6 个街口之外）。
- * 修法：在请求瓦片和画标记时都过一遍 `wgs84ToGcj02()`。
- *
- * ===== 為什麼 Leaflet 走國內 CDN 而不是打包進 bundle =====
- *
- * 用戶問過「為什麼不依賴 CDN，走 VPS 的頻寬嗎？」—— 實測後結論是**該用 CDN**：
- *
- *   本站同源 JS（Cloudflare → 西雅圖 SEA，10/10 次都是 SEA）
- *     冷連接 2360ms / 熱連接 775ms，TLS 握手就要 330ms
- *   lib.baomitu.com（中國 CDN）  平均 204ms，TLS 僅 80ms
- *   cdn.staticfile.org           平均 187ms，TLS 僅 65ms
- *
- * 把 41.7KB(gzip) 的 Leaflet 塞進同源 bundle，等於讓它陪著一起走
- * 西雅圖那條 0.8–2.4 秒的鏈路；保留 CDN，CSS/JS 並行且逾時自動換鏡像。
- *
- * 安全：兩個鏡像的 leaflet.js / leaflet.css 都與 npm 包 **sha256 完全一致**
- * （實測比對通過），故可放心用。
- *
- * ===== 為什麼用動態 <script> 而不是 import =====
- *
- * 地圖是次要功能（用戶多數只想知道地址），不該讓全部訪客都下載 Leaflet。
- * 用動態注入 → 只有真的點開地圖的人付這 41.7KB。
- * 也因此只在需要時載入全域 L。
- */
-
-/**
- * 瓦片源：高德地圖
- *
- * ===== 爲什麼選 wprd01 + style=7 =====
- *
- * 选 wprd01–04 + style=7：海面与陆地底色明显区分，改善香港地图的水域辨识度。
- * 单张测速不代表首屏体验；初始请求按坐标分散到四个节点，慢请求**不砍**、
- * 并行对冲到别的节点，最多三条同时跑，谁先回来谁算数。实现见 lib/amap-tiles.ts。
- *
- * maxZoom=19：高德实测 z20 返回 179B 空白瓦片，z19 是上限。
- *
- * ===== 數據來源與署名 =====
- *
- * ⚠️ 重要更正（上一版寫錯了）：
- *
- *   上一版註釋與 UI 都寫「高德瓦片基底是 OSM 資料」——那是**我的推測，未經證實，
- *   而且是錯的**。高德的地圖數據來自自家採集與官方測繪授權，與 OSM 是兩套獨立
- *   體系（最直接的證據：高德用 GCJ-02 火星坐標，OSM 用 WGS-84）。
- *   高德瓦片商用需要授權，本站目前**沒有開發者 key**，是直接引用高德網頁版用的
- *   公開瓦片端點（hotlinking）。所以：
- *     - 署名只寫「© 高德地圖」，**不再虛假標註 OpenStreetMap / ODbL**
- *       （ODbL 是有法律約束力的許可證，亂署比不署更糟）
- *     - 底部保留「在高德地圖開啟 ↗」跳官方，作為正規出口
- *     - 待辦：申請高德開放平台 key（免費額度足夠本站用量），把未授權引用換成正規調用
- *
- * 不自动换地图供应商：重试仍然使用高德同一 style=7，保留外链作最后兜底。
+ *   做法是「街道圖 + CSS 濾鏡」而不是換成 Esri 的深色底圖服務：
+ *   後者（Canvas/World_Dark_Gray_Base）在香港 z17 以上沒有資料，
+ *   回傳的是「Map data not yet available」佔位圖，而地圖預設 zoom 16、
+ *   用戶會拉到 18。濾鏡方案語言與街道細節完全不變（仍是繁體），
+ *   只把亮度反轉。濾鏡細節見 lib/map-tiles.ts 的 DARK_TILE_FILTER。
  */
 
 /** Leaflet 的最小型別（只用到這幾個成員，不為它裝 300KB 的 @types） */
@@ -132,10 +65,9 @@ export function CinemaMapDialog({
   const coord = CINEMA_COORD[cinemaId] ?? null;
 
   /**
-   * GCJ-02（火星坐標）版本座標 —— 高德瓦片與高德外鏈都要用它。
+   * GCJ-02 座標只用於高德外鏈；Esri 瓦片使用原始 WGS-84 座標。
    *
-   * 香港 WGS-84 → GCJ-02 偏移約 595m：不偏移的話，地圖標記與高德外鏈
-   * 都會落在 6 個街口之外。Google 外鏈則用 WGS-84 原值（下方 googleMapsUrl）。
+   * 香港 WGS-84 → GCJ-02 偏移約 595m；高德外鏈需轉換，Esri 標記與 Google 外鏈用原值。
    */
   const gcjCoord: [number, number] | null = coord
     ? wgs84ToGcj02(coord[0], coord[1])
@@ -185,21 +117,34 @@ export function CinemaMapDialog({
 
         const L = (window as unknown as { L: LeafletNS }).L;
 
+        /*
+         * 地圖樣式跟隨當前主題。
+         *
+         * ★ 為什麼只讀一次就夠：主題切換鈕在頂欄（z-50），而本彈層是
+         *   fixed inset-0 z-[60] —— 彈層開著時切換鈕根本點不到，
+         *   所以「彈層開著時主題變了」不可能發生，不需要 MutationObserver。
+         *   （若日後把彈層 z-index 降到頂欄之下，這裡要改成監聽。）
+         *
+         * ★ 為什麼讀 data-theme 而不是 .dark 類：兩者在 ThemeToggle 裡
+         *   是同步維護的，但 data-theme 是啟動腳本就寫入的**事實來源**
+         *   （見 app/layout.tsx 的 THEME_SCRIPT），更早、更可靠。
+         */
+        const isDark = document.documentElement.dataset.theme !== 'light'
+          && document.documentElement.dataset.theme !== 'pink';
+        const tileStyle: MapTileStyle = isDark ? 'dark' : 'street';
+
         // 标记色跟随当前主题（见下方 circleMarker 的注释）
         const cs = getComputedStyle(document.documentElement);
         const accent = cs.getPropertyValue('--hkm-accent').trim() || '#8b7cff';
         const accentSoft = cs.getPropertyValue('--hkm-accent-soft').trim() || '#a78bfa';
 
-        // 高德瓦片用 GCJ-02（偏移在下方 gcjCoord 統算）。
-        const [gcjLat, gcjLon] = gcjCoord;
+        const [mapLat, mapLon] = coord;
 
         const map = L.map(boxRef.current, {
-          center: [gcjLat, gcjLon],
+          center: [mapLat, mapLon],
           zoom: 16,
           zoomControl: true,
-          // 不使用 Leaflet 自带的 attribution 控件（它会拼一个「Leaflet | 」前缀），
-          // 右下角角标交给弹层自己的 DOM 渲染（见下方底部署名区），
-          // 保证右下角只有「© 高德地圖」这一行，不混入 Leaflet 标识。
+          // Attribution is rendered in the dialog footer with the Esri source list.
           attributionControl: false,
           // 手機上雙指縮放才不會被頁面滾動搶走
           tap: true,
@@ -209,10 +154,10 @@ export function CinemaMapDialog({
         // GridLayer lets retries finish before Leaflet marks a tile complete.
         const tiles = L.gridLayer({ maxZoom: 19 });
         tiles.createTile = (coords, done) => {
-          const { tile, cancel } = createAMapTile(coords, (error, element) => {
+          const { tile, cancel } = createMapTile(coords, (error, element) => {
             pendingTiles.delete(element);
             if (!cancelled) done(error, element);
-          });
+          }, tileStyle);
           pendingTiles.set(tile, cancel);
           return tile;
         };
@@ -234,9 +179,7 @@ export function CinemaMapDialog({
         retryTilesRef.current = () => tiles.redraw();
         tiles.addTo(map);
 
-        // 標記：用圓點而非預設大頭針 —— Leaflet 預設圖示是外部 PNG，
-        // 在高德瓦片上偏亮且要多一次請求；圓點是純 SVG，且用主題色。
-        L.circleMarker([gcjLat, gcjLon], {
+        L.circleMarker([mapLat, mapLon], {
           radius: 8,
           // ★ 颜色从 CSS 变量现读，不写死：标记色应与当前主题的强调色一致
           //   （浅色主题下 #8b7cff 在亮色地图上偏淡）。变量缺失时回退到原紫。
@@ -325,7 +268,12 @@ export function CinemaMapDialog({
           className="relative shrink-0"
           style={{ height: 'min(60vh, 460px)' }}
         >
-          <div ref={boxRef} className="absolute inset-0" />
+          {/*
+           * hkm-map-canvas：底色與縮放鈕的深色適配（見 app/globals.css）。
+           * Leaflet 會在這個 div 上自己加 .leaflet-container 類，
+           * 兩者互不衝突。
+           */}
+          <div ref={boxRef} className="hkm-map-canvas absolute inset-0" />
 
           {state === 'loading' && (
             <div className="pointer-events-none absolute left-1/2 top-3 z-[500] -translate-x-1/2 rounded-full border border-hairline bg-[var(--hkm-panel)]/90 px-3 py-1.5 text-sm text-fg-muted shadow-lg backdrop-blur-md">
@@ -344,7 +292,7 @@ export function CinemaMapDialog({
             <div className="absolute inset-0 z-[500] flex flex-col items-center justify-center gap-2 px-6 text-center">
               <p className="text-sm text-fg-soft">{errMsg}</p>
               <p className="text-xs text-fg-dim">
-                可改用下方「在高德／Google 地圖開啟」直接前往地圖網站。
+                可改用下方地圖連結直接前往地圖網站。
               </p>
             </div>
           )}
@@ -383,7 +331,7 @@ export function CinemaMapDialog({
             </>
           )}
           <span className="text-[11px] leading-relaxed text-fg-dim">
-            &copy; 高德地圖
+            Sources: Esri, HERE, Garmin, USGS, Intermap, INCREMENT P, NRCan, Esri Japan, METI, Esri China (Hong Kong), Esri Korea, Esri (Thailand), NGCC, (c) OpenStreetMap contributors, and the GIS User Community
           </span>
         </div>
       </div>
@@ -393,6 +341,6 @@ export function CinemaMapDialog({
 
 /**
  * 備援方案：
- *   1. 弹层打不开 → 底部「在高德／Google 地圖開啟」外链
- *   2. 高德节点异常 → 慢请求并行对冲到别的节点；最终失败时可点「重試」或使用外链。
+ *   1. 弹层打不开 → 底部地图外链
+ *   2. 瓦片节点异常 → 慢请求并行对冲到另一节点；最终失败时可点「重試」或使用外链。
  */

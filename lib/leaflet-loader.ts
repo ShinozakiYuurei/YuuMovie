@@ -36,16 +36,25 @@ function loadAsset(url: string, kind: 'css' | 'js'): Promise<void> {
   });
 }
 
-/** Preconnect only when a map is about to be used, not on every page visit. */
+/**
+ * 瓦片來源的預連線：只在即將打開地圖時做，不是每次造訪都做。
+ *
+ * ★ 2026-09-30 由高德四個子域（wprd01~04.is.autonavi.com）改為 Esri。
+ *   底圖已切到 Esri World Street Map（繁體標註，見 lib/map-tiles.ts），
+ *   還去預連高德的域名等於白開四條連線 —— 既沒用到，又佔用行動網路的
+ *   並發名額（瀏覽器對同一來源的連線數有限，開著的地圖反而排隊）。
+ *
+ * ★ 為什麼只留一個：Esri 側只有一個對外域名（見 map-tiles.ts 的實測）。
+ *   預連線的價值在「提前完成 DNS + TLS 握手」，多寫幾個用不到的域名
+ *   只會把首屏瓦片的握手往後擠。
+ */
 function warmTileConnections(): void {
-  for (let host = 1; host <= 4; host++) {
-    const href = `https://wprd0${host}.is.autonavi.com`;
-    if (document.querySelector(`link[rel="preconnect"][href="${href}"]`)) continue;
-    const link = document.createElement('link');
-    link.rel = 'preconnect';
-    link.href = href;
-    document.head.appendChild(link);
-  }
+  const href = 'https://server.arcgisonline.com';
+  if (document.querySelector(`link[rel="preconnect"][href="${href}"]`)) return;
+  const link = document.createElement('link');
+  link.rel = 'preconnect';
+  link.href = href;
+  document.head.appendChild(link);
 }
 
 export function loadLeaflet(): Promise<void> {
