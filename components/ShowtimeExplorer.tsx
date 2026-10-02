@@ -542,7 +542,10 @@ export function ShowtimeExplorer({
               {days.map((d) => {
                 const on = d === activeDate;
                 const n = [...byDate.get(d)!.values()].reduce((m, l) => m + l.length, 0);
-                const rel = relativeDay(d);
+                // 相對日期（今天／明天／後天）隨 now 在客戶端算：
+                // now 為 null（首屏、尚未掛載）時 relativeDay 回傳 null →
+                // 顯示場次數；掛載後才顯示相對日期，跨午夜也隨 now 一起更新。
+                const rel = relativeDay(d, now);
                 return (
                   <button
                     key={d}

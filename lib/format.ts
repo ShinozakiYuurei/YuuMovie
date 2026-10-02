@@ -64,10 +64,29 @@ export function formatDurationShort(min: number | null): string {
   return `${min}分鐘`;
 }
 
-/** 相对今天的天数描述 */
-export function relativeDay(date: string): string {
-  const today = new Date();
-  const todayStr = new Date(today.getTime() + 8 * 3600_000).toISOString().slice(0, 10);
+/**
+ * 相對今天的天數描述：今天／明天／後天／N 天後／已過 N 天
+ *
+ * @param now 當前時間（epoch ms）。**傳 null 表示「時間未知」→ 回傳 null**
+ *
+ * ★ 為什麼「現在」必須由調用方傳入，而不是在這裡 new Date()（2026-10-02 修復）
+ *
+ *   本站是 SSG（output: 'export'），頁面每 2–6 小時才重建一次，而
+ *   「今天／明天／後天」是相對**瀏覽時刻**的：構建時算好寫進 HTML 的相對
+ *   日期，一過香港午夜就會錯位 —— 用戶實測首頁與 /upcoming 顯示
+ *   「明天上映」，其實當天已經上映了。抓取、重建頻率再高也治不了：
+ *   相對日期永遠會過期，唯一能貼著時鐘走的只有瀏覽器裡的 JS。
+ *
+ *   所以把時間交給調用方：
+ *     · 服務端（首屏 HTML）傳 null → 不輸出相對日期，HTML 不含時間主張
+ *     · 客戶端掛載後傳真實時間 → 才顯示「今天／明天／後天」
+ *   與 lib/live.ts 的 isLiveShow()、lib/use-live-now.ts 是同一套取捨。
+ */
+export function relativeDay(date: string, now: number | null): string | null {
+  if (now == null) return null;
+  // 「今天」按香港時區（UTC+8）判定：香港站的一天就是香港的一天，
+  // 不該因為訪客身在日本而提前一小時跨日。
+  const todayStr = new Date(now + 8 * 3600_000).toISOString().slice(0, 10);
   const diff = Math.round(
     (new Date(date + 'T00:00:00Z').getTime() - new Date(todayStr + 'T00:00:00Z').getTime()) / 86400_000
   );

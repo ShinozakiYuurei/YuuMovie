@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { PosterImage } from './PosterImage';
+import { RelativeDayLabel } from './RelativeDayLabel';
 import type { MovieGroup } from '@/lib/data';
-import { formatDurationShort, relativeDay } from '@/lib/format';
+import { formatDurationShort } from '@/lib/format';
 import { computeCardRating, ratingTitle } from '@/lib/rating';
 import { Film } from 'lucide-react';
 
@@ -111,8 +112,11 @@ export function MovieGroupCard({
 
         <div className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 pt-2">
           {group.status === 'upcoming' && m.openingDate ? (
+            /* 相對日期（今天／明天／後天）刻意**不在構建時算**：本站每 2–6 小時
+               才重建一次，寫進 HTML 的相對日期跨天即錯位。改由 RelativeDayLabel
+               在 hydration 後補上（見該檔註釋），SSR 首屏只有「上映 · 日期」。 */
             <p className="min-w-0 text-[13px] font-medium text-fg-soft">
-              {relativeDay(m.openingDate)}上映 · {m.openingDate}
+              <RelativeDayLabel date={m.openingDate} />上映 · {m.openingDate}
             </p>
           ) : (
             /* 时长与票价同为「数字 + 单位」形态、同一字重与亮度：
