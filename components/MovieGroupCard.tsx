@@ -111,12 +111,15 @@ export function MovieGroupCard({
         </h3>
 
         <div className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 pt-2">
-          {group.status === 'upcoming' && m.openingDate ? (
+          {group.status === 'upcoming' && group.displayOpeningDate ? (
             /* 相對日期（今天／明天／後天）刻意**不在構建時算**：本站每 2–6 小時
                才重建一次，寫進 HTML 的相對日期跨天即錯位。改由 RelativeDayLabel
-               在 hydration 後補上（見該檔註釋），SSR 首屏只有「上映 · 日期」。 */
+               在 hydration 後補上（見該檔註釋），SSR 首屏只有「上映 · 日期」。
+               ★ 日期取組級 displayOpeningDate 而非 primary.openingDate：
+               primary 按場次最多選出，它所在院線可能沒給日期（整行消失）；
+               「這部片幾時上映」以組內最早日期為準（組級決策規則）。 */
             <p className="min-w-0 text-[13px] font-medium text-fg-soft">
-              <RelativeDayLabel date={m.openingDate} />上映 · {m.openingDate}
+              <RelativeDayLabel date={group.displayOpeningDate} />上映 · {group.displayOpeningDate}
             </p>
           ) : (
             /* 时长与票价同为「数字 + 单位」形态、同一字重与亮度：

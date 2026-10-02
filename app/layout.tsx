@@ -1,6 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import './globals.css';
+// ★ 中文字体不走 next/font/local：那会把 5.2MB 的 CJK 可变字体整包输出成
+//   一个 woff2 并在每页 preload（实测占首页下载 94%）。改用预切分片：
+//   scripts/slice-cjk-font.mjs 按站内用字切成 4 片，带 unicode-range，
+//   浏览器只下载本页文字真正用到的片。规则文件：app/fonts/noto-sans-hk.css
+import './fonts/noto-sans-hk.css';
 import { getMeta, getShowingGroups, getUpcomingGroups, SOURCE_LABEL } from '@/lib/data';
 import type { Source } from '@/lib/types';
 import { NavLinks } from '@/components/NavLinks';
@@ -12,11 +17,6 @@ const inter = localFont({
   src: './fonts/Inter-Variable.woff2',
   weight: '100 900',
   variable: '--font-inter',
-});
-const notoSansHK = localFont({
-  src: './fonts/NotoSansHK-Variable.woff2',
-  weight: '100 900',
-  variable: '--font-noto-sans-hk',
 });
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
@@ -97,7 +97,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="zh-HK"
-      className={cn('font-sans', inter.variable, notoSansHK.variable)}
+      className={cn('font-sans', inter.variable)}
       suppressHydrationWarning
     >
       <head>

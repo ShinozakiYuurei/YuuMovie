@@ -12,7 +12,7 @@
  *   （因为 .dark 类从没被加上过），而且这种错很难看出是变体判定失配。
  *
  *   ★ 为什么不让 JS 同时维护 .dark 类（两种写法都行）而是改这里：
-   *     class 是服务端渲染时就写定的（layout 里的 cn(inter.variable, notoSansHK.variable, 'font-sans')），
+   *     class 是服务端渲染时就写定的（layout 里的 cn(inter.variable, 'font-sans')），
  *     而 data-theme 是启动脚本在 hydrate 之前改的。
  *     两者混用等于让 React 去调和一个它不认识的 class，
  *     属于不必要的风险。data-theme 是**唯一事实来源**，变体跟着它走最干净。

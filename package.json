@@ -14,7 +14,8 @@
     "test:hydrate": "node scripts/test-hydration.cjs",
     "test:relative-day": "node scripts/test-relative-day.cjs",
     "test:mcl": "node --test scripts/test-mcl-http.mjs",
-    "test:lux": "node --test scripts/test-lux-scraper.mjs"
+    "test:lux": "node --test scripts/test-lux-scraper.mjs",
+    "slice-fonts": "node scripts/slice-cjk-font.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
@@ -38,9 +39,11 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "postcss": "^8.5.28",
+    "subset-font": "^2.9.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.15",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "wawoff2": "^2.0.1"
   },
   "type": "module"
 }

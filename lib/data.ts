@@ -1452,8 +1452,12 @@ export function getShowingGroups(): MovieGroup[] {
 
 /** 待映的电影组（按上映日排序） */
 export function getUpcomingGroups(): MovieGroup[] {
+  // ★ 按 displayOpeningDate（组内最早）排，不按 primary.openingDate（2026-10-02）：
+  //   卡片显示的就是 displayOpeningDate，排序键必须与展示键同源，
+  //   否则列表按 primary 的日期排、卡片却写组级最早日期，观感上就是乱序。
+  //   primary 按场次最多选出，与「哪天上映」无关（组级决策规则）。
   return [...getMovieGroups('upcoming')].sort((a, b) =>
-    (a.primary.openingDate || '').localeCompare(b.primary.openingDate || '')
+    (a.displayOpeningDate || '').localeCompare(b.displayOpeningDate || '')
   );
 }
 
@@ -1473,7 +1477,10 @@ export function getUpcomingGroups(): MovieGroup[] {
 export function getUpcomingGroupsByMonth(): { month: string; groups: MovieGroup[] }[] {
   const byMonth = new Map<string, MovieGroup[]>();
   for (const g of getUpcomingGroups()) {
-    const d = g.primary.openingDate || '';
+    // 与卡片同源：按 displayOpeningDate 分桶（2026-10-02 改，原因见 getUpcomingGroups）。
+    // displayOpeningDate 是组内最早非空日期，必 ≤ primary.openingDate，
+    // 因此切换只会让「未定」变出日期，不会让有日期的组掉进「未定」。
+    const d = g.displayOpeningDate || '';
     // 2026-10-08 → 2026-10；日期缺失归到 '未定'
     const mo = /^\d{4}-\d{2}/.test(d) ? d.slice(0, 7) : '未定';
     const bucket = byMonth.get(mo);
