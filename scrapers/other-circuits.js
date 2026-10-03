@@ -18,6 +18,70 @@ async function fetchText(url, { fetchImpl = fetch } = {}) {
   throw lastError;
 }
 
+/**
+ * �w^~)�v Cookie �w^~)�v��y��yۧu���U�w^~)�v��y��yۧu���S�w^~)�v��y��y�
+ *
+ * Lumen+�u���D�w^~)�v��y��yۧu���A�w^~)�tVista�w^~)�v��y��yۧu���@�w^~)�v��y��y� 302"��y��y� AspxAutoDetectCookieSupport=;�u���L
+ * Node"��y��yۧu���z fetch"��y��yۧu���]�w^~)�t Set-Cookie�w^~)�v��y��yۧu���e follow+�u���C�w^~)�v��y��yۧu���^�w^~)�v��y��yۧu���A�w^~)�t
+ * �w^~)�v��y��yۧu���h�w^~)�v��y��yۧu���K�w^~)�v��y��yۧu���[�w^~)�v��y��yۧu���K cookif��y��yۧu���v�w^~)�v��y��yۧu���K�w^~)�v��y��yۧu���@�w^~)�v��y��y�
+ */
+async function fetchWithCookieRedirect(url) {
+  let cookie = '';
+  for (let hop = 0; hop < 4; hop++) {
+    const response = await fetch(url, {
+      redirect: 'manual',
+      signal: AbortSignal.timeout(20_000),
+      headers: { 'user-agent': 'Mozilla/5.0', ...(cookie ? { cookie } : {}) },
+    });
+    const setCookies = response.headers.getSetCookie?.() ?? [];
+    if (setCookies.length) {
+      const jar = new Map(
+        cookie.split(/;\s*/).filter(Boolean).map((pair) => {
+          const eq = pair.indexOf('=');
+          return [pair.slice(0, eq), pair.slice(eq + 1)];
+        })
+      );
+      for (const line of setCookies) {
+        const [pair] = line.split(';');
+        const eq = pair.indexOf('=');
+        if (eq > 0) jar.set(pair.slice(0, eq).trim(), pair.slice(eq + 1));
+      }
+      cookie = [...jar].map(([name, value]) => `${name}=${value}`).join('; ');
+    }
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      response.body?.cancel();
+      const location = response.headers.get('location');
+      if (!location) throw new Error('Redirect without location for ' + url);
+      url = new URL(location, url).href;
+      continue;
+    }
+    if (!response.ok) throw new Error('HTTP ' + response.status + ' for ' + url);
+    return response.text();
+  }
+  throw new Error('Too many redirects for ' + url);
+}
+
+/**
+ *+�u���P�w^~)�v��y��yۧu���x�w^~)�v��y��yۧu���A�w^~)�v��y��yۧu���f�w^~)�v��y��yۧu���k�w^~)�v��y��yۧu���a�w^~)�v
+ *
+ * countSeats �w^~)�v��y��y� { available, total {�u���Ztotal �w^~)�v��y��yۧu���o�w^~)�t+�u���r�w^~)�v��y��yۧu���D�w^~)�v��y��yۧu���g�w^~)�v��y��yۧu���L
+ * available �w^~)�v��y��yۧu���o�w^~)�v��y��yۧu���M�w^~)�v��y��yۧu���S�w^~)�v��y��yۧu���H�w^~)�v��y��yۧu���A5xx�w^~)�v��y��yۧu���K�w^~)�v��y��yۧu���q�w^~)�v��y��y� nuln��y��y�
+ *"��y��yۧu���S�w^~)�v��y��yۧu���q�w^~)�v��y��yۧu���n�w^~)�v��y��yۧu���b�w^~)�v��y��y�
+ */
+async function fillSeatAvailability(shows, countSeats, concurrency = 4) {
+  await mapLimit(shows, concurrency, async (show) => {
+    try {
+      const seats = await countSeats(show);
+      if (!seats || seats.total <= 0) return;
+      show.seats = seats.total;
+      show.remainRate = Math.max(0, Math.min(1, seats.available / seats.total));
+      show.soldOut = seats.available <= 0;
+    } catch {
+      // �w^~)�v��y��yۧu���_�w^~)�v��y��y� seats/remainRate null
+    }
+  });
+}
+
 function decode(value) {
   return String(value || '').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'")
     .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;|&#160;/g, ' ').replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)));
@@ -161,6 +225,15 @@ export async function scrapeChinachem() {
       }
     }
   }
+  // �w^~)�v��y��yۧu���A�w^~)�v��y��yۧu���L�w^~)�v��y��yۧu���M JSOK�u���Zavail �w^~)�w AV��y��yۧu���o�w^~)�v��y��y�/ BKF��y��yۧu���r�w^~)�v��y��yۧu���L
+  // type=void+�u���D�w^~)�v��y��yۧu���S�w^~)�v��y��yۧu���d�w^~)�v��y��yۧu���I avail"��y��yۧu���L�w^~)�v��y��yۧu���M�w^~)�v��y��yۧu���r�w^~)�v��y��yۧu���B
+  await fillSeatAvailability(shows, async (show) => {
+    const seatHtml = await fetchText(show.bookingUrl);
+    return {
+      available: (seatHtml.match(/"avail":"AV"/g) || []).length,
+      total: (seatHtml.match(/"avail":"/g) || []).length,
+    };
+  });
   if (!shows.length) throw new Error('Chinachem returned no showtimes');
   return { movies: [...movieMap.values()], cinemas: [{ id: 'chinachem-plnym', code: 'PLNYM', nameZh: '巴黎倫敦紐約米蘭戲院', address: 'Hong Lai Garden, Ho Pong Street, TMTL 280, Tuen Mun, N.T.', mapUrl: 'https://goo.gl/maps/NvkxDVniiQn', detailUrl: base + '/en/home', source: 'chinachem' }], shows };
 }
@@ -203,6 +276,19 @@ export async function scrapeLumen() {
       shows.push({ id: 'lumen-' + sessionId, movieId, cinemaId: 'lumen-1001', houseName: '', startAt, date: datetime.slice(0, 10), price: null, seats: null, remainRate: null, soldOut: false, tags: [], version: anchor.match(/alt="([^"]+)"/i)?.[1] || null, language: null, bookingUrl: absoluteUrl(base, href), source: 'lumen' });
     }
   }
+  // Vista+�u���M�w^~)�v��y��yۧu���h�w^~)�v��y��yۧu���h�w^~)�v��y��yۧu���P�w^~)�v��y��yۧu���x�w^~)�v��y��yۧu���Zdata-original+�u���o�w^~)�v��y��yۧu���M�w^~)�t
+  //+�u���l�w^~)�v��y��yۧu���h�w^~)�v��y��yۧu���`�w^~)�w Adulv��y��yۧu���G�w^~)�v��y��yۧu���L�w^~)�v��y��yۧu���h�w^~)�v��y��yۧu���c�w^~)�v��y��yۧu���t�w^~)�v
+  //+�u����w^~)�v��y��yۧu���K Vista"��y��yۧu���h�w^~)�v��y��yۧu���A�w^~)�v��y��yۧu���o�w^~)�v��y��yۧu���l�w^~)�v��y��yۧu���b�w^~)�v��y��yۧu���p�w^~)�v��y��yۧu���g�w^~)�v��y��yۧu���j�w^~)�v��y��y�
+  const priceBySession = new Map(await mapLimit([...seenSessions], 4, async (sessionId) => {
+    try {
+      const ticketHtml = await fetchWithCookieRedirect(`${base}/Ticketing/visSelectTickets.aspx?cinemacode=1001&txtSessionId=${sessionId}&visLang=1`);
+      const cents = Number(ticketHtml.match(/data-original="(\d+)"/i)?.[1]);
+      return [sessionId, Number.isFinite(cents) ? cents / 100 : null];
+    } catch {
+      return [sessionId, null];
+    }
+  }));
+  for (const show of shows) show.price = priceBySession.get(show.id.slice('lumen-'.length)) ?? null;
   const cinemaUrl = base + '/Browsing/Cinemas/Details/1001';
   const cinemaPage = await fetchText(cinemaUrl);
   const map = cinemaPage.match(/maps\.google\.com\/maps\?[^"']+/i)?.[0] || '';
@@ -276,6 +362,15 @@ export async function scrapeNewport() {
       shows.push({ id: 'newport-' + sessionId, movieId: 'newport-' + movieId, cinemaId: 'newport-hyland', houseName: 'House ' + row[6], startAt: time12ToHkt(date, row[3], row[4], row[5]), date, price: Number(row[7]), seats: null, remainRate: null, soldOut: false, tags: [], category, version: null, language: dialect, bookingUrl: base + '/en/ticketing/seatplan/' + sessionId, source: 'newport' });
     }
   }
+  // �w^~)�v��y��yۧu���A�w^~)�v��y��yۧu���M�w^~)�v��y��yۧu���r�w^~)�v��y��yۧu���g�w^~)�v��y��yۧu���Zclass �w^~)�v availablk�u���H�w^~)�v��y��yۧu���I�w^~)�v sold�w^~)�v��y��yۧu���n�w^~)�v��y��y�
+  // �w^~)�v��y��y�/�w^~)�v��y��yۧu���Y�w^~)�v��y��yۧu���v�w^~)�v block+�u���M�w^~)�v��y��yۧu���i�w^~)�v��y��yۧu���L�w^~)�t class+�u���s�w^~)�v��y��yۧu���_�w^~)�v��y��yۧu���B
+  await fillSeatAvailability(shows, async (show) => {
+    const seatHtml = await fetchText(show.bookingUrl);
+    return {
+      available: (seatHtml.match(/class="[^"]*\bavailable\b/g) || []).length,
+      total: (seatHtml.match(/class="[^"]*\b(?:available|sold)\b/g) || []).length,
+    };
+  });
   if (!shows.length) throw new Error('Newport returned no showtimes');
   const address = '136 Heung Sze Wui Road, Tuen Mun, N.T.';
   return { movies, shows, cinemas: [{ id: 'newport-hyland', code: 'HYLAND', nameZh: '凱都戲院（屯門）', address, mapUrl: mapSearch('Hyland Theatre', address), detailUrl: base + '/en/cinema/hyland_theatre?page=cinemaSchedule', source: 'newport' }] };
