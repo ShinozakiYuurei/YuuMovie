@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getShowingGroups, getUpcomingGroups, getMeta } from '@/lib/data';
+import { getShowingGroups, getUpcomingGroups } from '@/lib/data';
 import type { MovieGroup } from '@/lib/data';
 import { MovieGroupCard } from '@/components/MovieGroupCard';
 
@@ -77,8 +77,6 @@ export default function HomePage() {
   const upcomingGroups = getUpcomingGroups();
   const showing = showingGroups.slice(0, PER_SECTION);
   const upcoming = upcomingGroups.slice(0, PER_SECTION);
-  const meta = getMeta();
-
   return (
     <div className="space-y-10">
       {/* ── 現正上映 ── */}
@@ -90,7 +88,7 @@ export default function HomePage() {
               現正<span className="hkm-grad-text">上映</span>
             </>
           }
-          subtitle={`共 ${showingGroups.length} 部電影 · ${meta.counts.shows} 場次，按排片場次排列。`}
+          subtitle="Now Showing"
           cta="查看全部"
         />
         <PosterGrid groups={showing} />
@@ -108,7 +106,7 @@ export default function HomePage() {
               即將<span className="hkm-grad-text">上映</span>
             </>
           }
-          subtitle={`共 ${upcomingGroups.length} 部電影等待上映，查看上映日期與場次。`}
+          subtitle="Coming soon"
           cta="查看全部"
         />
         <PosterGrid groups={upcoming} />
