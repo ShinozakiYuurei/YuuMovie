@@ -123,6 +123,49 @@ const PAREN_RE = /[（(〔[【{「『《][^）)〕\]】}」』》]*[）)〕\]】
 const TAIL_NOISE_RE =
   /(?:\s+(?:Hi\s+Bye|Meet\s*&?\s*Greet|見面場|特典場|特典|加碼|加場|優先場|優先|場次|見面會|安可|重映|encore|screener|fandub|dubbed|subbed))+|\s+\d{4}\s*[–—-]\s*\d{2,4}\b|\s+(?:NT\s*Live|The\s*Met|Royal\s*Ballet|GFF|HKIFF)\b.*$/gi;
 
+/** 放映格式品牌词（搜索查询专用）
+ *
+ *  院线会把规格冠名直接写进片名：4DX / CGS / SCREENX / Infinity Vision…
+ *  带去 IMDb / 豆瓣搜索根本找不到正主（《復仇者聯盟4》重映实测踩过）。
+ *  只服务**搜索候选**，不碰 enrichKey 的 FORMAT_WORDS —— 改那份词表会让
+ *  已有缓存键整体漂移，风险大得多。
+ *  刻意只收品牌整词与固定短语：Infinity / Vision 单独出现可能是真片名
+ *  （Infinity Pool），只允许「Infinity Vision」成对剥。
+ */
+const FORMAT_BRAND_PHRASES = ['infinity vision', 'imax with laser'];
+const FORMAT_BRAND_WORDS = [
+  'imax',
+  '4dx',
+  'screenx',
+  'cgs',
+  'luxe',
+  'mx4d',
+  'dolby',
+  'atmos',
+  'cinity',
+  'dubox',
+  'dbox',
+];
+
+/** 剥掉片名里的放映格式品牌词（展示侧清洗走各自词表，不要用这个） */
+export function stripFormatBrands(s) {
+  let out = s || '';
+  for (const phrase of FORMAT_BRAND_PHRASES) {
+    const esc = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    out = out.replace(new RegExp(esc, 'gi'), ' ');
+  }
+  for (const word of FORMAT_BRAND_WORDS) {
+    out = out.replace(new RegExp(`(^|[^a-z0-9])${word}(?![a-z0-9])`, 'gi'), '$1 ');
+  }
+  // 品牌词剥掉后可能留下「SCREENX - 片名」的孤儿连字符，搜索查询顺手收掉
+  // 空括号与首尾孤儿分隔符一并收掉（「(IMAX)」剥成「( )」很难看）
+  return out
+    .replace(/\(\s*\)|（\s*）/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s|·•\-–—]+|[\s|·•\-–—]+$/g, '')
+    .trim();
+}
+
 /** 去掉院线片名里的装饰：括号标记、【】、书名号、尾部噪声、多余空白 */
 export function cleanTitle(s) {
   let out = (s || '').replace(PAREN_RE, ' ');
@@ -172,8 +215,8 @@ export function pickDoubanCard(cards, year) {
 export async function resolveDouban(movie, opt = {}) {
   const zh = (movie.zh || '').trim();
   const en = (movie.en || '').trim();
-  const zhClean = cleanTitle(zh);
-  const enClean = cleanTitle(en);
+  const zhClean = stripFormatBrands(cleanTitle(zh));
+  const enClean = stripFormatBrands(cleanTitle(en));
   // “够长”的粗略判定：CJK 按字算（≥ 3 字），拉丁按词算（≥ 2 词）
   const longEnough = (s) => {
     if (!s) return false;

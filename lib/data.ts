@@ -1139,6 +1139,16 @@ export interface MovieGroup {
  * 关键：同一格式在不同院线是独立条目，需合并为一个版本；
  *       不同格式必须分开，否则详情页的版本分类就没了。
  */
+/** 该条 enrich 记录是否真的带分：notFound / 尚未上映都算没分（probe 复用） */
+export function enrichHasRating(e: EnrichEntry): boolean {
+  const imdb = e.imdb && !e.imdb.notFound ? e.imdb.rating ?? null : null;
+  const douban =
+    e.douban && !e.douban.notFound && e.douban.ratingState !== 'unreleased'
+      ? e.douban.rating ?? null
+      : null;
+  return imdb != null || douban != null;
+}
+
 /**
  * 为一组条目找对应的补充数据
  *
@@ -1146,16 +1156,25 @@ export interface MovieGroup {
  * 之所以不只用 displayName：不同院线的片名写法不同（带不带 IMAX、
  * 中英文优先），而 enrich.js 建缓存时用的是「按条目算出的 key」，
  * 这里多试几个名字才能跟上。
+ *
+ * ★ 「命中」必须是带分的记录（2026-10-04）：同组里冠名条目（如
+ *   Infinity Vision 版）的片名洗完自带独立 key，enrich.js 会为它们
+ *   单独记一条 notFound；若首中即返，整组就被这条空记录挡住，
+ *   卡片评分凭空消失（《復仇者聯盟4》实测）。跳过没分的继续找，
+ *   全组都没分才返 notFound 那条（评分侧照样算无分，行为不变）。
  */
-function findEnrich(list: Movie[], pool: Record<string, EnrichEntry>): EnrichEntry | null {
+export function findEnrich(list: Movie[], pool: Record<string, EnrichEntry>): EnrichEntry | null {
+  let firstMiss: EnrichEntry | null = null;
   for (const m of list) {
     for (const n of [m.nameZh, m.nameEn]) {
       if (!n) continue;
       const hit = pool[enrichKey(n)];
-      if (hit) return hit;
+      if (!hit) continue;
+      if (enrichHasRating(hit)) return hit;
+      firstMiss ??= hit;
     }
   }
-  return null;
+  return firstMiss;
 }
 
 export function getMovieGroups(status?: 'showing' | 'upcoming'): MovieGroup[] {

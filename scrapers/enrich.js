@@ -31,7 +31,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { enrichKey } from '../lib/enrich-key.js';
-import { parseDoubanCard, resolveDouban } from './douban-suggest.js';
+import { parseDoubanCard, resolveDouban, stripFormatBrands } from './douban-suggest.js';
 import { imdbRatings, imdbUrl, isReissueEvidence, matchesDoubanYear, resolveImdbIds } from './imdb.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -137,8 +137,16 @@ function shapeImdb(pick, rating, cands, extra = {}) {
 
 async function fetchImdb(names, year, opt = {}) {
   // 括号里往往是院线自己的标记（(GFF) / (IMAX) / (The Royal Ballet 2026 – 2027)），
-  // 带上去 IMDb 根本搜不到，所以额外备一份去掉括号的写法。
-  const queries = [...new Set(names.flatMap((n) => (n ? [n, cleanTitle(n)] : [])).filter(Boolean))];
+  // 带上去 IMDb 根本搜不到，所以额外备一份去掉括号的写法；
+  // 百老汇还会把 4DX / CGS / Infinity Vision 这类冠名**裸写**在片名里，
+  // 再备一份剥掉格式品牌词的写法（《復仇者聯盟4》重映实测踩过）。
+  const queries = [
+    ...new Set(
+      names
+        .flatMap((n) => (n ? [n, cleanTitle(n), stripFormatBrands(cleanTitle(n))] : []))
+        .filter(Boolean)
+    ),
+  ];
   const cands = await resolveImdbIds(queries, year);
   if (!cands.length) return null;
 

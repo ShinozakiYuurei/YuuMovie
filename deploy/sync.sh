@@ -148,6 +148,9 @@ else
   # 或变成「4DX Avengers: Endgame Encore Infinity Vision」。
   # 用户 2026-09-25 报的就是「整行不见了」那一类。
   "$TSX" probe/check-english-title.mts
+  # 组级评分回退：notFound 冠名条目（4DX / Infinity Vision）不能挡住整组评分，
+  # 且组内任一条目有分时展示条目必须有分（《復仇者聯盟4》重映实测踩过）。
+  "$TSX" probe/check-rating-fallback.mts
   # 卡片链接 → 静态页的覆盖面：movie 页是 dynamicParams=false 的静态导出，
   # 链接 slug 与 generateStaticParams 的 slug 一旦分叉就是线上 404。
   # 这个 bug 本地构建不报错、类型不报错，只在服务器部署后才被死链检查拦下 ——
