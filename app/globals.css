@@ -696,15 +696,12 @@ html {
 }
 
 html.hkm-theme-transition {
-  background: transparent;
+  /* 过渡期间画布必须保持不透明：旧/新两张整页快照做交叉淡入。
+   一旦透明，快照缺的画布像素就会露出底下浏览器默认的白色。 */
   transition: none;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  html.hkm-theme-transition .hkm-aurora {
-    view-transition-name: hkm-theme-background;
-  }
-
   html.hkm-theme-transition::view-transition-group(root),
   html.hkm-theme-transition::view-transition-old(root),
   html.hkm-theme-transition::view-transition-new(root) {
@@ -714,17 +711,6 @@ html.hkm-theme-transition {
 
   html.hkm-theme-transition::view-transition-group(root) {
     z-index: 1;
-  }
-
-  html.hkm-theme-transition::view-transition-group(hkm-theme-background),
-  html.hkm-theme-transition::view-transition-old(hkm-theme-background),
-  html.hkm-theme-transition::view-transition-new(hkm-theme-background) {
-    animation-duration: 560ms;
-    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  html.hkm-theme-transition::view-transition-group(hkm-theme-background) {
-    z-index: 0;
   }
 }
 

@@ -95,7 +95,12 @@ export function ThemeToggle() {
 
     transitionLock.current = true;
     setAnimating(true);
-    root.classList.add('hkm-theme-transition');
+    /*
+     * 过渡类与主题一起在快照回调里换上：旧快照 = 深色整页（不透明），
+     * 新快照 = 粉色整页（不透明），两张图交叉淡入即是完整过渡。
+     * 快照期间画布必须保持不透明（见 globals.css），任何一层缺了
+     * 不透明的底，快照缺口处露出的都是浏览器默认的白。
+     */
 
     /* hkm-theme-transition 类的所有权归「最新一次过渡」：
      * 被新过渡跳过的旧过渡不得摘类，否则会拆掉新过渡的样式。 */
@@ -108,7 +113,10 @@ export function ThemeToggle() {
     };
 
     try {
-      const transition = document.startViewTransition(() => chooseTheme(next));
+      const transition = document.startViewTransition(() => {
+        root.classList.add('hkm-theme-transition');
+        chooseTheme(next);
+      });
       /*
        * ready：伪元素树已建好、动画即将开始。此刻就解锁，让连点立即生效；
        * 但类要留到 finished 再摘——动画播放中摘掉会让
