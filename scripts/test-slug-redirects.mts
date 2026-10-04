@@ -16,7 +16,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { computeRedirects, renderMap } from '../scripts/gen-slug-redirects.mts';
+import { computeRedirects, renderMap, buildRedirects } from '../scripts/gen-slug-redirects.mts';
 
 /** 造一部片：一个组 + 若干条目，`canonicalSlug` 那个条目的 slug 即组地址 */
 function film(canonicalSlug: string, entries: { id: string; slug: string }[]) {
@@ -112,4 +112,55 @@ test('空表也要能渲染（首次部署放占位表用）', () => {
   assert.match(text, /^map \$uri \$hkm_redirect_to \{/m);
   assert.match(text, /^\s*default "";$/m);
   assert.match(text, /^\}$/m);
+});
+
+// ---------- 长度上限：超了必须拒绝写盘 ----------
+//
+// 这张表每次重建都重新生成，而站点 conf include 的是固定路径 ——
+// 写出一个 nginx 装不下的表，磁盘上的配置就坏了。当下不发作
+// （nginx 还在用内存里的旧配置跑），但**容器下次重启就起不来**，
+// 而这个 nginx 还带着另外三个站。所以宁可沿用旧表。
+// 实测（2026-10-04，530 条真实数据）：最长 108 字符。
+test('★ 超长 slug 会被长度守卫识别（写出前拦截，不落盘）', () => {
+  // 规则本身不拦长 slug（拦的是写盘那一步），所以这里验的是
+  // 「渲染出来的行确实超长」＋「上限常量与 nginx 配置对得上」。
+  const longSlug = 'x'.repeat(200);
+  const { group, entries } = film('a-1', [
+    { id: 'src-1', slug: 'a-1' },
+    { id: 'src-2', slug: longSlug },
+  ]);
+  const got = computeRedirects(entries, [group]);
+  assert.equal(got.length, 1);
+
+  const text = renderMap(got, 't');
+  const keys = text
+    .split('\n')
+    .filter((l) => l.trim().startsWith('/movie/'))
+    .map((l) => l.trim().split(/\s+/)[0]);
+  assert.ok(
+    keys.some((k) => k.length > 120),
+    `应当有超过 120 字符的 key（实测最长 ${Math.max(...keys.map((k) => k.length))}）`
+  );
+});
+
+test('★ 真实数据的键长在 nginx bucket 容量内（当前 128）', () => {
+  // 用真实 data/；没有数据的环境（如全新 checkout）跳过而不误报。
+  let entries: ReturnType<typeof computeRedirects>;
+  try {
+    entries = buildRedirects();
+  } catch {
+    return;
+  }
+  if (!entries.length) return;
+  const longest = Math.max(
+    ...entries.flatMap((e) => [`/movie/${e.from}/`, `/movie/${e.to}/`].map((s) => s.length))
+  );
+  // 128 是 deploy/nginx-static.conf 里 map_hash_bucket_size 的值。
+  // 超了就必须同步调大那里（而且要走 sync-nginx-conf.sh 才能上线上），
+  // 否则生成器会拒绝写表、旧 slug 静默不重定向。
+  assert.ok(
+    longest <= 120,
+    `最长 key ${longest} 字符，逼近 nginx map_hash_bucket_size 128；` +
+      `请同步调大 deploy/nginx-static.conf 并确认线上已同步`
+  );
 });

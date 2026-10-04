@@ -181,5 +181,17 @@ else
 fi
 
 # ---------- 4. 重载 nginx ----------
-docker exec nginx nginx -t >/dev/null 2>&1 && docker exec nginx nginx -s reload
+# ★ 不能写成 `nginx -t && nginx -s reload`（2026-10-04 实际踩到）：
+#   在 `set -e` 下，&& 列表中非末尾命令的失败是**豁免**的 ——
+#   nginx -t 失败后 reload 被跳过，脚本却继续打印「✅ 完成」。
+#   当时的情况是 map 表太长（键 108 字符 > 默认 bucket 64）导致 -t 失败，
+#   线上带着一份**坏的磁盘配置**继续跑，只要容器重启就会连带把
+#   komari / jpstage / imgmove 一起弄挂。现在显式判断，失败就非零退出。
+if docker exec nginx nginx -t 2>&1 | tail -3 | sed 's/^/  /'; then
+  docker exec nginx nginx -s reload
+else
+  echo "✖ nginx 配置检查失败，未 reload（站点仍在用旧配置运行，但磁盘上的配置是坏的）" >&2
+  echo "  请先修好配置再重建；映射表异常时可用 SLUG_REDIRECTS=0 跳过生成。" >&2
+  exit 1
+fi
 echo "✅ 完成 $(date -Iseconds)"

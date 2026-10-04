@@ -77,7 +77,10 @@ smoke() {
     [ "$a$b$c" = "200200200" ] || { echo "✖ 冒煙未通過，檢查伺服器構建日誌"; exit 1; }
   else
     echo "  首頁=$a  /showing=$b  （產物裡尚無電影頁，跳過抽檢）"
-    [ "$ab" = "200200" ] || { echo "✖ 冒煙未通過，檢查伺服器構建日誌"; exit 1; }
+    # ★ 原来是 [ "$ab" = "200200" ] —— 变量名拼错（应为 $a$b），
+    #   于是左侧恒为空串、判断恒为假，冒煙永远失败。
+    #   这条分支要站点刚建、还没有任何电影页时才会走到，所以一直没被发现。
+    [ "$a$b" = "200200" ] || { echo "✖ 冒煙未通過，檢查伺服器構建日誌"; exit 1; }
   fi
   echo "✅ 已發布"
 }
@@ -198,6 +201,24 @@ echo "▶ [4/4] 服务器部署"
 # 二是脚本执行途中会被 git checkout 换掉内容，在 bash 逐行读取下担心自覆盖。
 # 放 /tmp 跑副本，两个问题一起消。
 vps "cat > /tmp/hkmovie-vps-deploy.sh" < deploy/vps-deploy.sh
+
+# ★ nginx 站点配置必须**先**同步，再重建。
+#
+# 2026-10-04 实际踩到：仓库里的 nginx-static.conf 早就收编入库，但部署链路
+# 从不推它 —— 线上那份是手工维护的。于是仓库里加了 map_hash_bucket_size、
+# 线上没有，新加的 include 让 `nginx -t` 直接失败；更糟的是那次失败被静默
+# 吞掉（见 rebuild-static.sh 第 4 步注释），线上带着一份**坏的磁盘配置**继续跑，
+# 只要容器重启就会连带把 komari / jpstage / imgmove 一起弄挂。
+#
+# 必须先于重建：重建末尾要 reload nginx，配置得先是好的。
+# 这一步自带「备份 → 校验 → 失败回滚」，失败会非零退出、不会推半成品。
+# 需 root（conf.d 属于 root），所以走 vps 的 root shell，不经 sudo -u hkmovie。
+echo "▶ 同步 nginx 站点配置"
+vps "cat > /tmp/hkmovie-sync-nginx-conf.sh" < deploy/sync-nginx-conf.sh
+vps "cat > /tmp/hkmovie-setup-slug-redirects.sh" < deploy/setup-slug-redirects.sh
+vps "mkdir -p /tmp/hkmovie-deploy-scripts && cp /tmp/hkmovie-sync-nginx-conf.sh /tmp/hkmovie-deploy-scripts/sync-nginx-conf.sh && cp /tmp/hkmovie-setup-slug-redirects.sh /tmp/hkmovie-deploy-scripts/setup-slug-redirects.sh && cat > /tmp/hkmovie-deploy-scripts/nginx-static.conf" < deploy/nginx-static.conf
+vps "SITE_DOMAIN='$(echo "$SITE" | sed 's|https\?://||;s|/.*||')' bash /tmp/hkmovie-deploy-scripts/sync-nginx-conf.sh"
+
 vps "sudo -u hkmovie APP_DIR='$APP_DIR' SCRAPE='$DEPLOY_SCRAPE' ONLY='$DEPLOY_ONLY' bash /tmp/hkmovie-vps-deploy.sh '$BRANCH'"
 
 # 评分数据也要同步更新静态页面；安装独立的每小时定时器，并立即跑首轮刷新。

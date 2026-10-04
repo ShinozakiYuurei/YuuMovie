@@ -128,6 +128,21 @@ export function buildRedirects(): RedirectEntry[] {
   return computeRedirects(getAllMovies() as SlugSource[], getMovieGroups() as unknown as GroupSource[]);
 }
 
+/**
+ * nginx 侧 map_hash_bucket_size 的设定值（见 deploy/nginx-static.conf）。
+ *
+ * ★ 为什么生成器要知道它：这张表是**每次重建都重新生成**的，
+ *   而站点 conf 里 include 的是固定路径 —— 一旦写出一个 nginx 装不下的表，
+ *   磁盘上的配置就坏了。当下不会立刻发作（nginx 还在用内存里的旧配置跑），
+ *   但**容器下一次重启就会起不来**，而且这个 nginx 还带着另外三个站。
+ *   所以宁可「本次不更新表」（沿用旧表，旧 slug 可能 404）也不写出坏文件。
+ *
+ * 实测（2026-10-04，530 条真实数据）：最长 key/value 均 108 字符。
+ * 上限按 bucket_size 算，再留 8 字符余量给将来。
+ */
+const NGINX_BUCKET_SIZE = 128;
+const MAX_KEY_LEN = NGINX_BUCKET_SIZE - 8;
+
 /** 渲染成 nginx map 块 */
 export function renderMap(entries: RedirectEntry[], stamp: string): string {
   const lines = [
@@ -194,6 +209,24 @@ function main() {
   // 原子替换：先写同目录临时文件再 rename。
   // 为什么不直接 writeFileSync 到目标：nginx 随时可能 reload，
   // 读到半截的 map 文件会直接起不来（这个容器还带着另外三个站）。
+  //
+  // ★ 先自检长度再落盘：宁可沿用旧表，也不写出 nginx 装不下的配置。
+  const tooLong = entries
+    .flatMap((e) => [`/movie/${e.from}/`, `/movie/${e.from}`, `/movie/${e.to}/`])
+    .filter((s) => s.length > MAX_KEY_LEN);
+  if (tooLong.length) {
+    console.error(
+      `✖ 有 ${tooLong.length} 个 slug 超过 ${MAX_KEY_LEN} 字符，超出 nginx map_hash_bucket_size ` +
+        `(${NGINX_BUCKET_SIZE}) 的安全范围 —— 拒绝写出，沿用上一版表。`
+    );
+    for (const s of tooLong.slice(0, 5)) console.error(`    ${s.length} 字符：${s}`);
+    console.error(
+      `  处理：提高 deploy/nginx-static.conf 的 map_hash_bucket_size（同步记得走 sync-nginx-conf.sh）`
+    );
+    process.exitCode = 1;
+    return;
+  }
+
   fs.mkdirSync(path.dirname(OUT_FILE), { recursive: true });
   const tmp = `${OUT_FILE}.tmp-${process.pid}`;
   fs.writeFileSync(tmp, text);
