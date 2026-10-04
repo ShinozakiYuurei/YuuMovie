@@ -200,6 +200,39 @@ export function parseKinohkSynopsis(html) {
   return last ? stripHtml(last[1]) : '';
 }
 
+// ---------- hkmovie6 ----------
+
+/**
+ * hkmovie6 列表 → Map<归一化片名, [{slug,title}]>
+ *
+ * 影片页地址是 /movie/<uuid>/<URL 编码的片名>，片名就写在路径里
+ * （下划线代空格，如 柴可夫斯基《尤金．奧涅金》_(The_Met_2026)）。
+ * 站点是 Nuxt，但**服务端渲染**，HTML 里就有链接与正文，不必上浏览器。
+ */
+export function parseHkmovie6Index(html) {
+  const map = new Map();
+  for (const [, slug] of html.matchAll(/href="(\/movie\/[0-9a-f-]{36}\/[^"?#]+)"/gi)) {
+    let title = '';
+    try {
+      title = decodeURIComponent(slug.split('/').pop() || '').replace(/_/g, ' ').trim();
+    } catch {
+      continue;
+    }
+    const key = synopsisKey(title);
+    if (!key) continue;
+    const list = map.get(key) || [];
+    if (!list.some((x) => x.slug === slug)) list.push({ slug, title });
+    map.set(key, list);
+  }
+  return map;
+}
+
+/** hkmovie6 详情页 → 简介正文（<div class="synopsis"> 里的第一层内文） */
+export function parseHkmovie6Synopsis(html) {
+  const m = html.match(/<div[^>]*class="[^"]*\bsynopsis\b[^"]*"[^>]*>\s*<div[^>]*>([\s\S]*?)<\/div>/i);
+  return m ? stripHtml(m[1]) : '';
+}
+
 // ---------- 主流程 ----------
 
 /** 收集「整组都没有简介」的影片（按 synopsisKey 归一，跨院线去重） */
@@ -309,6 +342,19 @@ async function fromKinohk(row, index) {
   return null;
 }
 
+async function fromHkmovie6(row, index) {
+  const candidates = matchIndex(index, row.key);
+  for (const candidate of candidates) {
+    const url = 'https://hkmovie6.com' + candidate.slug;
+    const html = await fetchText(url);
+    const zh = usableSynopsis(parseHkmovie6Synopsis(html));
+    await sleep(GAP_MS);
+    if (zh) return { zh, source: 'hkmovie6', url, canonical: synopsisKey(candidate.title) };
+  }
+  return null;
+}
+
+
 async function main() {
   const moviesFile = readJson(MOVIES_FILE, null);
   const movies = moviesFile ? (Array.isArray(moviesFile) ? moviesFile : moviesFile.movies || []) : [];
@@ -339,6 +385,10 @@ async function main() {
     'https://wmoov.com/movie/showing',
     'https://wmoov.com/movie/upcoming',
   ], parseWmoovIndex, 'wmoov');
+  const hkmovie6Index = await buildIndex([
+    'https://hkmovie6.com/',
+  ], parseHkmovie6Index, 'hkmovie6');
+
   const kinohkIndex = await buildIndex([
     'https://kinohk.com/movies/now-showing',
     'https://kinohk.com/coming',
@@ -351,6 +401,7 @@ async function main() {
     try {
       hit = await fromWmoov(row, wmoovIndex);
       if (!hit) hit = await fromKinohk(row, kinohkIndex);
+      if (!hit) hit = await fromHkmovie6(row, hkmovie6Index);
     } catch (error) {
       log('  ⚠️ ' + label + '：' + error.message);
     }

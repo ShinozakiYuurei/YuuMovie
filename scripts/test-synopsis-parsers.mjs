@@ -3,6 +3,8 @@ import { test } from 'node:test';
 import {
   filmsNeedingSynopsis,
   matchIndex,
+  parseHkmovie6Index,
+  parseHkmovie6Synopsis,
   parseKinohkIndex,
   parseKinohkSynopsis,
   parseWmoovIndex,
@@ -117,6 +119,20 @@ test('matchIndex reaches a title wrapped in brand or language marks', () => {
   assert.deepEqual(matchIndex(index, synopsisKey('CGS復仇者聯盟5：末日降臨 Infinity Vision')), [{ id: '67513' }]);
   assert.deepEqual(matchIndex(index, synopsisKey('【Infinity Vision】復仇者聯盟5：末日降臨 (早鳥) LUXE')), [{ id: '67513' }]);
   assert.deepEqual(matchIndex(index, synopsisKey('粵語版 - 誤闖遺忘島')), [], '索引里没有的片名不许乱配');
+});
+test('hkmovie6 index takes the title out of the URL slug', () => {
+  const html = '<a href="/movie/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/%E7%A4%BE%E4%BA%A4%E6%B8%85%E7%AE%97">社交清算</a>';
+  const index = parseHkmovie6Index(html);
+  assert.deepEqual(matchIndex(index, synopsisKey('社交清算')), [
+    { slug: '/movie/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/%E7%A4%BE%E4%BA%A4%E6%B8%85%E7%AE%97', title: '社交清算' },
+  ]);
+  assert.deepEqual(matchIndex(index, synopsisKey('完全不相關的片名')), []);
+});
+
+test('hkmovie6 synopsis is the first block inside the synopsis container', () => {
+  const html = '<div class="synopsis desktop-only"><div class="line-clamp-7">繼2024年在歌劇中首次亮相並大獲好評。</div><div>其他</div></div>';
+  assert.equal(parseHkmovie6Synopsis(html), '繼2024年在歌劇中首次亮相並大獲好評。');
+  assert.equal(parseHkmovie6Synopsis('<div>沒有簡介區塊</div>'), '');
 });
 test('filmsNeedingSynopsis only reports films whose every entry lacks text', () => {
   const needs = filmsNeedingSynopsis([
