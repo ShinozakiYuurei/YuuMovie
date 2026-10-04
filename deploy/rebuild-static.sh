@@ -88,7 +88,8 @@ fi
 # 非致命：抓不到就跳过，页面只是少这一块，不该阻断整站重建。
 if [ "${SYNOPSIS:-1}" = "1" ]; then
   echo "▶ 补全院线缺失的简介..."
-  node scrapers/synopsis.js || echo "  ⚠️ 简介补全失败（不影响重建）"
+  # SYNOPSIS_FORCE=1 才强制重查（缓存的「查不到」有 7 天 TTL，正常重跑不会敲门）
+  SYNOPSIS_FORCE="${SYNOPSIS_FORCE:-0}" node scrapers/synopsis.js || echo "  ⚠️ 简介补全失败（不影响重建）"
 else
   echo "▶ SYNOPSIS=0，跳过简介补全"
 fi

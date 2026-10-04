@@ -11,7 +11,7 @@ import {
   stripHtml,
   usableSynopsis,
 } from '../scrapers/synopsis.js';
-import { enrichKey } from '../lib/enrich-key.js';
+import { synopsisKey } from '../lib/synopsis-key.js';
 
 const WMOOV_INDEX = `
   <ul>
@@ -38,12 +38,28 @@ const KINOHK_DETAIL = `
 
 test('wmoov index maps a normalised title to its detail id', () => {
   const index = parseWmoovIndex(WMOOV_INDEX);
-  assert.deepEqual(index.get(enrichKey('復仇者聯盟5：末日降臨')), [
+  assert.deepEqual(index.get(synopsisKey('復仇者聯盟5：末日降臨')), [
     { id: '67513', title: '復仇者聯盟5：末日降臨' },
   ]);
-  assert.equal(index.has(enrichKey('社交清算')), true);
+  assert.equal(index.has(synopsisKey('社交清算')), true);
 });
 
+test('wmoov sidebar links carry the title in the title attribute, not the inner text', () => {
+  const sidebar = `
+    <ul class="nav-movie">
+      <li><a class="level_IIA" href="/movie/details/73145" title="我阿爹想旅行">我阿爹想旅行</a></li>
+      <li><a class="level_IIB" href="/movie/details/73655" title="偵戰電影資料、預告、戲院"></a></li>
+    </ul>`;
+  const index = parseWmoovIndex(sidebar);
+  assert.deepEqual(index.get(synopsisKey('我阿爹想旅行')), [{ id: '73145', title: '我阿爹想旅行' }]);
+  assert.deepEqual(index.get(synopsisKey('偵戰')), [{ id: '73655', title: '偵戰' }], '固定尾巴必须剥掉');
+});
+
+test('a wrapped title such as 《社交清算》 still matches the plain site title', () => {
+  assert.equal(synopsisKey('《社交清算》'), synopsisKey('社交清算'));
+  assert.equal(synopsisKey('《空槍》'), synopsisKey('空槍'));
+  assert.notEqual(synopsisKey('空槍'), synopsisKey('空手道'));
+});
 test('wmoov detail gives both the synopsis and the names used to verify it', () => {
   assert.deepEqual(parseWmoovNames(WMOOV_DETAIL), { zh: '復仇者聯盟5：末日降臨', en: 'Avengers: Doomsday' });
   assert.equal(
@@ -54,7 +70,7 @@ test('wmoov detail gives both the synopsis and the names used to verify it', () 
 
 test('kinohk index keeps the slug and drops the alias span from the title', () => {
   const index = parseKinohkIndex(KINOHK_INDEX);
-  assert.deepEqual(index.get(enrichKey('復仇者聯盟5：末日降臨')), [
+  assert.deepEqual(index.get(synopsisKey('復仇者聯盟5：末日降臨')), [
     { slug: '/movie/復仇者聯盟5末日降臨-早鳥', title: '復仇者聯盟5：末日降臨 (早鳥)', en: 'Avengers: Doomsday' },
   ]);
 });
@@ -69,16 +85,16 @@ test('kinohk synopsis is the paragraph before the site credit, not the credit it
 
 test('matchIndex falls back to a prefix match only when the pick is unambiguous', () => {
   const index = new Map([
-    [enrichKey('復仇者聯盟5：末日降臨'), [{ id: '67513' }]],
+    [synopsisKey('復仇者聯盟5：末日降臨'), [{ id: '67513' }]],
   ]);
-  assert.deepEqual(matchIndex(index, enrichKey('復仇者聯盟5：末日降臨')), [{ id: '67513' }]);
-  assert.deepEqual(matchIndex(index, enrichKey('復仇者聯盟5：末日降臨 開畫日特典首場')), [{ id: '67513' }]);
-  assert.deepEqual(matchIndex(index, enrichKey('完全不相關的片名')), []);
+  assert.deepEqual(matchIndex(index, synopsisKey('復仇者聯盟5：末日降臨')), [{ id: '67513' }]);
+  assert.deepEqual(matchIndex(index, synopsisKey('復仇者聯盟5：末日降臨 開畫日特典首場')), [{ id: '67513' }]);
+  assert.deepEqual(matchIndex(index, synopsisKey('完全不相關的片名')), []);
   const tie = new Map([
-    [enrichKey('甲片 特典場'), [{ id: 'a' }]],
-    [enrichKey('甲片 優先場'), [{ id: 'b' }]],
+    [synopsisKey('甲片 特典場'), [{ id: 'a' }]],
+    [synopsisKey('甲片 優先場'), [{ id: 'b' }]],
   ]);
-  assert.deepEqual(matchIndex(tie, enrichKey('甲片')), [], '两个等长的候选必须放弃');
+  assert.deepEqual(matchIndex(tie, synopsisKey('甲片')), [], '两个等长的候选必须放弃');
 });
 
 test('filmsNeedingSynopsis only reports films whose every entry lacks text', () => {

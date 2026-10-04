@@ -24,7 +24,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { enrichKey } from '../lib/enrich-key.js';
+import { synopsisKey } from '../lib/synopsis-key.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(__dirname, '..', 'data');
@@ -35,7 +35,8 @@ const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 const DRY = process.env.DRY === '1';
-const FORCE_REFRESH = process.env.FORCE_REFRESH === '1';
+/** SYNOPSIS_FORCE=1 强制重查（缓存的「查不到」有 7 天 TTL；评分那轮不带这个，免得每小时敲门） */
+const FORCE_REFRESH = process.env.FORCE_REFRESH === '1' || process.env.SYNOPSIS_FORCE === '1';
 const ONLY = (process.env.ONLY || '').split(',').map((s) => s.trim()).filter(Boolean);
 const LIMIT = Number(process.env.LIMIT || 0);
 /** 有简介后多久重查一次（简介基本不变，周期可以长） */
@@ -113,16 +114,34 @@ export function usableSynopsis(text) {
 
 // ---------- wmoov ----------
 
-/** wmoov「現正上映 / 即將上映」列表 → Map<归一化片名, [{id,title}]> */
+/** wmoov 链接 title 属性里的固定尾巴：「…電影資料、預告、戲院」 */
+const WMOOV_TITLE_SUFFIX = /(電影資料|電影預告|預告|上映戲院|放映時間|戲院).*$/;
+
+/**
+ * wmoov 任意页 → Map<归一化片名, [{id,title}]>
+ *
+ * ★ 2026-10-04：不能只认 <h3> 里的链接。
+ *   实测「現正上映」页有 166 部片，但 <h3> 只有 59 个 —— 其余在侧栏
+ *   <ul class="nav-movie"> 里，而且那些 <a> 的内文常常是空的（图片链接），
+ *   片名只在 title 属性上。只认 <h3> 会漏掉三分之二的片（首轮补全就是这么漏的）。
+ *   所以改为：凡是 /movie/details/<id> 的链接都收，片名取 title 属性（剥掉固定尾巴）。
+ */
 export function parseWmoovIndex(html) {
   const map = new Map();
-  for (const [, id, raw] of html.matchAll(/<h3>\s*<a href="\/movie\/details\/(\d+)"[^>]*>([\s\S]*?)<\/a>/gi)) {
-    const title = stripHtml(raw);
-    const key = enrichKey(title);
-    if (!key) continue;
+  const add = (id, raw) => {
+    const title = stripHtml(raw).replace(WMOOV_TITLE_SUFFIX, '').trim();
+    const key = synopsisKey(title);
+    if (!key) return;
     const list = map.get(key) || [];
     if (!list.some((x) => x.id === id)) list.push({ id, title });
     map.set(key, list);
+  };
+  for (const [, id, title] of html.matchAll(/<a\b[^>]*href="\/movie\/details\/(\d+)"[^>]*title="([^"]*)"/gi)) {
+    add(id, title);
+  }
+  // 没有 title 属性的列表项（个别版式）再退回读内文
+  for (const [, id, inner] of html.matchAll(/<h3>\s*<a href="\/movie\/details\/(\d+)"[^>]*>([\s\S]*?)<\/a>/gi)) {
+    add(id, inner);
   }
   return map;
 }
@@ -157,7 +176,7 @@ export function parseKinohkIndex(html) {
     // h3 里除了片名还有一个「（別名）」的 span，先剥掉
     const title = stripHtml(h3[1].replace(/<span[\s\S]*?<\/span>/gi, ''));
     const en = stripHtml(block.match(/<p[^>]*>([^<]*)<\/p>/i)?.[1] || '');
-    const key = enrichKey(title);
+    const key = synopsisKey(title);
     if (!key) continue;
     const list = map.get(key) || [];
     if (!list.some((x) => x.slug === slug)) list.push({ slug, title, en });
@@ -183,12 +202,12 @@ export function parseKinohkSynopsis(html) {
 
 // ---------- 主流程 ----------
 
-/** 收集「整组都没有简介」的影片（按 enrichKey 归一，跨院线去重） */
+/** 收集「整组都没有简介」的影片（按 synopsisKey 归一，跨院线去重） */
 export function filmsNeedingSynopsis(movies) {
   const byKey = new Map();
   for (const movie of movies) {
     const name = movie.nameZh || movie.nameEn || '';
-    const key = enrichKey(name);
+    const key = synopsisKey(name);
     if (!key) continue;
     const row = byKey.get(key) || { key, nameZh: movie.nameZh || '', nameEn: movie.nameEn || '', hasText: false };
     if ((movie.description || '').trim()) row.hasText = true;
@@ -212,8 +231,8 @@ function isFresh(entry, ttlDays, now) {
  * vs 资料站的 Avengers: Doomsday），那是同一部片，不是另一部。
  */
 function titleAgrees(expectedEn, actualEn) {
-  const a = enrichKey(expectedEn);
-  const b = enrichKey(actualEn);
+  const a = synopsisKey(expectedEn);
+  const b = synopsisKey(actualEn);
   if (!a || !b) return true;
   return a === b || a.startsWith(b) || b.startsWith(a);
 }

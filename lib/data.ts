@@ -17,6 +17,8 @@ import {
 } from './versions';
 // key 归一化与 scrapers/enrich.js 共用同一份实现（见该文件头注释）
 import { enrichKey } from './enrich-key.js';
+// 简介缓存键多剥一层书名号（见该文件注释），两侧必须用同一个
+import { synopsisKey } from './synopsis-key.js';
 import { zhGenres, dropParents } from './genre-zh';
 import { zhLanguages, zhSubtitles } from './lang-zh';
 import { inferGeo, districtOrder, REGION_ORDER } from './region';
@@ -1032,7 +1034,7 @@ function pickSynopsisFallback(list: Movie[], pool: Record<string, SynopsisEntry>
   for (const m of list) {
     for (const n of [m.nameZh, m.nameEn]) {
       if (!n) continue;
-      const zh = pool[enrichKey(n)]?.zh?.trim();
+      const zh = pool[synopsisKey(n)]?.zh?.trim();
       if (zh) return zh;
     }
   }
