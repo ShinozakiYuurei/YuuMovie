@@ -131,7 +131,8 @@ const SPEC_RULES: SpecRule[] = [
   //   「Onyx Cinema LED」、影藝的「7院 / IMAX」「VIP House」都是證據），
   //   所以「全部是編號廳」可推得「沒有品牌特色廳」；
   //   但**推不出**「沒有 Atmos／4K」—— 那些不會改廳名。
-  //   詳情頁的措辭必須跟這個邊界一致（見 CinemaGuideDialog）。
+  //   相關措辭（如卡片空規格時的「已核實：院方未公佈放映／音響規格」）
+  //   必須跟這個邊界一致。
   //
   // fields 為空：只能由官方配置表補入（見 CINEMA_FACILITIES），不認片名或場次版本。
   { key: 'standard', label: '普通影廳', group: 'hall', re: /普通影廳|普通厅/, fields: [] },

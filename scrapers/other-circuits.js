@@ -248,6 +248,17 @@ export async function scrapeChinachem() {
   return { movies: [...movieMap.values()], cinemas: [{ id: 'chinachem-plnym', code: 'PLNYM', nameZh: '巴黎倫敦紐約米蘭戲院', address: 'Hong Lai Garden, Ho Pong Street, TMTL 280, Tuen Mun, N.T.', mapUrl: 'https://goo.gl/maps/NvkxDVniiQn', detailUrl: base + '/en/home', source: 'chinachem' }], shows };
 }
 
+async function fetchQuickTickets(base, body) {
+  const response = await fetch(base + '/Browsing/QuickTickets/Sessions', {
+    method: 'POST',
+    signal: AbortSignal.timeout(20_000),
+    headers: { 'user-agent': 'Mozilla/5.0', 'content-type': 'application/x-www-form-urlencoded; charset=UTF-8', 'x-requested-with': 'XMLHttpRequest' },
+    body,
+  });
+  if (!response.ok) throw new Error('HTTP ' + response.status + ' for QuickTickets/Sessions');
+  return response.text();
+}
+
 export function parseLumenPoster(_html, filmId, base = 'https://www.lumencinema.com.hk') {
   const id = String(filmId || '').replace(/^f-/i, '');
   if (!id) return null;
@@ -299,6 +310,31 @@ export async function scrapeLumen() {
     }
   }));
   for (const show of shows) show.price = priceBySession.get(show.id.slice('lumen-'.length)) ?? null;
+  // Vista 公网页面拿不到座位图，但快达票（QuickTickets）的 Sessions 接口逐场返回 SoldOut 布尔值，
+  // 按 Time=Day / Evening 各查一次即可覆盖全日场次；只做售满标记，remainRate 维持 null。
+  const soldOutBySession = new Map();
+  const movieIds = [...new Set(shows.map((show) => show.movieId.replace(/^lumen-/, 'f-')))];
+  await mapLimit(movieIds, 3, async (filmId) => {
+    for (const timeFilter of ['Day', 'Evening']) {
+      try {
+        const body = new URLSearchParams();
+        body.append('Movies', filmId);
+        body.append('Cinemas', '1001');
+        body.append('ShowTypes', '2D');
+        body.append('Time', timeFilter);
+        body.append('Date', '');
+        const payload = await fetchQuickTickets(base, body.toString());
+        if (!payload.trim().startsWith('[')) continue;
+        for (const row of JSON.parse(payload)) {
+          if (row.Id && typeof row.SoldOut === 'boolean') soldOutBySession.set(String(row.Id), row.SoldOut);
+        }
+      } catch {
+        // 单部片查询失败不影响整院线，该场次保持默认未售满
+      }
+    }
+  });
+  const soldOutIds = new Set([...soldOutBySession.entries()].filter(([, sold]) => sold).map(([id]) => id));
+  for (const show of shows) show.soldOut = soldOutIds.has(show.id.slice('lumen-'.length));
   const cinemaUrl = base + '/Browsing/Cinemas/Details/1001';
   const cinemaPage = await fetchText(cinemaUrl);
   const map = cinemaPage.match(/maps\.google\.com\/maps\?[^"']+/i)?.[0] || '';

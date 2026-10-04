@@ -266,8 +266,9 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
                    *
                    * ★ 官方規格與觀眾指南整理的規格**用同一種標籤**（2026-09-26 用戶指定）。
                    *   曾經用虛線邊框 + 一行註記區分來源，用戶認為太花：
-                   *   卡片的標籤區只需回答「這間有什麼」，來源追蹤放在詳情頁的
-                   *   「觀眾指南整理的規格」一節（見 CinemaGuideDialog）。
+                   *   卡片的標籤區只需回答「這間有什麼」。來源標註原本放在指南彈窗
+                   *   的「觀眾指南整理的規格」一節，2026-10-05 應用戶要求連同
+                   *   「已核實規格」「場地概況」各節一併刪除，UI 不再區分來源。
                    */}
                   {c.specs.length > 0 ? (
                     <div className="mt-2.5 flex flex-wrap gap-1.5">
@@ -362,11 +363,9 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
           const guide = CINEMA_GUIDES[guideId];
           return c && guide ? (
             <CinemaGuideDialog
-              cinemaId={c.id}
               name={c.nameZh}
               address={c.address}
               guide={guide}
-              guideSpecs={c.specs.filter((s) => c.guideSpecs.includes(s.key))}
               onClose={() => setGuideId(null)}
             />
           ) : null;

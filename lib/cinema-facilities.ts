@@ -286,8 +286,9 @@ export function fixedCinemaSpecs(cinemaId: string): string[] {
  * 「篩 IMAX 看不到 K11」是同一類靜默失效（頁面照樣 200，只是清單少幾家）。
  *
  * 用戶明確要求放寬「只採院方明示」的規則。卡片上這一層與官方規格用同一種
- * 標籤（用戶 2026-09-26 指定，不要虛線或註記）；來源追蹤放在詳情頁
- * 另開的「觀眾指南整理的規格」一節（見 CinemaGuideDialog）。
+ * 標籤（用戶 2026-09-26 指定，不要虛線或註記）。UI 曾另有「觀眾指南整理的
+ * 規格」一節標明來源，2026-10-05 應用戶要求刪除，來源區分只留在本檔
+ * 註釋與 probe/check-cinema-specs.mts。
  *
  * 每條都必須能在 CINEMA_GUIDES 的文字裡找到對應依據；
  * probe/check-cinema-specs.mts 逐條回查，防止這一層偏離指南原文。
@@ -329,7 +330,7 @@ export const GUIDE_SPECS: Record<string, string[]> = {
   'mcl-022': ['laser', 'atmos', 'dolby71'],
 };
 
-/** 觀眾指南整理的規格（非院方公布）。回傳副本。 */
+/** 觀眾指南整理的規格（非院方公布），僅供篩選補齊。回傳副本。 */
 export function guideCinemaSpecs(cinemaId: string): string[] {
   return [...(GUIDE_SPECS[cinemaId] ?? [])];
 }

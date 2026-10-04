@@ -645,8 +645,9 @@ function load() {
   //   1. 院方明示（fixedCinemaSpecs）
   //   2. 場次證據（hallSpecsOf）
   //   3. 第三方觀眾指南（guideCinemaSpecs）—— 僅供篩選補齊，非院方公布
-  // 1、2 都沒有的、只有指南支持的規格會記進 guideSpecs，卡片要標明來源
-  // （用戶 2026-09-26 指定：放寬「只採院方明示」的前提是附來源標註）。
+  // 1、2 都沒有的、只有指南支持的規格會記進 guideSpecs。曾以「卡片要標明
+  // 來源」為放寬前提，後 UI 的來源標註一節已於 2026-10-05 刪除；
+  // 卡片上兩層規格同款展示，來源區分只留在數據層（cinema-facilities.ts）。
   const officialByCinema = new Map(cinemas.map((c) => [c.id, new Set(fixedCinemaSpecs(c.id))]));
   const specsByCinema = new Map(cinemas.map((c) => [c.id, new Set(fixedCinemaSpecs(c.id))]));
   for (const c of cinemas) {
