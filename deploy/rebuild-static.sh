@@ -155,6 +155,63 @@ export NEXT_PUBLIC_POSTER_ORIGIN="${POSTER_ORIGIN:-}"
 npm run build
 echo "  HTML 页数: $(find out -name '*.html' | wc -l)"
 
+# ---------- 2.5 发布前快照上一版产物 ----------
+# 下面第 3 步是 find -mindepth 1 -delete + 同步新产物，旧版页面一旦清掉就找不回。
+# 快照放在同步之前，部署、定时抓取、评分刷新每条发布路径都自动留一份上一版整站，
+# 新版本有问题或发布中途翻车时能直接拿回来。
+#
+# 用 cp -al 硬链接快照：瞬时完成、不复制数据，也没有 cp -a 全量拷贝的 I/O。
+# 注意硬链接在这里省的是快照那一刻的复制成本，不是稳态磁盘：每次发布都是整站重建
+# （tar 解包全新 inode），每份快照会钉住约 100M 数据块，KEEP=5 时稳态占用上限约 500M
+# （站点 108M，其中大头是海报），磁盘余量 6.8G 可承受。
+# 前提是快照目录与 SITE_DIR 在同一文件系统（都在 /dev/vda1）；跨文件系统时 cp -al
+# 会整体失败 → 回退成普通 cp -a（代价同上，且慢几秒）。
+# 滚动保留最近 SNAPSHOT_KEEP 份；非致命：快照失败只警告，不阻断本次发布。
+SNAPSHOT_DIR="${SNAPSHOT_DIR:-${APP_DIR}/.snapshots}"
+SNAPSHOT_KEEP="${SNAPSHOT_KEEP:-5}"
+if [ "${SNAPSHOT:-1}" = "1" ] && [ -d "${SITE_DIR}" ] && [ -n "$(ls -A "${SITE_DIR}" 2>/dev/null)" ]; then
+  echo "▶ 快照上一版产物..."
+  SNAP="${SNAPSHOT_DIR}/$(date +%Y%m%d-%H%M%S)"
+  # flock 已保证同一时刻只有一次重建；同一秒内的第 2、3 份…加递增序号。
+  # ★ 不能只查「基名是否存在」就复用它（2026-10-04 实测踩坑）：上一秒的快照可能
+  #   已被轮转回收，基名空出来 —— 复用后名字按字典序排到带后缀兄弟之前，
+  #   紧接着的轮转会把这份新快照当最旧的删掉。所以只要这一秒还有任何快照，
+  #   就续接最大后缀 +1，基名一去不回头；后缀递增保证同秒内字典序 = 时间序。
+  #   （跨秒排序天然成立：时间戳宽度固定，下一秒的名字严格大于上一秒全部名字。）
+  if ls -1 "${SNAPSHOT_DIR}" 2>/dev/null | grep -q "^$(basename "${SNAP}")\(-[0-9]\+\)\?$"; then
+    _snapbase=$(basename "${SNAP}")
+    _snapmax=$(ls -1 "${SNAPSHOT_DIR}" 2>/dev/null | grep -o "^${_snapbase}-[0-9]\+$" | cut -d- -f3 | sort -n | tail -1)
+    SNAP="${SNAPSHOT_DIR}/${_snapbase}-$(( ${_snapmax:-0} + 1 ))"
+  fi
+  if mkdir -p "${SNAP}" && cp -al "${SITE_DIR}/." "${SNAP}/" 2>/dev/null; then
+    echo "  已快照到 ${SNAP}（硬链接）"
+  elif cp -a "${SITE_DIR}/." "${SNAP}/" 2>/dev/null; then
+    echo "  硬链接快照失败（跨文件系统？），已全量拷贝到 ${SNAP}"
+  else
+    rm -rf "${SNAP}"
+    echo "  ⚠️ 快照失败，本次发布不留档（不影响发布）"
+  fi
+  # cp -al 会把站点目录自身的旧 mtime 带到快照目录上（实测），恢复成创建时刻，
+  # 免得人看目录时间时被误导
+  if [ -d "${SNAP}" ]; then
+    touch "${SNAP}"
+  fi
+  # 轮转：目录名即时间戳，按名字排序 = 时间排序，tail 丢弃第 KEEP+1 份起的旧快照。
+  # ★ 不能用 ls -t（2026-10-04 实测踩坑）：cp -a 会把源目录自身的 mtime 原样带到
+  #   快照目录上，各快照的 mtime 反映的是「站点目录上次被改的时间」而非创建时间；
+  #   源目录 mtime 不变时（只覆写文件内容）所有快照 mtime 全部相同，
+  #   ls -t 遇相同 mtime 退化为名字升序 —— tail 別掉的是最新的那份而不是最旧的。
+  # ★ 也不能用带尾斜杠的 glob 排序（同日实测踩坑）：'/' 字节大于后缀 '-'，
+  #   同一秒的首份（无后缀，最旧）会排到带后缀的兄弟之后，删的又不对 ——
+  #   用 ls -1 裸名 + LC_ALL=C 按字节排序：前缀名排在前（更旧），后缀递增在后。
+  [ "${SNAPSHOT_KEEP}" -ge 1 ] 2>/dev/null || SNAPSHOT_KEEP=5
+  ls -1 "${SNAPSHOT_DIR}" 2>/dev/null | LC_ALL=C sort -r | tail -n +$((SNAPSHOT_KEEP + 1)) | while IFS= read -r old; do
+    rm -rf "${SNAPSHOT_DIR:?}/${old}"
+  done
+else
+  echo "▶ SNAPSHOT=0 或站点目录为空，跳过快照"
+fi
+
 # ---------- 3. 同步到 nginx 静态目录 ----------
 # 同样：清空内容但保留目录本身（保持 inode 不变）
 echo "▶ 同步到 ${SITE_DIR} ..."
