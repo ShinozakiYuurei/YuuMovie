@@ -1,3 +1,5 @@
+import { buildRecordMap, langField } from './broadway.js';
+
 const HKT_OFFSET_MS = 8 * 60 * 60 * 1000;
 const CHANNELS = { cgv: { base: 'https://cgv.com.hk', route: 'zh' }, cineart: { base: 'https://cinearthouse.com.hk', route: 'hk' } };
 async function fetchText(url) {
@@ -55,6 +57,7 @@ function pageData(html) {
   const flight = flightText(html);
   if (!flight) throw new Error('GrabTicks page has no Flight payload');
   return {
+    records: buildRecordMap(flight),
     movies: jsonValueAfter(flight, 'movies') || [],
     shows: jsonValueAfter(flight, 'shows') || [],
     sites: jsonValueAfter(flight, 'showSites') || [],
@@ -63,12 +66,21 @@ function pageData(html) {
   };
 }
 
-function localized(value, lang) {
-  if (!value) return '';
-  if (typeof value === 'string') {
-    try { return localized(JSON.parse(value), lang); } catch { return value; }
+/**
+ * 读 `*_lang` 字段 → 字符串
+ *
+ * ★ 2026-10-04 修复（用户报「剧情简介获取错误」）：Next.js Flight 载荷会把长字符串
+ *   抽成独立记录，字段位置只留 `"$34"` 这样的引用 —— CineArt 首页的简介就是这样，
+ *   原先把引用字面量当简介写进了资料卡。现在复用百老匯那套 buildRecordMap + langField
+ *   还原（同一种载荷、同一个坑）；还原不到就当空串，绝不把 `$34` 写进数据。
+ */
+function grabLang(records, value, lang) {
+  const obj = langField(records, value);
+  if (obj && typeof obj === 'object' && Object.keys(obj).length) {
+    return (lang ? obj[lang] : obj.zh_hk || obj.zhHK || obj.zh || obj.en || obj.enGB) || '';
   }
-  return value[lang || 'zh_hk'] || value.zhHK || value.zh || value.en || value.enGB || '';
+  const text = typeof value === 'string' ? value : '';
+  return /^\$\d+$/.test(text.trim()) ? '' : text;
 }
 
 function plainText(value) {
@@ -94,6 +106,7 @@ function imageUrl(value) {
 }
 
 function normalizeGrabTicks(source, raw, cfg) {
+  const records = raw.records || new Map();
   const movieById = new Map(raw.movies.map((movie) => [String(movie.id), movie]));
   const groupedSites = raw.siteGroups.flatMap((group) => group.items || []).map((item) => item.site).filter(Boolean);
   const sites = groupedSites.length ? groupedSites : raw.sites;
@@ -105,17 +118,17 @@ function normalizeGrabTicks(source, raw, cfg) {
     return {
       id: source + '-' + movie.id,
       slug: '',
-      nameZh: localized(movie.name_lang || movie.title_lang || movie.name) || movie.title || movie.name || '',
-      nameEn: localized(movie.name_lang || movie.title_lang || movie.name, 'en') || movie.title || movie.name || '',
+      nameZh: grabLang(records, movie.name_lang || movie.title_lang || movie.name) || movie.title || movie.name || '',
+      nameEn: grabLang(records, movie.name_lang || movie.title_lang || movie.name, 'en') || movie.title || movie.name || '',
       openingDate,
       duration: Number(movie.duration) || null,
       category: movie.category || null,
-      dialect: localized(movie.dialect_lang || movie.dialect) || null,
-      subtitle: localized(movie.subtitle_lang || movie.subtitle) || null,
-      genres: (movie.movieTypes || []).map((item) => localized(item.name_lang || item.name)).filter(Boolean),
-      director: localized(movie.director_lang || movie.director) || null,
-      cast: localized(movie.cast_lang || movie.cast) || null,
-      description: plainText(localized(movie.description_lang || movie.description)),
+      dialect: grabLang(records, movie.dialect_lang || movie.dialect) || null,
+      subtitle: grabLang(records, movie.subtitle_lang || movie.subtitle) || null,
+      genres: (movie.movieTypes || []).map((item) => grabLang(records, item.name_lang || item.name)).filter(Boolean),
+      director: grabLang(records, movie.director_lang || movie.director) || null,
+      cast: grabLang(records, movie.cast_lang || movie.cast) || null,
+      description: plainText(grabLang(records, movie.description_lang || movie.description)),
       poster: imageUrl((movie.images || [])[0]),
       trailer: movie.trailer || null,
       detailUrl: cfg.base + '/' + cfg.route + '/movie/' + movie.id,
@@ -125,8 +138,8 @@ function normalizeGrabTicks(source, raw, cfg) {
   });
 
   const cinemas = [...new Map(sites.map((site) => [String(site.id), site])).values()].map((site) => {
-    const name = localized(site.name_lang || site.name) || site.shortName || site.name || '';
-    const rawAddress = localized(site.address_lang || site.address) || site.address || '';
+    const name = grabLang(records, site.name_lang || site.name) || site.shortName || site.name || '';
+    const rawAddress = grabLang(records, site.address_lang || site.address) || site.address || '';
     const address = rawAddress === '.' && source === 'cineart' && String(site.id) === '23'
       ? 'L2, Phase 4, MOSTown, 18 On Luk Street, Ma On Shan, N.T.'
       : rawAddress === '.' ? '' : plainText(rawAddress);
@@ -155,14 +168,14 @@ function normalizeGrabTicks(source, raw, cfg) {
     const movie = movieById.get(movieId) || show.movie || {};
     const house = houses.get(String(show.house?.id));
     const version = [movie.attr1, movie.attr2, movie.attr3, movie.attr4, movie.attr5]
-      .map((attr) => localized(attr?.name_lang || attr?.name)).filter(Boolean).join(' ') || null;
+      .map((attr) => grabLang(records, attr?.name_lang || attr?.name)).filter(Boolean).join(' ') || null;
     const seats = Number(show.seats) || null;
     const available = Number(show.avaliable);
     shows.push({
       id: source + '-' + id,
       movieId: source + '-' + movieId,
       cinemaId: source + '-' + siteId,
-      houseName: localized(house?.name_lang || house?.name) || String(show.house?.id || ''),
+      houseName: grabLang(records, house?.name_lang || house?.name) || String(show.house?.id || ''),
       startAt,
       date,
       price: Number.isFinite(Number(show.price)) ? Number(show.price) : null,
@@ -172,7 +185,7 @@ function normalizeGrabTicks(source, raw, cfg) {
       tags: [...(show.tags || []), ...(show.manualTags || [])].filter((tag) => typeof tag === 'string'),
       category: movie.category || null,
       version,
-      language: localized(movie.dialect_lang || movie.dialect) || null,
+      language: grabLang(records, movie.dialect_lang || movie.dialect) || null,
       bookingUrl: cfg.base + '/' + cfg.route + '/show/' + id,
       source,
     });
@@ -210,8 +223,9 @@ export async function scrapeCgv({ maxMovies = 0 } = {}) {
     try { return pageData(await fetchText(cfg.base + '/' + cfg.route + '/movie/' + id)); }
     catch (error) { console.warn('[cgv] movie ' + id + ': ' + error.message); return null; }
   });
-  const merged = { movies: [], shows: [], sites: [], siteGroups: [], houses: [] };
+  const merged = { records: new Map(), movies: [], shows: [], sites: [], siteGroups: [], houses: [] };
   for (const page of pages.filter(Boolean)) {
+    for (const [k, v] of page.records || []) if (!merged.records.has(k)) merged.records.set(k, v);
     merged.movies.push(...page.movies);
     merged.shows.push(...page.shows);
     merged.sites.push(...page.sites);

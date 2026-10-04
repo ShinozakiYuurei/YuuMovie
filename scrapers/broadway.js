@@ -139,13 +139,17 @@ function scanJsonValue(s, start) {
  *
  * ⚠️ id 前必须是行首或非数字字母，否则 `"createTime":"…37:52.688Z"`
  *   这类时间戳会被当成 id=37 命中（踩过）。
+ *
+ * ⚠️ Flight 的行 id 是**十六进制**：CineArt 首页实测有 `"$3a"` 这类引用，
+ *   只按十进制解析会漏掉一半记录（2026-10-04 修）。map 的键与引用两边
+ *   统一用 parseInt(…, 16)，`37` 与 `3a` 都还原得到。
  */
 export function buildRecordMap(rsc) {
   const map = new Map();
-  const re = /(?:^|[^0-9A-Za-z_])(\d+):T[0-9a-f]+,/g;
+  const re = /(?:^|[^0-9A-Za-z_])([0-9a-f]+):T[0-9a-f]+,/g;
   let m;
   while ((m = re.exec(rsc)) !== null) {
-    const id = Number(m[1]);
+    const id = parseInt(m[1], 16);
     if (map.has(id)) continue;
     const start = m.index + m[0].length;
     const end = scanJsonValue(rsc, start);
@@ -185,8 +189,8 @@ function deepParse(v) {
 export function langField(records, v) {
   let raw = v;
   if (typeof raw === 'string') {
-    const ref = /^\$(\d+)$/.exec(raw);
-    if (ref) raw = records.get(Number(ref[1])) ?? null;
+    const ref = /^\$([0-9a-f]+)$/.exec(raw);
+    if (ref) raw = records.get(parseInt(ref[1], 16)) ?? null;
   }
   const out = deepParse(raw);
   return out && typeof out === 'object' ? out : {};

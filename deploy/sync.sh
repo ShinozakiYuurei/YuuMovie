@@ -119,6 +119,9 @@ else
   "$TSX" --test scripts/test-cinema-payments.ts
   # MCL 官方详情从数字 ID 抓取；片名不符要拒绝，且分类/片长/简介须进组级资料卡。
   "$TSX" probe/check-mcl-details.mts
+  # React Flight 载荷的 `$ref` 还原（行 id 是十六进制）：还原不到就会把 "$3a"
+  # 当简介写进资料卡（2026-10-04 CineArt 实测），所以十进制／十六进制一起钉死。
+  node --import tsx --test scripts/test-flight-records.mjs
   "$TSX" probe/check-group-slug-status.mts
   # 选海报的规则全是取舍，错了不会报错、只会静默换封面（2026-09-21 就踩过），
   # 所以跟错合并一样在发布前钉死。不读 data/、不联网，服务器上也能跑。
