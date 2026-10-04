@@ -227,14 +227,26 @@ function isFresh(entry, ttlDays, now) {
 /**
  * 英文片名对不上就别用：同名旧片/重拍是这类站点最常见的事故。
  *
- * 但允许「包含」：院线的活动场名字更长（Avengers: Doomsday Special Screening
- * vs 资料站的 Avengers: Doomsday），那是同一部片，不是另一部。
+ * 两道宽容（都是实测逼出来的）：
+ *   1. 一方包含另一方 —— 院线会加活动/版本尾巴（Avengers: Doomsday Special
+ *      Screening、… (Japanese Version)），资料站只有正片名。
+ *   2. 词集重合 ≥ 80% —— 院线英文名会少写「The Movie」：
+ *      cgv 写 Chiikawa The Secret Of The Mermaid Island - Japanese Version，
+ *      wmoov 写 Chiikawa The Movie: The Secret Of The Mermaid Island。
+ *      真错的片名（Avengers: Endgame vs Avengers: Doomsday）重合只有 50%，仍被挡下。
  */
-function titleAgrees(expectedEn, actualEn) {
+export function titleAgrees(expectedEn, actualEn) {
   const a = synopsisKey(expectedEn);
   const b = synopsisKey(actualEn);
   if (!a || !b) return true;
-  return a === b || a.startsWith(b) || b.startsWith(a) || a.includes(b) || b.includes(a);
+  if (a === b || a.startsWith(b) || b.startsWith(a) || a.includes(b) || b.includes(a)) return true;
+  const ta = new Set(a.split(' ').filter(Boolean));
+  const tb = new Set(b.split(' ').filter(Boolean));
+  const [small, big] = ta.size <= tb.size ? [ta, tb] : [tb, ta];
+  if (!small.size) return true;
+  let hit = 0;
+  for (const word of small) if (big.has(word)) hit++;
+  return hit / small.size >= 0.8;
 }
 
 /**

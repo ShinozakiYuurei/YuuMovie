@@ -9,6 +9,7 @@ import {
   parseWmoovNames,
   parseWmoovSynopsis,
   stripHtml,
+  titleAgrees,
   usableSynopsis,
 } from '../scrapers/synopsis.js';
 import { synopsisKey } from '../lib/synopsis-key.js';
@@ -85,6 +86,18 @@ test('kinohk synopsis is the paragraph before the site credit, not the credit it
   assert.equal(parseKinohkSynopsis('<p>沒有出處標註</p>'), '');
 });
 
+test('titleAgrees tolerates version tails and a missing The Movie, but not a different film', () => {
+  assert.equal(titleAgrees('Avengers: Doomsday Special Screening', 'Avengers: Doomsday'), true);
+  assert.equal(
+    titleAgrees(
+      'Chiikawa The Secret Of The Mermaid Island - Japanese Version',
+      'Chiikawa The Movie: The Secret Of The Mermaid Island',
+    ),
+    true,
+  );
+  assert.equal(titleAgrees('Avengers: Endgame', 'Avengers: Doomsday'), false, '不同集数必须挡下');
+  assert.equal(titleAgrees('', 'Anything'), true, '没有英文名时不做判断');
+});
 test('matchIndex falls back to a prefix match only when the pick is unambiguous', () => {
   const index = new Map([
     [synopsisKey('復仇者聯盟5：末日降臨'), [{ id: '67513' }]],
