@@ -59,6 +59,8 @@ test('a wrapped title such as 《社交清算》 still matches the plain site ti
   assert.equal(synopsisKey('《社交清算》'), synopsisKey('社交清算'));
   assert.equal(synopsisKey('《空槍》'), synopsisKey('空槍'));
   assert.notEqual(synopsisKey('空槍'), synopsisKey('空手道'));
+  // 异体字：院线写 麽、wmoov 写 麼（2026-10-04《怎麽可能我家的祖先是你家的鬼》实测）
+  assert.equal(synopsisKey('怎麽可能我家的祖先是你家的鬼'), synopsisKey('怎麼可能我家的祖先是你家的鬼'));
 });
 test('wmoov detail gives both the synopsis and the names used to verify it', () => {
   assert.deepEqual(parseWmoovNames(WMOOV_DETAIL), { zh: '復仇者聯盟5：末日降臨', en: 'Avengers: Doomsday' });

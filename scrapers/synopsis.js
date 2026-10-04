@@ -234,7 +234,7 @@ function titleAgrees(expectedEn, actualEn) {
   const a = synopsisKey(expectedEn);
   const b = synopsisKey(actualEn);
   if (!a || !b) return true;
-  return a === b || a.startsWith(b) || b.startsWith(a);
+  return a === b || a.startsWith(b) || b.startsWith(a) || a.includes(b) || b.includes(a);
 }
 
 /**
