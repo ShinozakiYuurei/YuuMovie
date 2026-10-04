@@ -55,6 +55,13 @@ const notice = parseMclMovieDetails([{ ...fixtures[0].raw[0],
   '14743', fixtures[0].title);
 assert.equal(notice?.description, '', '特典場須知不得當作劇情簡介');
 
+// 「简介 + 備註」拼在同一段时，只截掉须知部分，简介必须留下。
+// （2026-10-04 线上《星聲夢裡人》《MOONWALKER》实测：简介后面拖着换领条款。）
+const mixed = parseMclMovieDetails([{ ...fixtures[0].raw[0],
+  i: '<p>旭仔是香港六十年代一個反叛青年，渴望高飛。</p><p><strong>備註：</strong><br>凡購買戲票一張，即可到票房換領海報一張（數量有限）</p>' }],
+  '14743', fixtures[0].title);
+assert.equal(mixed?.description, '旭仔是香港六十年代一個反叛青年，渴望高飛。', '只截須知、保留簡介');
+
 // 模拟三端点 + 缓存：证明抓取会用数字 ID 取详情，并且详情故障不丢场次。
 const requests: string[] = [];
 const grid = { movies: fixtures.map((f) => ({ id: String(f.id), mn: f.title })),
