@@ -238,22 +238,32 @@ function titleAgrees(expectedEn, actualEn) {
 }
 
 /**
- * 在索引里找一部片
+ * 在索引里找一部片（三级退让，越往后越宽松、也越保守）
  *
- * 先精确命中；再退一步允许「一方是另一方的前缀」—— 院线片名常带活动尾巴
- * （「復仇者聯盟5：末日降臨 開畫日特典首場」），而资料站只有正片名。
+ * 1. 精确命中 —— 最常见的形态，优先用它，避免「空槍」被「空槍2」抢走。
+ * 2. 前缀 —— 一方是另一方的前缀。院线片名常带活动尾巴
+ *    （「復仇者聯盟5：末日降臨 開畫日特典首場」），资料站只有正片名。
+ * 3. 子串 —— 片名被品牌/语言标记夹在中间：院线叫
+ *    「【Infinity Vision】復仇者聯盟5：末日降臨 (早鳥) LUXE」「CGS…Infinity Vision」
+ *    「粵語版 - 誤闖遺忘島」，而资料站只有「復仇者聯盟5：末日降臨」「誤闖遺忘島」。
+ *    前两级都够不到，只有子串能命中（2026-10-04 实测）。
+ *
  * 退让时取**最长**的那个键（最具体），并且只在唯一时采用：
  * 有歧义宁缺毋滥，错配一部片的简介比缺简介更糟。
+ * 英文片名的比对（titleAgrees）是最后一道闸。
  */
 export function matchIndex(index, key) {
   const exact = index.get(key);
   if (exact && exact.length) return exact;
-  const keys = [...index.keys()].filter((k) => k.startsWith(key) || key.startsWith(k));
-  if (!keys.length) return [];
-  const longest = Math.max(...keys.map((k) => k.length));
-  const best = keys.filter((k) => k.length === longest);
-  if (best.length !== 1) return [];
-  return index.get(best[0]) || [];
+  for (const test of [(k) => k.startsWith(key) || key.startsWith(k), (k) => k.includes(key) || key.includes(k)]) {
+    const keys = [...index.keys()].filter((k) => k.length >= 4 && test(k));
+    if (!keys.length) continue;
+    const longest = Math.max(...keys.map((k) => k.length));
+    const best = keys.filter((k) => k.length === longest);
+    if (best.length !== 1) continue;
+    return index.get(best[0]) || [];
+  }
+  return [];
 }
 
 async function fromWmoov(row, index) {
@@ -269,7 +279,7 @@ async function fromWmoov(row, index) {
     }
     const zh = usableSynopsis(parseWmoovSynopsis(html));
     await sleep(GAP_MS);
-    if (zh) return { zh, source: 'wmoov', url };
+    if (zh) return { zh, source: 'wmoov', url, canonical: synopsisKey(candidate.title) };
   }
   return null;
 }
@@ -282,7 +292,7 @@ async function fromKinohk(row, index) {
     const html = await fetchText(url);
     const zh = usableSynopsis(parseKinohkSynopsis(html));
     await sleep(GAP_MS);
-    if (zh) return { zh, source: 'kinohk', url };
+    if (zh) return { zh, source: 'kinohk', url, canonical: synopsisKey(candidate.title) };
   }
   return null;
 }
@@ -333,7 +343,11 @@ async function main() {
       log('  ⚠️ ' + label + '：' + error.message);
     }
     if (hit) {
-      cache.entries[row.key] = { zh: hit.zh, source: hit.source, url: hit.url, at: new Date().toISOString() };
+      const record = { zh: hit.zh, source: hit.source, url: hit.url, at: new Date().toISOString() };
+      cache.entries[row.key] = record;
+      // 同时按资料站的正片名存一份：院线那条叫「CGS…Infinity Vision」、别的院线叫正片名，
+      // 组级兜底要能用正片名查到同一段文案。
+      if (hit.canonical && hit.canonical !== row.key) cache.entries[hit.canonical] = record;
       found++;
       log('  ✓ ' + label + ' ← ' + hit.source + '（' + hit.zh.length + ' 字）');
     } else {

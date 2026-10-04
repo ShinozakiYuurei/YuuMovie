@@ -97,6 +97,12 @@ test('matchIndex falls back to a prefix match only when the pick is unambiguous'
   assert.deepEqual(matchIndex(tie, synopsisKey('甲片')), [], '两个等长的候选必须放弃');
 });
 
+test('matchIndex reaches a title wrapped in brand or language marks', () => {
+  const index = new Map([[synopsisKey('復仇者聯盟5：末日降臨'), [{ id: '67513' }]]]);
+  assert.deepEqual(matchIndex(index, synopsisKey('CGS復仇者聯盟5：末日降臨 Infinity Vision')), [{ id: '67513' }]);
+  assert.deepEqual(matchIndex(index, synopsisKey('【Infinity Vision】復仇者聯盟5：末日降臨 (早鳥) LUXE')), [{ id: '67513' }]);
+  assert.deepEqual(matchIndex(index, synopsisKey('粵語版 - 誤闖遺忘島')), [], '索引里没有的片名不许乱配');
+});
 test('filmsNeedingSynopsis only reports films whose every entry lacks text', () => {
   const needs = filmsNeedingSynopsis([
     { nameZh: '甲片', nameEn: 'A', description: '' },
