@@ -48,6 +48,13 @@ for (const f of fixtures) {
 assert.equal(parseMclMovieDetails([{ ...fixtures[0].raw[0], b: { mrt: 'TBC', mc: '8.0' } }], '14743', fixtures[0].title)?.duration, null);
 assert.equal(parseMclMovieDetails([{ ...fixtures[0].raw[0], b: { mrt: 'TBC', mc: '8.0' } }], '14743', fixtures[0].title)?.category, null);
 
+// 特典場 / 早鳥場的 i 欄位是贈品換領須知，不是劇情。若照舊寫進 description，
+// 詳情頁「劇情簡介」會變成購票條款（2026-10-04 線上《復仇者聯盟5：末日降臨》實測）。
+const notice = parseMclMovieDetails([{ ...fixtures[0].raw[0],
+  i: '<p>凡購買《復仇者聯盟5：末日降臨》Infinity Vision 開畫日特典首場戲票 1張，可獲贈:<br>1️⃣ 限量透明A3海報 1張</p>' }],
+  '14743', fixtures[0].title);
+assert.equal(notice?.description, '', '特典場須知不得當作劇情簡介');
+
 // 模拟三端点 + 缓存：证明抓取会用数字 ID 取详情，并且详情故障不丢场次。
 const requests: string[] = [];
 const grid = { movies: fixtures.map((f) => ({ id: String(f.id), mn: f.title })),

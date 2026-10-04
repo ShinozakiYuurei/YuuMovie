@@ -82,6 +82,20 @@ function plainText(value) {
 }
 
 /**
+ * MCL 的 `i` 字段同时承载两种东西：剧情简介，和场次须知。
+ * 特典场 / 早鸟场的 `i` 是赠品换领条款（「凡購買…戲票 1 張，可獲贈…」），整段没有剧情。
+ * 若照旧当简介用，详情页「劇情簡介」会变成购物须知（实测《復仇者聯盟5：末日降臨》）。
+ *
+ * 判据取「以凡購買开头」：2026-10-04 全量核对 MCL 详情缓存 107 部，命中 9 部
+ * 全部是特典/早鸟须知，没有一条真简介被误伤。命中即视为无简介，
+ * 该片若别源也没有文案，页面就不显示这一块。
+ */
+function mclSynopsis(value) {
+  const text = plainText(value);
+  return /^凡購買/.test(text) ? '' : text;
+}
+
+/**
  * 官方详情的数字 ID 必须匹配；列表有标题时再要求标题完全匹配。
  * 列表偶尔漏掉 Grid 影片时，仅凭官方详情中的同一数字 ID 补回片名。
  * 新数据/缓存均走这道校验，避免 ID 复用或误关联详情污染资料卡。
@@ -111,7 +125,7 @@ export function parseMclMovieDetails(raw, id, title = '') {
     genres: genreText.split(/[、/,，;；]/).map((s) => s.trim()).filter(Boolean),
     director: plainText(e.md) || null,
     cast: plainText(e.mc) || null,
-    description: plainText(info.i),
+    description: mclSynopsis(info.i),
   };
 }
 
