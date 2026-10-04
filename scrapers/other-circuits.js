@@ -115,6 +115,16 @@ function firstText(html, tag, className) {
   return text(html.match(pattern)?.[1] || '');
 }
 
+/**
+ * Lumen 的简介段落自带固定标签：<p class="boxout-blurb">Introduction :<br /><br />正文…</p>。
+ * 「Introduction :」是页面标签不是正文，必须剥掉；没有正文时返回空串 —— 否则
+ * 组级简介会把只剩标签的条目当成「有简介」挑走，盖住别源的正文。
+ * （2026-10-04《復仇者聯盟5：末日降臨》详情页实测：简介整段显示成「Introduction :」。）
+ */
+export function parseLumenBlurb(html) {
+  return firstText(html, 'p', 'boxout-blurb').replace(/^Introduction\s*:\s*/i, '').trim();
+}
+
 function attr(tag, name) {
   const match = tag.match(new RegExp('\\b' + name + '\\s*=\\s*(?:"([^"]*)"|\'([^\']*)\')', 'i'));
   return decode(match?.[1] ?? match?.[2] ?? '');
@@ -262,7 +272,7 @@ export async function scrapeLumen() {
     if (!name) continue;
     const runtime = Number(html.match(/Run Time:\s*<\/label>\s*<span>(\d+)/i)?.[1]) || null;
     const poster = parseLumenPoster(html, filmId, base);
-    const blurb = firstText(html, 'p', 'boxout-blurb');
+    const blurb = parseLumenBlurb(html);
     const movieId = 'lumen-' + filmId.replace(/^f-/i, '');
     movies.push({ id: movieId, slug: '', nameZh: '', nameEn: name, openingDate: null, duration: runtime, category: null, dialect: null, subtitle: null, genres: [], director: null, cast: null, description: blurb, poster, trailer: null, detailUrl: url, status, source: 'lumen' });
     for (const [, anchor] of html.matchAll(/(<a\b[^>]*class="[^"]*\bsession-time\b[^"]*"[^>]*>[\s\S]*?<\/a>)/gi)) {

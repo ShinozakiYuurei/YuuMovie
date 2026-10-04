@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   parseChinachemPosters,
+  parseLumenBlurb,
   parseLumenPoster,
   parseNewportPoster,
   parseSunbeamPoster,
@@ -78,4 +79,12 @@ test('known screening suffixes normalize without damaging a one-letter title', (
     normalizeTitle('CHIIKAWA the Movie: The Secret of the Mermaid Isla'),
     normalizeTitle('Chiikawa the Movie: The Secret of the Mermaid Island'),
   );
+});
+
+test('Lumen blurb drops the fixed Introduction label and keeps the real synopsis', () => {
+  const labelled = '<p class="boxout-blurb">Introduction :<br /><br />A pilot wakes up alone.</p>';
+  assert.equal(parseLumenBlurb(labelled), 'A pilot wakes up alone.');
+  const bare = '<p class="boxout-blurb">Introduction :<br /><br /></p>';
+  assert.equal(parseLumenBlurb(bare), '');
+  assert.equal(parseLumenBlurb('<p class="other">Introduction : nope</p>'), '');
 });
