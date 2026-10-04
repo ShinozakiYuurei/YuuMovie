@@ -162,6 +162,24 @@ find "${SITE_DIR}" -mindepth 1 -delete
 tar -cf - -C out . | tar -xf - -C "${SITE_DIR}"
 echo "  HTML 页数: $(find "${SITE_DIR}" -name '*.html' | wc -l)"
 
+# ---------- 3.5 旧 slug 的 301 映射表 ----------
+# 详情页 slug 取「组内场次最多的条目」，代表条目换人（分组规则修正、
+# 场次此消彼长）时旧网址会 404 —— 实测 2026-10-04 修完分组 bug 就撞上。
+# 这张表从当前数据纯推导（条目 slug 稳定，变的只是谁当代表），
+# 所以每次重建都重新生成，写到 nginx 的 include 目录。
+#
+# ★ 非致命：生成失败就沿用上一版表（文件是原子替换，不会留半截）。
+#   注意**不能**在失败时删掉它 —— 站点 conf 里是精确路径 include，
+#   文件没了 nginx 直接起不来，而这个容器还带着另外三个站。
+if [ "${SLUG_REDIRECTS:-1}" = "1" ]; then
+  echo "▶ 生成旧 slug 的 301 映射表..."
+  REDIRECT_OUT="${REDIRECT_DIR:-/home/web/conf.d/redirects}/hkmovie-slug-redirects.map" \
+    node --import tsx scripts/gen-slug-redirects.mts \
+    || echo "  ⚠️ 映射表生成失败，沿用上一版（旧 slug 可能仍 404，但不影响本次发布）"
+else
+  echo "▶ SLUG_REDIRECTS=0，跳过映射表生成"
+fi
+
 # ---------- 4. 重载 nginx ----------
 docker exec nginx nginx -t >/dev/null 2>&1 && docker exec nginx nginx -s reload
 echo "✅ 完成 $(date -Iseconds)"

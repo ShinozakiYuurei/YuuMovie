@@ -124,6 +124,11 @@ else
   node --import tsx --test scripts/test-flight-records.mjs
   # 第三方简介（wmoov / kinohk）：索引/详情解析与「宁缺毋滥」的片名匹配，错了会静默配错片。
   node --import tsx --test scripts/test-synopsis-parsers.mjs
+  # 旧 slug → 新 slug 的 301 规则：错了不报错、页面照样 200，
+  # 但会把活页面劫走或把旧链接送进 404 —— 都是只有用户点链接才发现的静默错误。
+  node --import tsx --test scripts/test-slug-redirects.mts
+  # 上一条测规则，这一条用真实数据守整体性质（无劫持、无死胡同、覆盖完整）。
+  "$TSX" probe/check-slug-redirects.mts
   "$TSX" probe/check-group-slug-status.mts
   # 选海报的规则全是取舍，错了不会报错、只会静默换封面（2026-09-21 就踩过），
   # 所以跟错合并一样在发布前钉死。不读 data/、不联网，服务器上也能跑。

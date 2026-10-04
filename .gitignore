@@ -57,6 +57,8 @@ data.local-test/
 #   - check-version-text.mts 由 deploy/sync.sh 在本地自检阶段跑（挡场次卡片版本·语言写错）
 #   - check-cinema-specs.mts 由 deploy/sync.sh 在本地自检阶段跑（挡戲院影廳規格推断错）
 #   - check-slug-coverage.mts 由 deploy/sync.sh 在本地自检阶段跑（挡卡片链接指向未生成的 movie 页）
+#   - check-slug-redirects.mts 由 deploy/sync.sh 在本地自检阶段跑
+#     （挡旧 slug 的 301 表把活页面劫走 / 指向 404 / 漏收旧地址）
 #   - check-published-links.mjs 由 deploy/vps-deploy.sh 在服务器上跑（挡死链）
 #   - check-nav-category.mjs 由 deploy/vps-deploy.sh 在服务器上跑
 #     （挡详情页被归错类：待映片标成现正上映，面包屑与顶栏色块都错）
@@ -87,6 +89,7 @@ probe/*
 !probe/check-english-title.mts
 !probe/check-rating-fallback.mts
 !probe/check-slug-coverage.mts
+!probe/check-slug-redirects.mts
 !probe/check-published-links.mjs
 !probe/check-nav-category.mjs
 !probe/check-rating-badge.mjs
