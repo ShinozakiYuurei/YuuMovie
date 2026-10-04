@@ -122,6 +122,8 @@ else
   # React Flight 载荷的 `$ref` 还原（行 id 是十六进制）：还原不到就会把 "$3a"
   # 当简介写进资料卡（2026-10-04 CineArt 实测），所以十进制／十六进制一起钉死。
   node --import tsx --test scripts/test-flight-records.mjs
+  # 第三方简介（wmoov / kinohk）：索引/详情解析与「宁缺毋滥」的片名匹配，错了会静默配错片。
+  node --import tsx --test scripts/test-synopsis-parsers.mjs
   "$TSX" probe/check-group-slug-status.mts
   # 选海报的规则全是取舍，错了不会报错、只会静默换封面（2026-09-21 就踩过），
   # 所以跟错合并一样在发布前钉死。不读 data/、不联网，服务器上也能跑。

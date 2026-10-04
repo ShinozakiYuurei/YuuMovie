@@ -105,6 +105,23 @@ export interface EnrichEntry {
   } | null;
 }
 
+/**
+ * 第三方剧情简介（data/synopsis.json）
+ *
+ * 院线完全不提供简介的影片，由 scrapers/synopsis.js 从 wmoov / kinohk 取回。
+ * 与评分同理单独存一份：movies.json 每次抓取被整体重写，外部文案不能写进去。
+ * 只作**最后兜底** —— 院线有文案时永远优先用院线的。
+ */
+export interface SynopsisEntry {
+  /** 简介正文（中文）；查不到时为空串，页面不显示这一块 */
+  zh?: string;
+  /** 来源站（wmoov / kinohk） */
+  source?: string | null;
+  /** 来源页 URL，便于人工核对 */
+  url?: string | null;
+  /** 抓取时间 */
+  at?: string;
+}
 export interface Cinema {
   id: string;
   code: string;

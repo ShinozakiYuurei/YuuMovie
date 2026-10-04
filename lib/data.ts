@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Movie, Show, Cinema, Meta, Source, EnrichEntry } from './types';
+import type { Movie, Show, Cinema, Meta, Source, EnrichEntry, SynopsisEntry } from './types';
 import {
   normalizeTitle,
   fallbackTitle,
@@ -582,6 +582,8 @@ let _cache: {
   cinemas: Cinema[];
   meta: Meta;
   enrich: Record<string, EnrichEntry>;
+  /** 第三方简介（wmoov / kinohk），见 scrapers/synopsis.js */
+  synopsis: Record<string, SynopsisEntry>;
   at: number;
 } | null = null;
 
@@ -720,6 +722,13 @@ function load() {
     }
   }
 
+  // ★ 第三方简介补全（院线完全没有文案的影片，见 scrapers/synopsis.js）
+  //
+  // 与评分同样单独一份：movies.json 每次抓取被整体重写，外部来源的文案
+  // 不能写进去。文件缺失时降级为空对象，页面照常，只是这一块不显示。
+  const synopsisFile = readJson<{ entries?: Record<string, SynopsisEntry> }>('synopsis.json', {}, true);
+  const synopsis = synopsisFile.entries || {};
+
   // ★ 剔除已开映的场次
   //
   // 背景：抓取每 2–6 小时才跑一次，中间已开映的场次会一直留在页面上，
@@ -734,7 +743,7 @@ function load() {
   //   真正的實時剔除由客戶端組件負責，見 lib/live.ts 的完整說明。
   const liveShows = shows.filter((s) => isLiveShow(s.startAt, now));
 
-  _cache = { movies, shows: liveShows, cinemas, meta, enrich, at: now };
+  _cache = { movies, shows: liveShows, cinemas, meta, enrich, synopsis, at: now };
   return _cache;
 }
 
@@ -1013,6 +1022,23 @@ function pickDisplayOpening(list: Movie[]): string | null {
 }
 
 /**
+ * 第三方简介兜底（wmoov / kinohk，见 scrapers/synopsis.js）
+ *
+ * 只在**整组都没有院线文案**时使用：院线文案永远优先（它是发行商口径，
+ * 而且和场次来自同一份数据）。键的算法与评分共用 enrichKey，
+ * 所以同一个片名的多种写法（带格式标记、别名）都能命中。
+ */
+function pickSynopsisFallback(list: Movie[], pool: Record<string, SynopsisEntry>): string | null {
+  for (const m of list) {
+    for (const n of [m.nameZh, m.nameEn]) {
+      if (!n) continue;
+      const zh = pool[enrichKey(n)]?.zh?.trim();
+      if (zh) return zh;
+    }
+  }
+  return null;
+}
+/**
  * 简介：院线官方文案（中文优先，各源里最长最完整的那份）
  */
 function pickDisplayDescription(list: Movie[]): string | null {
@@ -1274,7 +1300,7 @@ function canonicalSlugById(): Map<string, string> {
 const _groupsCache = new Map<string, { at: number; groups: MovieGroup[] }>();
 
 function buildMovieGroups(status?: 'showing' | 'upcoming'): MovieGroup[] {
-  const { movies, shows, enrich: enrichPool } = load();
+  const { movies, shows, enrich: enrichPool, synopsis: synopsisPool } = load();
   const posterWidthMap = posterWidths();
   const highResolutionPosterIndex = posterFallbackIndex(movies, posterWidthMap);
 
@@ -1442,7 +1468,7 @@ function buildMovieGroups(status?: 'showing' | 'upcoming'): MovieGroup[] {
       displayGenres: pickDisplayGenres(list),
       displayLanguageDetail: pickDisplayLanguageDetail(list),
       displayOpeningDate: pickDisplayOpening(list),
-      displayDescription: pickDisplayDescription(list),
+      displayDescription: pickDisplayDescription(list) ?? pickSynopsisFallback(list, synopsisPool),
       enrich: findEnrich(list, enrichPool),
     });
   }

@@ -80,6 +80,18 @@ else
   echo "▶ ENRICH=0，跳过评分刷新"
 fi
 
+# ---------- 0.6 第三方简介补全（默认开）----------
+# 院线不给简介的影片（新片、特映、歌劇轉播等）从 wmoov / kinohk 取一份，
+# 缓存进 data/synopsis.json，由 lib/data.ts 在「整组都没有院线文案」时兜底。
+#
+# ⚠️ 只有香港 VPS 跑得动：wmoov 在 Cloudflare 后面，大陆直连 403（本机实测）。
+# 非致命：抓不到就跳过，页面只是少这一块，不该阻断整站重建。
+if [ "${SYNOPSIS:-1}" = "1" ]; then
+  echo "▶ 补全院线缺失的简介..."
+  node scrapers/synopsis.js || echo "  ⚠️ 简介补全失败（不影响重建）"
+else
+  echo "▶ SYNOPSIS=0，跳过简介补全"
+fi
 # ---------- 1. 校验数据 ----------
 SHOWS=$(node -e "console.log(require('./data/meta.json').counts?.shows ?? 0)")
 if [ "${SHOWS}" -lt 100 ]; then
