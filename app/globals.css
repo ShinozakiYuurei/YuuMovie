@@ -2095,7 +2095,7 @@ html[data-theme='pink'] .hkm-map-canvas {
 
 html[data-theme='dark'] .hkm-map-canvas,
 html:not([data-theme='light']):not([data-theme='pink']) .hkm-map-canvas {
-  background-color: #131411;
+  background-color: #101214;
 }
 
 /*
@@ -2172,14 +2172,14 @@ html:not([data-theme='light']):not([data-theme='pink']) .hkm-map-canvas .leaflet
 
 html[data-theme='dark'] .hkm-map-canvas .leaflet-control-zoom a,
 html:not([data-theme='light']):not([data-theme='pink']) .hkm-map-canvas .leaflet-control-zoom a {
-  background: #2d3033;
-  color: #e8eaed;
+  background: #202124;
+  color: #dfe1e5;
   border-bottom-color: rgb(255 255 255 / 0.12);
 }
 
 html[data-theme='dark'] .hkm-map-canvas .leaflet-control-zoom a:hover,
 html:not([data-theme='light']):not([data-theme='pink']) .hkm-map-canvas .leaflet-control-zoom a:hover {
-  background: #3c4043;
+  background: #303134;
   color: #ffffff;
 }
 

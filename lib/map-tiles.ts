@@ -76,13 +76,14 @@ export function mapTileUrl(coords: TileCoords, attempt = 0): string {
  *   掛在每張 tile 上則只有底圖被轉換，標記保持原色。
  */
 export const DARK_TILE_FILTER =
-  'brightness(0.42) saturate(0.58) contrast(1.08)';
+  'brightness(0.34) saturate(0.72) contrast(1.16)';
 
 export function createMapTile(coords: TileCoords, done: TileDone, style: MapTileStyle = 'street'): {
   tile: HTMLDivElement;
   cancel: () => void;
 } {
   const tile = document.createElement('div');
+  tile.style.backgroundColor = style === 'dark' ? '#101214' : 'transparent';
   if (style === 'dark') tile.style.filter = DARK_TILE_FILTER;
   let settled = false;
   let started = 0;
