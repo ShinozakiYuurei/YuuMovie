@@ -22,7 +22,7 @@ export { preloadLeaflet } from '@/lib/leaflet-loader';
  *   後者（Canvas/World_Dark_Gray_Base）在香港 z17 以上沒有資料，
  *   回傳的是「Map data not yet available」佔位圖，而地圖預設 zoom 16、
  *   用戶會拉到 18。濾鏡方案語言與街道細節完全不變（仍是繁體），
- *   只把亮度反轉。濾鏡細節見 lib/map-tiles.ts 的 DARK_TILE_FILTER。
+ *   只把底圖壓暗並降低飽和度，不反相道路與地面顏色。濾鏡細節見 lib/map-tiles.ts 的 DARK_TILE_FILTER。
  */
 
 /** Leaflet 的最小型別（只用到這幾個成員，不為它裝 300KB 的 @types） */
@@ -178,16 +178,16 @@ export function CinemaMapDialog({
 
         // Two layers keep the cinema location legible against both light and dark tiles.
         L.circleMarker([mapLat, mapLon], {
-          radius: 17,
+          radius: 11,
           className: 'hkm-map-marker-halo',
           color: markerBlue,
-          weight: 1.5,
-          opacity: 0.72,
+          weight: 1,
+          opacity: 0.42,
           fillColor: markerBlue,
-          fillOpacity: 0.2,
+          fillOpacity: 0.12,
         }).addTo(map);
         L.circleMarker([mapLat, mapLon], {
-          radius: 7,
+          radius: 5.5,
           className: 'hkm-map-marker-core',
           color: '#ffffff',
           weight: 2,

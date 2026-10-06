@@ -2084,7 +2084,7 @@ html[data-theme='dark'] {
      與檔案裡其他主題覆寫同一個思路（見頂部對 :root 的說明）。
 
    ★ 取值：亮色 #F2EFE9 是街道圖瓦片的米白底色；
-     深色 #131411 是同一張瓦片過 DARK_TILE_FILTER 後的實測底色
+     深色 #131411 是同一張瓦片過 DARK_TILE_FILTER 壓暗後的實測底色
      （旺角 z16 九宮格取樣，見 lib/map-tiles.ts）。
      兩者都讓「還沒畫出來的瓦片」與「已畫出來的」看不出接縫。
    ============================================================ */
@@ -2187,18 +2187,18 @@ html:not([data-theme='light']):not([data-theme='pink']) .hkm-map-canvas .leaflet
 .hkm-map-canvas .hkm-map-marker-halo {
   transform-box: fill-box;
   transform-origin: center;
-  animation: hkm-map-marker-pulse 2.6s ease-out infinite;
+  animation: hkm-map-marker-pulse 3.8s ease-out infinite;
 }
 
 @keyframes hkm-map-marker-pulse {
   0%,
   100% {
-    opacity: 0.42;
-    transform: scale(0.86);
+    opacity: 0.32;
+    transform: scale(0.92);
   }
   52% {
-    opacity: 0.1;
-    transform: scale(1.18);
+    opacity: 0.04;
+    transform: scale(1.08);
   }
 }
 
