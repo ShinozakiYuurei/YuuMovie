@@ -76,7 +76,7 @@ export function mapTileUrl(coords: TileCoords, attempt = 0): string {
  *   掛在每張 tile 上則只有底圖被轉換，標記保持原色。
  */
 export const DARK_TILE_FILTER =
-  'invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.88) saturate(0.55)';
+  'invert(1) hue-rotate(180deg) brightness(0.68) contrast(1.08) saturate(0.32)';
 
 export function createMapTile(coords: TileCoords, done: TileDone, style: MapTileStyle = 'street'): {
   tile: HTMLDivElement;

@@ -2125,6 +2125,76 @@ html:not([data-theme='light']):not([data-theme='pink']) .hkm-map-canvas .leaflet
   box-shadow: 0 1px 5px rgb(0 0 0 / 0.5);
 }
 
+/* Map controls use the same compact glass treatment in every theme. */
+.hkm-map-canvas .leaflet-control-zoom {
+  overflow: hidden;
+  border: 1px solid rgb(15 23 42 / 0.18);
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 0.22);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.hkm-map-canvas .leaflet-control-zoom a {
+  display: grid;
+  width: 2.125rem;
+  height: 2.125rem;
+  place-items: center;
+  border: 0;
+  font-size: 1.25rem;
+  font-weight: 500;
+  line-height: 1;
+  transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.hkm-map-canvas .leaflet-control-zoom a:active {
+  transform: scale(0.92);
+}
+
+html[data-theme='light'] .hkm-map-canvas .leaflet-control-zoom a,
+html[data-theme='pink'] .hkm-map-canvas .leaflet-control-zoom a {
+  background: rgb(255 255 255 / 0.82);
+  color: #25242b;
+  border-bottom-color: rgb(15 23 42 / 0.12);
+}
+
+html[data-theme='light'] .hkm-map-canvas .leaflet-control-zoom a:hover,
+html[data-theme='pink'] .hkm-map-canvas .leaflet-control-zoom a:hover {
+  background: rgb(255 255 255 / 0.98);
+  color: var(--hkm-accent);
+}
+
+html[data-theme='dark'] .hkm-map-canvas .leaflet-control-zoom,
+html:not([data-theme='light']):not([data-theme='pink']) .hkm-map-canvas .leaflet-control-zoom {
+  border-color: rgb(255 255 255 / 0.16);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.42);
+}
+
+/* The outer ring gently breathes so the location remains easy to find without competing with labels. */
+.hkm-map-canvas .hkm-map-marker-halo {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hkm-map-marker-pulse 2.6s ease-out infinite;
+}
+
+@keyframes hkm-map-marker-pulse {
+  0%,
+  100% {
+    opacity: 0.42;
+    transform: scale(0.86);
+  }
+  52% {
+    opacity: 0.1;
+    transform: scale(1.18);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hkm-map-canvas .hkm-map-marker-halo {
+    animation: none;
+  }
+}
+
 /* ============================================================
    頂欄導航的高亮（含詳情頁）
 

@@ -136,7 +136,6 @@ export function CinemaMapDialog({
         // 标记色跟随当前主题（见下方 circleMarker 的注释）
         const cs = getComputedStyle(document.documentElement);
         const accent = cs.getPropertyValue('--hkm-accent').trim() || '#8b7cff';
-        const accentSoft = cs.getPropertyValue('--hkm-accent-soft').trim() || '#a78bfa';
 
         const [mapLat, mapLon] = coord;
 
@@ -179,14 +178,23 @@ export function CinemaMapDialog({
         retryTilesRef.current = () => tiles.redraw();
         tiles.addTo(map);
 
+        // Two layers keep the cinema location legible against both light and dark tiles.
         L.circleMarker([mapLat, mapLon], {
-          radius: 8,
-          // ★ 颜色从 CSS 变量现读，不写死：标记色应与当前主题的强调色一致
-          //   （浅色主题下 #8b7cff 在亮色地图上偏淡）。变量缺失时回退到原紫。
-          color: accentSoft,
-          weight: 3,
+          radius: 17,
+          className: 'hkm-map-marker-halo',
+          color: accent,
+          weight: 1.5,
+          opacity: 0.72,
           fillColor: accent,
-          fillOpacity: 0.9,
+          fillOpacity: 0.2,
+        }).addTo(map);
+        L.circleMarker([mapLat, mapLon], {
+          radius: 7,
+          className: 'hkm-map-marker-core',
+          color: '#ffffff',
+          weight: 2,
+          fillColor: accent,
+          fillOpacity: 0.98,
         }).addTo(map);
 
         // 容器在彈層動畫中尺寸可能未定，強制量一次
