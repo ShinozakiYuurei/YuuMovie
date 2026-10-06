@@ -64,11 +64,10 @@ export function mapTileUrl(coords: TileCoords, attempt = 0): string {
  * 深色主題的瓦片濾鏡
  *
  * ★ 為什麼是這組參數（2026-09-30 以旺角 z16 九宮格實拍比對 A/B/C/D 四組）：
- *   invert(1) hue-rotate(180deg) 是通用「亮色地圖 → 深色地圖」手法：
- *   色相反轉兩次回到原色相（米白底 → 近黑、街道線 → 亮線），
- *   再把亮度與飽和度壓一點，避免反轉後的白字刺眼、綠地變螢光。
- *   純 invert 的對照組（A）飽和度過高、水體過藍，B 這組最接近
- *   Esri 官方深色底圖的觀感，且文字（中文標註）仍清晰可讀。
+ *   先反相再旋轉色相，把米白底轉成 Google Maps 相近的深藍灰，
+ *   同時讓道路與中文標註維持清晰的灰藍／白色。亮度、對比度和飽和度
+ *   都略微壓低，避免反相後的底色刺眼、綠地變螢光；這組參數比單純
+ *   brightness 更接近 Google 深色地圖的層次。
  *
  * ★ 為什麼放在瓦片層而不是整個地圖容器：
  *   標記（circleMarker）與縮放控件是 SVG/HTML，跟瓦片同一個 pane 之下；
@@ -76,14 +75,14 @@ export function mapTileUrl(coords: TileCoords, attempt = 0): string {
  *   掛在每張 tile 上則只有底圖被轉換，標記保持原色。
  */
 export const DARK_TILE_FILTER =
-  'brightness(0.34) saturate(0.72) contrast(1.16)';
+  'invert(1) hue-rotate(180deg) brightness(0.72) contrast(0.92) saturate(0.72)';
 
 export function createMapTile(coords: TileCoords, done: TileDone, style: MapTileStyle = 'street'): {
   tile: HTMLDivElement;
   cancel: () => void;
 } {
   const tile = document.createElement('div');
-  tile.style.backgroundColor = style === 'dark' ? '#101214' : 'transparent';
+  tile.style.backgroundColor = style === 'dark' ? '#202124' : 'transparent';
   if (style === 'dark') tile.style.filter = DARK_TILE_FILTER;
   let settled = false;
   let started = 0;
