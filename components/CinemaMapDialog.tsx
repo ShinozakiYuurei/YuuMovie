@@ -133,9 +133,7 @@ export function CinemaMapDialog({
           && document.documentElement.dataset.theme !== 'pink';
         const tileStyle: MapTileStyle = isDark ? 'dark' : 'street';
 
-        // 标记色跟随当前主题（见下方 circleMarker 的注释）
-        const cs = getComputedStyle(document.documentElement);
-        const accent = cs.getPropertyValue('--hkm-accent').trim() || '#8b7cff';
+        const markerBlue = '#4285f4';
 
         const [mapLat, mapLon] = coord;
 
@@ -182,10 +180,10 @@ export function CinemaMapDialog({
         L.circleMarker([mapLat, mapLon], {
           radius: 17,
           className: 'hkm-map-marker-halo',
-          color: accent,
+          color: markerBlue,
           weight: 1.5,
           opacity: 0.72,
-          fillColor: accent,
+          fillColor: markerBlue,
           fillOpacity: 0.2,
         }).addTo(map);
         L.circleMarker([mapLat, mapLon], {
@@ -193,7 +191,7 @@ export function CinemaMapDialog({
           className: 'hkm-map-marker-core',
           color: '#ffffff',
           weight: 2,
-          fillColor: accent,
+          fillColor: markerBlue,
           fillOpacity: 0.98,
         }).addTo(map);
 
