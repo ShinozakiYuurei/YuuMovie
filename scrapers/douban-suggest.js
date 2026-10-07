@@ -22,6 +22,9 @@ const UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 const SUGGEST = 'https://www.douban.com/j/search_suggest';
+const REXAR = 'https://m.douban.com/rexxar/api/v2/movie/';
+const UA_MOBILE =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
 
 /**
  * 只接受豆瓣「电影」条目（按 URL 域过滤）
@@ -39,6 +42,45 @@ export function isMovieSubjectUrl(url) {
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * 按豆瓣条目 ID 直接取分（移动端 rexxar 接口）
+ *
+ * ★ 为什么单独开这条通道（2026-10-08）
+ *   网页端 search_suggest 与移动端 rexxar 是**两套独立的限流桶**，
+ *   实测网页端被限流时 rexxar 仍可用（反之亦然）。已识别的条目
+ *   （有 doubanId）根本不需要重新搜索片名 —— 每小时全量重搜是
+ *   限流的根因。按 ID 取分把「上百部有 ID 条目」的搜索量降到 0。
+ *
+ *   robots 口径：m.douban.com/robots.txt 只禁 notification_chart 与
+ *   market 两个端点，本接口不在禁止列表内（与 www 的 /j/ 不同）。
+ *
+ * @returns {Promise<{rating:number|null, count:number|null, title:string|null, year:string|null}|null>}
+ *   null = 请求失败或被限流（调用方不应据此落盘）
+ */
+export async function doubanSubjectById(id, opt = {}) {
+  if (!id) return null;
+  const res = await fetch(REXAR + encodeURIComponent(id), {
+    headers: {
+      'user-agent': UA_MOBILE,
+      referer: 'https://m.douban.com/',
+      accept: 'application/json',
+    },
+    signal: AbortSignal.timeout(opt.timeoutMs || 12000),
+  }).catch(() => null);
+  if (!res || !res.ok) return null;
+  const j = await res.json().catch(() => null);
+  if (!j) return null;
+  // 限流/未登录响应带 code + msg（subject_ip_rate_limit / need_login），无 title
+  if (j.code || !j.title) return null;
+  const r = j.rating || null;
+  return {
+    rating: r && r.value != null ? Number(r.value) : null,
+    count: r && r.count != null ? Number(r.count) : null,
+    title: j.title || null,
+    year: j.year || null,
+  };
+}
 
 /**
  * 搜索建议

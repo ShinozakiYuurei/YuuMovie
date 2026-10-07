@@ -31,7 +31,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { enrichKey } from '../lib/enrich-key.js';
-import { isMovieSubjectUrl, parseDoubanCard, resolveDouban, stripFormatBrands } from './douban-suggest.js';
+import { doubanSubjectById, isMovieSubjectUrl, parseDoubanCard, resolveDouban, stripFormatBrands } from './douban-suggest.js';
 import { imdbRatings, imdbUrl, isReissueEvidence, matchesDoubanYear, resolveImdbIds } from './imdb.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -281,6 +281,8 @@ async function main() {
   // 不搜索、不写缺席，等下一轮接口恢复后自然重试。
   let doubanDegraded = false;
   let doubanDone = 0;
+  let byIdFails = 0;
+  let byIdDegraded = false;
   if (!NO_DUBAN && !DRY) {
     try {
       const probe = await resolveDouban({ zh: '阿凡達', en: 'Avatar', year: null });
@@ -353,10 +355,35 @@ async function main() {
       const dAt = row.douban?.at ? Date.parse(row.douban.at) : 0;
       const dFresh = row.douban && !row.douban.notFound && now - dAt <= DUBAN_REFRESH_DAYS * 864e5;
       const dRetry = row.douban?.notFound && now - dAt <= 7 * 864e5;
-      // 每小时强制刷新：已识别的条目重刷分数，没有记录的条目发起搜索，
-      // 缺席记录已过 7 天冷却的也重试一次；仍在新冷却期内的不重搜。
-      if (
-        (FORCE_REFRESH && (row.douban?.doubanId || !row.douban || !dRetry)) ||
+      // ★ 已识别条目（有 doubanId）：按 ID 轻量刷新，不重新搜索片名。
+      //   搜索端点是限流重灾区，而按 ID 走移动端 rexxar 独立限流桶，
+      //   把每小时的搜索量从「全部条目」降到「只有未匹配的」。
+      if (FORCE_REFRESH && row.douban?.doubanId && !byIdDegraded) {
+        try {
+          const got = await doubanSubjectById(row.douban.doubanId);
+          if (got) {
+            byIdFails = 0;
+            // 只在拿到分时覆盖；null 保持原状态（分数极少消失，不冒清零风险）
+            if (got.rating != null) {
+              row.douban.rating = got.rating;
+              row.douban.ratingState = 'rated';
+              dbHits++;
+            }
+            row.douban.at = new Date().toISOString();
+          } else {
+            byIdFails++;
+            if (byIdFails >= 5) {
+              byIdDegraded = true;
+              log('  ⚠️ 豆瓣按 ID 刷新连续失败（疑似限流），本轮余下条目跳过按 ID 刷新');
+            }
+          }
+        } catch (e) {
+          log('  ⚠️ 豆瓣按 ID 刷新失败: ' + (p.nameZh || p.nameEn));
+        }
+        await sleep(jitter(250, 450));
+      } else if (
+        // 未识别条目：搜索（量小，且受限流探针保护）。
+        (FORCE_REFRESH && (!row.douban || !dRetry)) ||
         (!FORCE_REFRESH && !dFresh && !dRetry)
       ) {
         try {
