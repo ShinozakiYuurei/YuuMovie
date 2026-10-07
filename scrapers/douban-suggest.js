@@ -23,6 +23,21 @@ const UA =
 
 const SUGGEST = 'https://www.douban.com/j/search_suggest';
 
+/**
+ * 只接受豆瓣「电影」条目（按 URL 域过滤）
+ *
+ * search_suggest 是全站搜索：同一串字可能返回书（book.douban.com）或
+ * 音乐（music.douban.com）条目。它们在电影语境下都是错配 —— 实测
+ * 《天鵝湖》拿回音乐专辑 9.5 分、《巴黎聖母院》拿回小说 9.0 分，
+ * 页面显示分数、链接却只能回退到搜索（两处口径打架）。
+ */
+const MOVIE_SUBJECT_PREFIX = 'https://movie.douban.com/subject/';
+const DIGITS_RE = /^[0-9]+/;
+
+export function isMovieSubjectUrl(url) {
+  return Boolean(url) && url.indexOf(MOVIE_SUBJECT_PREFIX) === 0 && DIGITS_RE.test(url.slice(MOVIE_SUBJECT_PREFIX.length));
+}
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
@@ -44,7 +59,7 @@ export async function doubanSuggest(q, opt = {}) {
   const j = await res.json().catch(() => null);
   const cards = Array.isArray(j?.cards) ? j.cards : [];
   return cards
-    .filter((c) => c && c.title)
+    .filter((c) => c && c.title && isMovieSubjectUrl((c.url || '').split('?')[0]))
     .map((c) => ({
       title: String(c.title).trim(),
       year: c.year ? String(c.year).trim() : null,

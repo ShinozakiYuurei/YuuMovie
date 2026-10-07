@@ -31,7 +31,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { enrichKey } from '../lib/enrich-key.js';
-import { parseDoubanCard, resolveDouban, stripFormatBrands } from './douban-suggest.js';
+import { isMovieSubjectUrl, parseDoubanCard, resolveDouban, stripFormatBrands } from './douban-suggest.js';
 import { imdbRatings, imdbUrl, isReissueEvidence, matchesDoubanYear, resolveImdbIds } from './imdb.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -346,7 +346,11 @@ async function main() {
               row.douban.ratingState = 'rated';
             }
             if (parsed.rating != null) dbHits++;
-          } else if (!row.douban || row.douban.notFound) {
+          } else if (
+            !row.douban ||
+            row.douban.notFound ||
+            !isMovieSubjectUrl(row.douban.doubanUrl)
+          ) {
             row.douban = { notFound: true, at: new Date().toISOString() };
           }
         } catch (e) {
