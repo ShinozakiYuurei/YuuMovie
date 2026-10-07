@@ -126,8 +126,14 @@ export function parseDoubanCard(card) {
   return out;
 }
 
-/** 括号类装饰（院线自己加的场次/版本/特典说明） */
-const PAREN_RE = /[（(〔[【{「『《][^）)〕\]】}」』》]*[）)〕\]】}」』》]/g;
+/**
+ * 括号类装饰（院线自己加的场次/版本/特典说明）
+ *
+ * ★ 《》不在其中（2026-10-08）：书名号包住的往往就是真片名，
+ *   「《這個殺手不太冷》(4K導演版)」连片名一起删会洗成空串，
+ *   douban 搜索直接废掉。书名号交给 cleanTitle 末尾的 replace 拆成空格。
+ */
+const PAREN_RE = /[（(〔[【{「『][^）)〕\]】}」』]*[）)〕\]】}」』]/g;
 
 /**
  * 尾部噪声：特典名、场次说明、上映年份区间
@@ -136,7 +142,7 @@ const PAREN_RE = /[（(〔[【{「『《][^）)〕\]】}」』》]*[）)〕\]】
  * 例：「…人魚島的秘密 Hi Bye Meet & Greet 見面場」剔掉尾部后才是真片名。
  */
 const TAIL_NOISE_RE =
-  /(?:\s+(?:Hi\s+Bye|Meet\s*&?\s*Greet|見面場|特典場|特典|加碼|加場|優先場|優先|場次|見面會|安可|重映|encore|screener|fandub|dubbed|subbed))+|\s+\d{4}\s*[–—-]\s*\d{2,4}\b|\s+(?:NT\s*Live|The\s*Met|Royal\s*Ballet|GFF|HKIFF)\b.*$/gi;
+  /(?:\s+(?:Hi\s+Bye|Meet\s*&?\s*Greet|見面場|特典場|特典|加碼|加場|優先場|優先|場次|見面會|安可|重映|encore|screener|fandub|dubbed|subbed|導演映後分享場|映後分享場|映後分享|電影分享會|分享會|應援場))+|\s+\d{4}\s*[–—-]\s*\d{2,4}\b|\s+(?:NT\s*Live|The\s*Met|Royal\s*Ballet|GFF|HKIFF)\b.*$/gi;
 
 /** 放映格式品牌词（搜索查询专用）
  *
@@ -181,13 +187,29 @@ export function stripFormatBrands(s) {
     .trim();
 }
 
+/**
+ * 取「《…》」里的片名（院线把真片名放进书名号时用）
+ *
+ * 例：「《空槍》T-Shirt特典場」→「空槍」；「《我阿爹想旅行》行得㗎啦見面場」
+ * →「我阿爹想旅行」。整体名带装饰时 douban 搜不到，剥干净又可能把
+ * 片名一起剥没，所以单独备一份候选。
+ */
+export function bracketTitle(s) {
+  const m = /《([^》]+)》/.exec(s || '');
+  return m ? m[1].trim() : '';
+}
+
 /** 去掉院线片名里的装饰：括号标记、【】、书名号、尾部噪声、多余空白 */
 export function cleanTitle(s) {
   let out = (s || '').replace(PAREN_RE, ' ');
   // 括号可能嵌套/连续，清两遍才能清干净
   out = out.replace(PAREN_RE, ' ');
   out = out.replace(TAIL_NOISE_RE, ' ');
-  return out.replace(/[《》]/g, ' ').replace(/\s+/g, ' ').trim();
+  return out
+    .replace(/[《》]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/[\s\-–—]+$/, '')
+    .trim();
 }
 
 /**
@@ -240,8 +262,17 @@ export async function resolveDouban(movie, opt = {}) {
     return s.split(/\s+/).filter(Boolean).length >= 2;
   };
 
+  // 《》里的片名单独作候选：2 个汉字（「空槍」）就够，比通用清洗更宽，
+  // 但仍挡住单字（「M (GFF)」洗出「M」会拿回一堆不相干条目）。
+  const zhBracket = bracketTitle(zh);
+  const bracketOk = (t) => {
+    const cjk = (t.match(/[\u3040-\u30ff\u4e00-\u9fff]/g) || []).length;
+    if (cjk) return cjk >= 2;
+    return t.split(/\s+/).filter(Boolean).length >= 2;
+  };
   const cand = [
     { q: zh, needLong: false },
+    { q: zhBracket, needLong: false, shortOk: true },
     { q: zhClean === zh ? '' : zhClean, needLong: true },
     { q: en, needLong: true },
     { q: enClean === en ? '' : enClean, needLong: true },
@@ -250,6 +281,7 @@ export async function resolveDouban(movie, opt = {}) {
   for (const x of cand) {
     if (!x.q) continue;
     if (x.needLong && !longEnough(x.q)) continue;
+    if (x.shortOk && !bracketOk(x.q)) continue;
     if (queries.includes(x.q)) continue;
     queries.push(x.q);
   }

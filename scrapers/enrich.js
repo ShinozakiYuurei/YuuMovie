@@ -87,6 +87,7 @@ const yearOf = (d) => {
 const cleanTitle = (s) =>
   (s || '')
     .replace(/[（(〔[【{「『][^）)〕\]】}」』]*[）)〕\]】}」』]/g, ' ')
+    .replace(/[《》]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -248,7 +249,7 @@ async function main() {
     todo = todo.filter((p) => ONLY.some((s) => p.key.includes(enrichKey(s)) || p.key.includes(s.toLowerCase())));
   }
   // FORCE_REFRESH 除了刷已识别的行，还要抓两类：完全没有记录的新上映影片，
-  // 以及只有缺席记录且已过 7 天重试冷却的行；任一侧还在冷却期的不重搜，
+  // 以及只有缺席记录且已过 7 天重试冷却的行；每一侧各自按自己的冷却判断，
   // 避免每小时对老缺席片反复搜索。
   let work = FORCE_REFRESH
     ? todo.filter((p) => {
@@ -259,7 +260,7 @@ async function main() {
           row.imdb?.notFound && row.updatedAt && now - Date.parse(row.updatedAt) <= 7 * 864e5;
         const doubanCooled =
           row.douban?.notFound && row.douban.at && now - Date.parse(row.douban.at) <= 7 * 864e5;
-        return !imdbCooled && !doubanCooled;
+        return !imdbCooled || !doubanCooled;
       })
     : todo.filter((p) => needsWork(entries[p.key], now));
   // DUBAN_ONLY：IMDb 已经新，不想重跑那 212 次搜索，只补豆瓣
@@ -323,10 +324,10 @@ async function main() {
       const dAt = row.douban?.at ? Date.parse(row.douban.at) : 0;
       const dFresh = row.douban && !row.douban.notFound && now - dAt <= DUBAN_REFRESH_DAYS * 864e5;
       const dRetry = row.douban?.notFound && now - dAt <= 7 * 864e5;
-      // 每小时强制刷新只查询已识别的豆瓣条目；无 ID 的影片沿用普通增量周期，
-      // 避免反复搜索尚未上映/未匹配的片名。
+      // 每小时强制刷新：已识别的条目重刷分数，没有记录的条目发起搜索，
+      // 缺席记录已过 7 天冷却的也重试一次；仍在新冷却期内的不重搜。
       if (
-        (FORCE_REFRESH && (row.douban?.doubanId || !row.douban)) ||
+        (FORCE_REFRESH && (row.douban?.doubanId || !row.douban || !dRetry)) ||
         (!FORCE_REFRESH && !dFresh && !dRetry)
       ) {
         try {
