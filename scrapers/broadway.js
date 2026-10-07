@@ -14,6 +14,19 @@
 
 export const BASE = 'https://www.cinema.com.hk';
 export const SOURCE = 'broadway';
+/**
+ * 院线英文名笔误校正表：key 为院线返回的英文名原样。
+ * 「Evangelion: 3.33」是日本影碟编号，官方英文标题是 3.0
+ * （enrich.json 里 IMDb 标题同样是 3.0，两处不一致会直接展示给用户）。
+ */
+const CORRECTED_ENGLISH_TITLES = new Map([
+  ['Evangelion: 3.33 You Can (Not) Redo', 'Evangelion: 3.0 You Can (Not) Redo'],
+]);
+
+// 院线英文名先过校正表，命中即替换。
+function correctedEn(en) {
+  return CORRECTED_ENGLISH_TITLES.get(en) ?? en;
+}
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -318,7 +331,7 @@ export function parseUpcomingHtml(html) {
   return list.map((m) => {
     const lang = langField(records, m.name_lang);
     const zh = lang.zh_hk || '';
-    const en = lang.en || m.name || '';
+    const en = correctedEn(lang.en || m.name || '');
     const desc = langField(records, m.description_lang);
     return {
       id: `${SOURCE}-${m.id}`,
@@ -427,9 +440,9 @@ async function scrapeMovieDetail(id) {
   const dl = langField(recs, movie.description_lang);
   return {
     id: `${SOURCE}-${id}`,
-    slug: slugify(lang.zh_hk, lang.en, id),
+    slug: slugify(lang.zh_hk, correctedEn(lang.en), id),
     nameZh: lang.zh_hk || '',
-    nameEn: lang.en || movie.name || '',
+    nameEn: correctedEn(lang.en || movie.name || ''),
     openingDate: hktDate(movie.openingDate),
     duration: movie.duration ?? null,
     category: movie.category ?? null,
@@ -562,7 +575,7 @@ export async function scrapeBroadway({ withDetails = true, concurrency = 3 } = {
         return {
           ...detail,
           nameZh: langField(ticketingRecords, m?.name_lang).zh_hk || detail.nameZh,
-          nameEn: langField(ticketingRecords, m?.name_lang).en || detail.nameEn,
+          nameEn: correctedEn(langField(ticketingRecords, m?.name_lang).en || detail.nameEn),
           openingDate: hktDate(m?.openingDate) || detail.openingDate,
         };
       }
@@ -570,9 +583,9 @@ export async function scrapeBroadway({ withDetails = true, concurrency = 3 } = {
       const lang = langField(ticketingRecords, m?.name_lang);
       return {
         id: `${SOURCE}-${mid}`,
-        slug: slugify(lang.zh_hk, lang.en, mid),
+        slug: slugify(lang.zh_hk, correctedEn(lang.en), mid),
         nameZh: lang.zh_hk || '',
-        nameEn: lang.en || m?.name || '',
+        nameEn: correctedEn(lang.en || m?.name || ''),
         openingDate: hktDate(m?.openingDate),
         duration: m?.duration ?? null,
         category: m?.category ?? null,
@@ -598,7 +611,7 @@ export async function scrapeBroadway({ withDetails = true, concurrency = 3 } = {
         id: `${SOURCE}-${mid}`,
         slug: slugify(lang.zh_hk, lang.en, mid),
         nameZh: lang.zh_hk || '',
-        nameEn: lang.en || m?.name || '',
+        nameEn: correctedEn(lang.en || m?.name || ''),
         openingDate: hktDate(m?.openingDate),
         duration: m?.duration ?? null,
         category: m?.category ?? null,
