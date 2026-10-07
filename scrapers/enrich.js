@@ -351,11 +351,12 @@ async function main() {
       }
       doubanDone++;
     }
-    if (!NO_DUBAN && !doubanDegraded) {
+    if (!NO_DUBAN) {
       const dAt = row.douban?.at ? Date.parse(row.douban.at) : 0;
       const dFresh = row.douban && !row.douban.notFound && now - dAt <= DUBAN_REFRESH_DAYS * 864e5;
       const dRetry = row.douban?.notFound && now - dAt <= 7 * 864e5;
       // ★ 已识别条目（有 doubanId）：按 ID 轻量刷新，不重新搜索片名。
+      //   （走 rexxar 独立桶，即使网页端搜索被限流也照常刷新。）
       //   搜索端点是限流重灾区，而按 ID 走移动端 rexxar 独立限流桶，
       //   把每小时的搜索量从「全部条目」降到「只有未匹配的」。
       if (FORCE_REFRESH && row.douban?.doubanId && !byIdDegraded) {
@@ -385,8 +386,11 @@ async function main() {
         // 未识别条目：搜索（量小，且受限流探针保护）。
         // ★ 已识别条目（有 doubanId）绝不走这里：by-ID 降级时宁可保持
         //   旧数据，也不能回退到搜索 —— 那正是限流的来源。
-        (FORCE_REFRESH && !row.douban?.doubanId && (!row.douban || !dRetry)) ||
-        (!FORCE_REFRESH && !dFresh && !dRetry && !row.douban?.doubanId)
+        // ★ 探针（网页端）失败只挡搜索：by-ID 走移动端 rexxar，是独立限流桶，
+        //   网页端被限时它常常仍可用（2026-10-08 实测）。
+        !doubanDegraded &&
+          ((FORCE_REFRESH && !row.douban?.doubanId && (!row.douban || !dRetry)) ||
+            (!FORCE_REFRESH && !dFresh && !dRetry && !row.douban?.doubanId))
       ) {
         try {
           const previousDouban = row.douban;

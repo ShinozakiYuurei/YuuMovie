@@ -340,30 +340,44 @@ export async function resolveDouban(movie, opt = {}) {
   //   会让整条查询落空 ——「復仇者聯盟4：終局之戰 加碼」能命中，
   //   加上「重映」就返回空。所以给每个查询再备「去掉尾部/头部若干词元」的写法。
   //
-  //   ★ 只剪「事件/版本/格式词」构成的片段（同日二修）：早一版无条件从尾部截词，
-  //   把《GIANT – The Play》剪成「GIANT – The」、把《Fallen Angels by Noël Coward》
-  //   剪成「Fallen Angels」，拿回同名却毫不相干的条目 —— 错配比缺数据严，
-  //   所以剪下的片段必须整体由事件/格式词、连接词、数字或分隔符组成，
-  //   且剪完的候选剥掉这些词后还要剩「片名主体」。
+  //   ★ 只剪「事件/版本/格式词」构成的整块（同日四修）：
+  //   - 早一版无条件从尾部截词，把《GIANT – The Play》剪成「GIANT – The」、
+  //     《Fallen Angels by Noël Coward》剪成「Fallen Angels」，拿回同名却毫不
+  //     相干的条目 —— 错配比缺数据严，所以被剪掉的整块必须由事件/格式词、
+  //     连接词、数字或分隔符构成；
+  //   - 逐词判断挡不住跨词短语（「LIVE VIEWING」「Infinity Vision開畫日特典首場」），
+  //     又容易把「末日降臨開畫日特典首場」这种片名+事件词粘连串误判成可剪，
+  //     所以改为对整块剥离后判空；
+  //   - 切点要遍历到底（不是撞到一块不纯就停）：尾部「Vision開畫日特典首場」
+  //     不纯，但再往前一块「Infinity Vision開畫日特典首場」是纯的；
+  //   - 括号不配对的候选直接丢（「天鵝湖 (The」会拿回挪威版芭蕾条目）。
   const TRIM_WORDS_RE =
-    /(?:導演映後分享場|映後分享場|映後分享|電影分享會|分享會|現場直播|特別放映|特別加映|特別版|紀念放映|馬拉松|千秋樂|連映|應援場|應援|謝票場|謝票|見面場|見面會|首映場|優先場|優先購票|開畫日|首場|加場|加碼|安可|重映|encore|screener|fandub|dubbed|subbed|特典場|特典|畫冊|杯墊|限定|修復版|菲林版|數位版|日語版|粵語版|國語版|英語版|原聲版|劇場版|live\s+viewing|imax\s+with\s+laser|infinity\s+vision|imax|4dx|screenx|mx4d|cgs|luxe|dolby|atmos|cinity|dubox|dbox|laser|35mm|16mm|70mm|4k|2k|nt\s+live|the\s+met|royal\s+ballet|gff|hkjff|hklgff|hkiff|bc30|bcsunday|kino)/i;
+    /(?:導演映後分享場|映後分享場|映後分享|電影分享會|分享會|見面場|見面會|現場直播|特別放映|特別加映|特別版|紀念放映|馬拉松|千秋樂|連映|應援場|應援|謝票場|謝票|首映場|優先場|優先購票|開畫日|首場|加場|加碼|安可|重映|encore|screener|fandub|dubbed|subbed|特典場|特典|畫冊|杯墊|限定|修復版|菲林版|數位版|日語版|粵語版|國語版|英語版|原聲版|劇場版|hi\s+bye|meet\s*&?\s*greet|live\s+viewing|special\s+screening|special\s+viewing|imax\s+with\s+laser|infinity\s+vision|imax|4dx|screenx|mx4d|cgs|luxe|dolby|atmos|cinity|dubox|dbox|laser|35mm|16mm|70mm|4k|2k|nt\s+live|the\s+met|royal\s+ballet|gff|hkjff|hklgff|hkiff|bc30|bcsunday|kino)/i;
   const TRIM_STRIP_RE = new RegExp(TRIM_WORDS_RE.source, 'gi');
-  const TRIM_GLUE_RE = /^(?:with|and|&|x|×|\+|-|–|—|·|\||:)$/i;
   const isTrimChunk = (chunk) => {
     if (!chunk.trim()) return true;
-    const tokens = chunk.split(/\s+/).filter(Boolean);
-    return tokens.every((t) => {
-      if (TRIM_GLUE_RE.test(t)) return true;
-      if (/^[\d\-–—·|:：x×()（）\[\]【】«»≪≫]+$/i.test(t)) return true;
-      if (!TRIM_WORDS_RE.test(t)) return false;
-      // ★ 纯词要求：剥掉事件/版本词后不能再剩片名主体。
-      //   CJK 无空格分词时，“末日降臨開畫日特典首場”这类串
-      //   会因含“開畫日”而被 test() 误判为可剪，把片名一起剪掉。
-      const rest = t
-        .replace(TRIM_STRIP_RE, '')
-        .replace(/[\s\-–—·|:：x×()（）\[\]【】«»≪≫]+/gi, '');
-      return rest.length === 0;
-    });
+    const rest = chunk
+      .replace(TRIM_STRIP_RE, '')
+      .replace(/\b(?:with|and)\b/gi, '')
+      .replace(/[\s\-–—·|:：x×+()（）\[\]【】《》〈〉「」『』«»≪≫&\d]+/gi, '');
+    return rest.length === 0;
+  };
+  const BRACKET_PAIRS = [
+    ['(', ')'],
+    ['（', '）'],
+    ['[', ']'],
+    ['【', '】'],
+    ['《', '》'],
+    ['「', '」'],
+    ['『', '』'],
+    ['«', '»'],
+    ['≪', '≫'],
+  ];
+  const balancedBrackets = (s) => {
+    for (const [a, b] of BRACKET_PAIRS) {
+      if (s.split(a).length !== s.split(b).length) return false;
+    }
+    return true;
   };
   const shrinkOk = (s) => {
     if (!s) return false;
@@ -393,22 +407,38 @@ export async function resolveDouban(movie, opt = {}) {
       const collapsed = v.replace(/([:：])\s+/g, '$1');
       const forms = collapsed === v ? [v] : [v, collapsed];
       for (const w of forms) {
-        if (w && w !== q && !out.includes(w) && shrinkOk(w)) out.push(w);
+        if (!w || w === q || out.includes(w)) continue;
+        if (!balancedBrackets(w) || !shrinkOk(w)) continue;
+        out.push(w);
       }
     }
   };
   const shrinkQueries = (q) => {
     const parts = q.split(/\s+/).filter(Boolean);
     const out = [];
-    // 去尾：保留前 n 个词元，剪掉的片段必须全部是事件/格式词（从长到短）
-    for (let n = parts.length - 1; n >= 1; n--) {
-      if (!isTrimChunk(parts.slice(n).join(' '))) break;
-      pushCand(out, parts.slice(0, n).join(' '), q);
+    // 去尾：保留前 i 个词元；被剪掉的尾部整块必须是事件/格式词
+    for (let i = parts.length - 1; i >= 1; i--) {
+      if (!isTrimChunk(parts.slice(i).join(' '))) continue;
+      pushCand(out, parts.slice(0, i).join(' '), q);
     }
-    // 去头：保留后 n 个词元（事件词在头部的情形：開畫日特典首場 / 日語版 / 35mm 菲林版）
-    for (let n = 1; n < parts.length; n++) {
-      if (!isTrimChunk(parts.slice(0, n).join(' '))) break;
-      pushCand(out, parts.slice(n).join(' '), q);
+    // 去头：保留后 n 个词元（事件词在头部：開畫日特典首場 / 日語版 / 35mm 菲林版）
+    for (let i = 1; i < parts.length; i++) {
+      if (!isTrimChunk(parts.slice(0, i).join(' '))) continue;
+      pushCand(out, parts.slice(i).join(' '), q);
+    }
+    // ★ 粘连 token：事件词与片名无空格相连（「末日降臨開畫日特典首場」）。
+    //   取「最长纯事件词后缀」剥掉后的前缀作候选，前缀本身仍要过 shrinkOk
+    //   （「重映開畫日特典首場」剥出「重映」会被 shrinkOk 挡掉）。
+    for (let t = 0; t < parts.length; t++) {
+      const tok = parts[t];
+      if (isTrimChunk(tok)) continue;
+      for (let st = 1; st < tok.length; st++) {
+        if (!isTrimChunk(tok.slice(st))) continue;
+        const next = [...parts];
+        next[t] = tok.slice(0, st);
+        pushCand(out, next.join(' '), q);
+        break;
+      }
     }
     return out;
   };
@@ -416,6 +446,30 @@ export async function resolveDouban(movie, opt = {}) {
   // ★ 基础查询（原片名/清洗名/英文名）先全部占位，缩短候选只填剩余名额 ——
   //   否则长片名的去尾候选可能把英文名挤出候选表。
   const expanded = [];
+  for (const q of queries) {
+    if (!expanded.includes(q)) expanded.push(q);
+  }
+  outer: for (const q of queries) {
+    for (const alt of shrinkQueries(q)) {
+      if (!expanded.includes(alt)) expanded.push(alt);
+      if (expanded.length >= 12) break outer;
+    }
+  }
+  queries.length = 0;
+  queries.push(...expanded);
+
+  for (const q of queries) {
+    if (!expanded.includes(q)) expanded.push(q);
+  }
+  outer: for (const q of queries) {
+    for (const alt of shrinkQueries(q)) {
+      if (!expanded.includes(alt)) expanded.push(alt);
+      if (expanded.length >= 12) break outer;
+    }
+  }
+  queries.length = 0;
+  queries.push(...expanded);
+
   for (const q of queries) {
     if (!expanded.includes(q)) expanded.push(q);
   }
