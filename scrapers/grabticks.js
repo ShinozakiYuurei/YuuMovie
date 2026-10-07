@@ -1,6 +1,20 @@
 import { buildRecordMap, langField } from './broadway.js';
 
 const HKT_OFFSET_MS = 8 * 60 * 60 * 1000;
+/**
+ * 院线英文名笔误校正表：key 为院线返回的英文名原样。
+ * CineArt 的「序」写的是日本影碟版编号 1.11（官方英文标题是影院版 1.0），
+ * 与 broadway.js 的校正表同一类问题（那边四部曲都有，见其注释）。
+ */
+const CORRECTED_ENGLISH_TITLES = new Map([
+  ['Evangelion: 1.11 You Are (Not) Alone.', 'Evangelion: 1.0 You Are (Not) Alone'],
+  ['Evangelion: 1.11 You Are (Not) Alone', 'Evangelion: 1.0 You Are (Not) Alone'],
+]);
+
+function correctedEn(en) {
+  return CORRECTED_ENGLISH_TITLES.get(en) ?? en;
+}
+
 const CHANNELS = { cgv: { base: 'https://cgv.com.hk', route: 'zh' }, cineart: { base: 'https://cinearthouse.com.hk', route: 'hk' } };
 async function fetchText(url) {
   let lastError;
@@ -119,7 +133,7 @@ function normalizeGrabTicks(source, raw, cfg) {
       id: source + '-' + movie.id,
       slug: '',
       nameZh: grabLang(records, movie.name_lang || movie.title_lang || movie.name) || movie.title || movie.name || '',
-      nameEn: grabLang(records, movie.name_lang || movie.title_lang || movie.name, 'en') || movie.title || movie.name || '',
+      nameEn: correctedEn(grabLang(records, movie.name_lang || movie.title_lang || movie.name, 'en') || movie.title || movie.name || ''),
       openingDate,
       duration: Number(movie.duration) || null,
       category: movie.category || null,

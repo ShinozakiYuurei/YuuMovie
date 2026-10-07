@@ -21,19 +21,29 @@
  * 跑法：node_modules/.bin/tsx probe/check-slug-redirects.mts
  */
 import { getAllMovies, getMovieGroups } from '../lib/data.ts';
-import { computeRedirects, type GroupSource, type SlugSource } from '../scripts/gen-slug-redirects.mts';
+import {
+  computeRedirects,
+  renamedRedirects,
+  RENAMED_SLUGS,
+  type GroupSource,
+  type SlugSource,
+} from '../scripts/gen-slug-redirects.mts';
 
 const movies = getAllMovies();
 const groups = getMovieGroups();
 
-const entries = computeRedirects(movies as SlugSource[], groups as unknown as GroupSource[]);
+const derived = computeRedirects(movies as SlugSource[], groups as unknown as GroupSource[]);
+const legacy = renamedRedirects(groups as unknown as GroupSource[]);
+const entries = [...derived, ...legacy].sort((a, b) => a.from.localeCompare(b.from));
 const canonicalSlugs = new Set(groups.map((g) => g.slug));
 const knownSlugs = new Set(movies.map((m) => m.slug));
+/** 改名遗留地址的 from 不是任何条目 slug（正是它存在的原因），单独放行。 */
+const renamedFroms = new Set(RENAMED_SLUGS.map((r) => r.from));
 
 let bad = 0;
 
 // ---- 1. from 必须是真实存在的条目 slug ----
-const ghost = entries.filter((e) => !knownSlugs.has(e.from));
+const ghost = entries.filter((e) => !knownSlugs.has(e.from) && !renamedFroms.has(e.from));
 for (const e of ghost) {
   console.log(`  ✗ 表里的 from 不是任何条目的 slug：${e.from}（条目 ${e.id}）`);
   bad++;
@@ -69,15 +79,35 @@ for (const s of missing) {
   console.log(`  ✗ 应当重定向却没进表：${s}`);
   bad++;
 }
-const extra = [...got].filter((s) => !expected.has(s));
+const extra = [...got].filter((s) => !expected.has(s) && !renamedFroms.has(s));
 for (const s of extra) {
   console.log(`  ✗ 表里有不该出现的条目：${s}`);
   bad++;
 }
 
+// ---- 5. 改名遗留地址：声明的必须解析出目标；anchor 下画后必须自动退出 ----
+const aliveIds = new Set<string>();
+for (const g of groups) for (const v of g.versions) for (const id of v.movieIds) aliveIds.add(id);
+for (const r of RENAMED_SLUGS) {
+  const hit = entries.find((e) => e.from === r.from);
+  const anchorAlive = aliveIds.has(r.anchorId);
+  if (anchorAlive && !hit) {
+    console.log(`  ✗ 改名遗留地址没进表：${r.from}（anchor ${r.anchorId}）`);
+    bad++;
+  }
+  if (!anchorAlive && hit) {
+    console.log(`  ✗ anchor 已下画，遗留地址却还在表里：${r.from}`);
+    bad++;
+  }
+  if (hit && !canonicalSlugs.has(hit.to)) {
+    console.log(`  ✗ 遗留地址指向不存在的组：${r.from} → ${hit.to}`);
+    bad++;
+  }
+}
+
 console.log(
-  `重定向表：${entries.length} 条 ｜ 组 ${groups.length} ｜ 条目 ${movies.length} ｜ ` +
-    `应有 ${expected.size}`
+  `重定向表：${entries.length} 条（含改名遗留 ${legacy.length}）｜ 组 ${groups.length} ｜ ` +
+    `条目 ${movies.length} ｜ 应有 ${expected.size}`
 );
 if (bad) {
   console.log(`✗ ${bad} 项检查不通过`);

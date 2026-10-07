@@ -123,9 +123,50 @@ export function computeRedirects(movies: SlugSource[], groups: GroupSource[]): R
   return [...seen.values()].sort((a, b) => a.from.localeCompare(b.from));
 }
 
-/** 用当前真实数据算（跑脚本时用） */
+/**
+ * 改名遗留的旧地址（手动维护；每次因改名丢弃旧 slug 时补一行）。
+ *
+ * 为什么必须手写：条目 slug = slugify(nameEn || nameZh) + '-' + id，而
+ * computeRedirects 只覆盖「当前数据里仍然存在的条目 slug」。片名一旦被修正
+ * （例：影碟编号 1.11 → 官方 1.0），旧 slug 就从数据里彻底消失、推导不出来
+ * —— 但它此前是线上真实可访问的地址，不该直接 404。
+ *
+ * anchorId 是旧 slug 原本所属的条目：生成时按它的**当前** canonical 解析目标，
+ * 代表条目换人时目标自动跟着走，不用改这张表；条目下画（不在任何组）时跳过。
+ */
+export const RENAMED_SLUGS: { from: string; anchorId: string; note: string }[] = [
+  { from: 'evangelion-1-11-you-are-not-alone-1290', anchorId: 'broadway-1290', note: '新劇場版 序 1.11 → 1.0' },
+  { from: 'evangelion-2-22-you-can-not-advance-1291', anchorId: 'broadway-1291', note: '新劇場版 破 2.22 → 2.0' },
+  { from: 'evangelion-3-33-you-can-not-redo-1292', anchorId: 'broadway-1292', note: '新劇場版 Q 3.33 → 3.0' },
+  { from: 'evangelion-3-0-1-01-thrice-upon-a-time-1293', anchorId: 'broadway-1293', note: '新劇場版 終 3.0+1.01 → 3.0+1.0' },
+];
+
+/** 解析 RENAMED_SLUGS：目标取 anchor 条目当前所属组的 canonical slug。 */
+export function renamedRedirects(groups: GroupSource[]): RedirectEntry[] {
+  const canonicalSlugs = new Set(groups.map((g) => g.slug));
+  const canonicalOf = new Map<string, string>();
+  for (const g of groups) {
+    for (const v of g.versions) for (const id of v.movieIds) canonicalOf.set(id, g.slug);
+  }
+  const out: RedirectEntry[] = [];
+  for (const r of RENAMED_SLUGS) {
+    const to = canonicalOf.get(r.anchorId);
+    if (!to || r.from === to) continue;
+    if (!ASCII_SLUG_RE.test(r.from)) continue;
+    if (canonicalSlugs.has(r.from)) continue;
+    out.push({ from: r.from, to, id: r.anchorId });
+  }
+  return out;
+}
+
+/** 用当前真实数据算（跑脚本时用）：派生表 + 改名遗留地址。 */
 export function buildRedirects(): RedirectEntry[] {
-  return computeRedirects(getAllMovies() as SlugSource[], getMovieGroups() as unknown as GroupSource[]);
+  const movies = getAllMovies() as SlugSource[];
+  const groups = getMovieGroups() as unknown as GroupSource[];
+  const merged = new Map<string, RedirectEntry>();
+  for (const e of computeRedirects(movies, groups)) merged.set(e.from, e);
+  for (const e of renamedRedirects(groups)) if (!merged.has(e.from)) merged.set(e.from, e);
+  return [...merged.values()].sort((a, b) => a.from.localeCompare(b.from));
 }
 
 /**

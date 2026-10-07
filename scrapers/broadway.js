@@ -16,11 +16,15 @@ export const BASE = 'https://www.cinema.com.hk';
 export const SOURCE = 'broadway';
 /**
  * 院线英文名笔误校正表：key 为院线返回的英文名原样。
- * 「Evangelion: 3.33」是日本影碟编号，官方英文标题是 3.0
- * （enrich.json 里 IMDb 标题同样是 3.0，两处不一致会直接展示给用户）。
+ * 新剧场版四部曲：院线写的是日本影碟版编号（1.11 / 2.22 / 3.33 / 3.0+1.01），
+ * 官方英文标题是影院版编号（1.0 / 2.0 / 3.0 / 3.0+1.0）——enrich.json 里的
+ * IMDb 标题用的正是后者，两处不一致会直接展示给用户（2026-10-07 用户报 3.33）。
  */
 const CORRECTED_ENGLISH_TITLES = new Map([
+  ['Evangelion: 1.11 You Are (Not) Alone', 'Evangelion: 1.0 You Are (Not) Alone'],
+  ['Evangelion: 2.22 You Can (Not) Advance', 'Evangelion: 2.0 You Can (Not) Advance'],
   ['Evangelion: 3.33 You Can (Not) Redo', 'Evangelion: 3.0 You Can (Not) Redo'],
+  ['Evangelion: 3.0+1.01 Thrice Upon A Time', 'Evangelion: 3.0+1.0 Thrice Upon a Time'],
 ]);
 
 // 院线英文名先过校正表，命中即替换。
@@ -609,7 +613,7 @@ export async function scrapeBroadway({ withDetails = true, concurrency = 3 } = {
       const lang = langField(ticketingRecords, m?.name_lang);
       return {
         id: `${SOURCE}-${mid}`,
-        slug: slugify(lang.zh_hk, lang.en, mid),
+        slug: slugify(lang.zh_hk, correctedEn(lang.en), mid),
         nameZh: lang.zh_hk || '',
         nameEn: correctedEn(lang.en || m?.name || ''),
         openingDate: hktDate(m?.openingDate),
