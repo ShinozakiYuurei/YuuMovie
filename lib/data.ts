@@ -1191,19 +1191,25 @@ export function enrichHasRating(e: EnrichEntry): boolean {
  *   单独记一条 notFound；若首中即返，整组就被这条空记录挡住，
  *   卡片评分凭空消失（《復仇者聯盟4》实测）。跳过没分的继续找，
  *   全组都没分才返 notFound 那条（评分侧照样算无分，行为不变）。
+ *
+ * ★ 「没分但有 ID」也优先于纯 notFound（2026-10-08）：未出分/未上映时
+ *   页面仍可用 ID 生成 /title/ 与 /subject/ 详情链接；《復仇者聯盟5》
+ *   实测「開畫日特典首場」notFound 排在前，整组详情链接退化成搜索。
  */
 export function findEnrich(list: Movie[], pool: Record<string, EnrichEntry>): EnrichEntry | null {
   let firstMiss: EnrichEntry | null = null;
+  let firstIdentified: EnrichEntry | null = null;
   for (const m of list) {
     for (const n of [m.nameZh, m.nameEn]) {
       if (!n) continue;
       const hit = pool[enrichKey(n)];
       if (!hit) continue;
       if (enrichHasRating(hit)) return hit;
+      if (hit.imdb?.imdbId || hit.douban?.doubanId) firstIdentified ??= hit;
       firstMiss ??= hit;
     }
   }
-  return firstMiss;
+  return firstIdentified ?? firstMiss;
 }
 
 export function getMovieGroups(status?: 'showing' | 'upcoming'): MovieGroup[] {
