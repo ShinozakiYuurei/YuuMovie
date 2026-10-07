@@ -2084,9 +2084,8 @@ html[data-theme='dark'] {
      與檔案裡其他主題覆寫同一個思路（見頂部對 :root 的說明）。
 
    ★ 取值：亮色 #F2EFE9 是街道圖瓦片的米白底色；
-     深色 #202124 與 Google 地圖深色控件同色，讓未載入瓦片的空白區
-     與深色濾鏡後的底圖保持連續。
-     兩者都讓「還沒畫出來的瓦片」與「已畫出來的」看不出接縫。
+     深色 #0D1B2C 與 DARK_TILE_FILTER 轉出來的底圖底色同色（見 lib/map-tiles.ts），
+     讓未載入瓦片的空白區與已畫出的瓦片看不出接縫。
    ============================================================ */
 html[data-theme='light'] .hkm-map-canvas,
 html[data-theme='pink'] .hkm-map-canvas {
@@ -2095,7 +2094,7 @@ html[data-theme='pink'] .hkm-map-canvas {
 
 html[data-theme='dark'] .hkm-map-canvas,
 html:not([data-theme='light']):not([data-theme='pink']) .hkm-map-canvas {
-  background-color: #202124;
+  background-color: #0d1b2c;
 }
 
 /*

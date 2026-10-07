@@ -14,15 +14,15 @@ export { preloadLeaflet } from '@/lib/leaflet-loader';
  * 瓦片網路錯誤時會並行對沖至另一個官方節點，避免慢連線留下空白。
  * Leaflet 只在打開地圖時載入，避免把次要功能加入每位訪客的初始下載。
  *
- * ★ 深色主題（2026-09-30 用戶要求）：
+ * ★ 深色主題（2026-09-30 用戶要求；2026-10-07 調成 Google Maps 深色模式）：
  *   站點是深色 / 淡粉雙主題（見 ThemeToggle.tsx），而地圖原本永遠是亮色 ——
  *   深色頁面上彈出一塊白底地圖，跟整個介面格格不入。
  *
- *   做法是「街道圖 + CSS 濾鏡」而不是換成 Esri 的深色底圖服務：
- *   後者（Canvas/World_Dark_Gray_Base）在香港 z17 以上沒有資料，
- *   回傳的是「Map data not yet available」佔位圖，而地圖預設 zoom 16、
- *   用戶會拉到 18。濾鏡方案語言與街道細節完全不變（仍是繁體），
- *   只把底圖壓暗並降低飽和度，不反相道路與地面顏色。濾鏡細節見 lib/map-tiles.ts 的 DARK_TILE_FILTER。
+ *   做法是「街道圖 + CSS 濾鏡」而不是換成深色底圖服務：
+ *   Esri Canvas/World_Dark_Gray_Base 在香港 z17 以上沒有資料、Carto dark_all
+ *   已要求 API key，兩者都會回傳佔位圖，而地圖預設 zoom 16、用戶會拉到 18。
+ *   濾鏡方案語言與街道細節完全不變（仍是繁體），
+ *   濾鏡細節見 lib/map-tiles.ts 的 DARK_TILE_FILTER。
  */
 
 /** Leaflet 的最小型別（只用到這幾個成員，不為它裝 300KB 的 @types） */

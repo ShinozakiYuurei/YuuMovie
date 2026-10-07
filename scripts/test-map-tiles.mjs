@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 import {
+  DARK_TILE_BG,
   DARK_TILE_FILTER,
+  DARK_TILE_TINT,
   HEDGE_AFTER_MS,
   TILE_TIMEOUT_MS,
   createMapTile,
@@ -21,6 +23,7 @@ function fakeDocument() {
         setAttribute() {},
         removeAttribute(name) { delete this[name]; },
         replaceChildren(...children) { this.children = children; },
+        appendChild(child) { this.children.push(child); return child; },
       };
       if (tag === 'img') images.push(element);
       return element;
@@ -152,27 +155,39 @@ test('unloading cancels pending work and does not notify Leaflet', (t) => {
   assert.deepEqual(results, []);
 });
 
-/*
- * 深色主題（2026-09-30 用戶要求）
+/**
+ * 深色主題的外觀（2026-10-07 調成 Google Maps 深色模式）
  *
- * 為什麼要釘死：
- *   深色不是換一個 Esri 服務（那個服務在香港 z17 以上只有
- *   「Map data not yet available」佔位圖，見 lib/map-tiles.ts），
- *   而是同一張街道圖加 CSS 濾鏡。濾鏡若哪天被漏掉或寫錯，
- *   深色頁面上會彈出一塊亮白地圖 —— 頁面照樣 200，只有肉眼看得出。
+ * 深色不是換一個 Esri 服務（Carto dark_all 已要 API key、Esri 深灰底圖在香港
+ * z17 以上只有佔位圖，見 lib/map-tiles.ts），而是同一張街道圖加 CSS 濾鏡
+ * 再疊一層藍調染色層。濾鏡若哪天被漏掉或寫錯，深色頁面上會彈出一塊亮白地圖 ——
+ * 頁面照樣 200，只有肉眼看得出。
  *
- *   ★ 還有一條容易踩的：濾鏡必須掛在**每張瓦片**上，不能掛在容器上。
- *     掛容器會連 SVG 標記一起反色（品牌紫 → 黃綠）。這裡斷言的是
- *     瓦片 div 的 style.filter，等於把「只作用於底圖」這件事釘住。
+ * ★ 濾鏡掛在**每張瓦片的 <img>** 上，不掛瓦片 div 也不掛容器：
+ *   掛 div 或容器會連 SVG 標記一起反色（品牌紫 → 黃綠）。這裡同時斷言
+ *   「div 本身不帶 filter」「img 帶 filter」「tint 層存在且在 img 之後」，
+ *   把三層結構（div 底色 → img 濾鏡 → tint 染色）釘住。
  */
-test('dark tiles carry the invert filter; street tiles stay untouched', () => {
+test('dark tiles filter the image and add a blue tint layer; street tiles stay untouched', () => {
   fakeDocument();
   const street = createMapTile(coords, () => {}, 'street');
   assert.equal(street.tile.style.filter, undefined);
   street.cancel();
 
+  const images = fakeDocument();
   const dark = createMapTile(coords, () => {}, 'dark');
-  assert.equal(dark.tile.style.filter, DARK_TILE_FILTER);
+  // 濾鏡不在瓦片 div 上，否則同層的 SVG 標記會一起被反色
+  assert.equal(dark.tile.style.filter, undefined);
+  assert.equal(dark.tile.style.backgroundColor, DARK_TILE_BG);
+  images[0].onload();
+  const image = dark.tile.children.find((child) => child === images[0]);
+  assert.ok(image, 'image should be inserted into the tile');
+  assert.equal(image.style.filter, DARK_TILE_FILTER);
+  const tint = dark.tile.children.find((child) => child !== images[0]);
+  assert.ok(tint, 'tint layer should be present');
+  assert.equal(tint.style.backgroundColor, DARK_TILE_TINT);
+  assert.equal(tint.style.mixBlendMode, 'color');
+  assert.equal(dark.tile.children[dark.tile.children.length - 1], tint);
   dark.cancel();
 });
 
