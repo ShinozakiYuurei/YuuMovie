@@ -190,7 +190,7 @@ const PAREN_RE = /[（(〔[【{「『][^）)〕\]】}」』]*[）)〕\]】}」�
  * 例：「…人魚島的秘密 Hi Bye Meet & Greet 見面場」剔掉尾部后才是真片名。
  */
 const TAIL_NOISE_RE =
-  /(?:\s+(?:Hi\s+Bye|Meet\s*&?\s*Greet|見面場|特典場|特典|加碼|加場|優先場|優先|場次|見面會|安可|重映|encore|screener|fandub|dubbed|subbed|導演映後分享場|映後分享場|映後分享|電影分享會|分享會|應援場))+|\s+\d{4}\s*[–—-]\s*\d{2,4}\b|\s+(?:NT\s*Live|The\s*Met|Royal\s*Ballet|GFF|HKIFF)\b.*$/gi;
+  /(?:\s+(?:Hi\s+Bye|Meet\s*&?\s*Greet|見面場|特典場|特典|加碼|加場|優先場|優先|場次|見面會|安可|重映|encore|screener|fandub|dubbed|subbed|導演映後分享場|映後分享場|映後分享|電影分享會|分享會|應援場|應援|謝票|畫冊|杯墊|千秋樂|馬拉松|連映|限定|特別放映|特別加映|現場直播|紀念放映|開畫日|加碼|優先購票|優先場|首映場))+|\s+\d{4}\s*[–—-]\s*\d{2,4}\b|\s+(?:NT\s*Live|The\s*Met|Royal\s*Ballet|GFF|HKIFF)\b.*$/gi;
 
 /** 放映格式品牌词（搜索查询专用）
  *
@@ -335,6 +335,34 @@ export async function resolveDouban(movie, opt = {}) {
   }
 
   let sawFailure = false;
+  // ★ 逐段缩短回退（2026-10-08）
+  //   豆瓣 search_suggest 要求**每个词都命中**：
+  //   「復仇者聯盟4：終局之戰 加碼」能命中，加上「重映」就返回空。
+  //   事件词表再全也堵不住长尾，所以对每个查询再备「去掉最后 N 个词元」
+  //   的写法，从长到短依次尝试。只对空白分词生效，纯 CJK 单串不动。
+  const shrinkQueries = (q) => {
+    const parts = q.split(/\s+/).filter(Boolean);
+    const out = [];
+    for (let n = parts.length - 1; n >= 1; n--) {
+      const cand = parts.slice(0, n).join(' ');
+      // 至少保留一个「够长」的片名主体，避免退化成单字查询
+      if (cand && longEnough(cand)) out.push(cand);
+    }
+    return out;
+  };
+  // 上限 12 条：缩短候选是「救急」，不能让单个片名的请求量失控
+  // （缩短只影响查询数量，命中即返回，正常片名第一条就命中）。
+  const expanded = [];
+  outer: for (const q of queries) {
+    if (!expanded.includes(q)) expanded.push(q);
+    for (const alt of shrinkQueries(q)) {
+      if (!expanded.includes(alt)) expanded.push(alt);
+      if (expanded.length >= 12) break outer;
+    }
+  }
+  queries.length = 0;
+  queries.push(...expanded);
+
   for (const q of queries) {
     const cards = await doubanSuggest(q, opt);
     if (cards === null) {
