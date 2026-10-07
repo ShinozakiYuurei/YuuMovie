@@ -274,6 +274,21 @@ async function main() {
   }
   const list = LIMIT > 0 ? work.slice(0, LIMIT) : work;
 
+  // ★ 豆瓣健康探针（2026-10-08）
+  // 接口被限流时会「HTTP 200 但 cards 为空」，单次响应无法与「确实没有
+  // 这部片」区分；批量重搜会把整批写成 notFound，再被 7 天冷却锁死。
+  // 用一部必然存在的片名先探一次：探针失败则本轮豆瓣整段跳过，
+  // 不搜索、不写缺席，等下一轮接口恢复后自然重试。
+  let doubanDegraded = false;
+  if (!NO_DUBAN && !DRY) {
+    try {
+      const probe = await resolveDouban({ zh: '阿凡達', en: 'Avatar', year: null });
+      if (!probe) doubanDegraded = true;
+    } catch {
+      doubanDegraded = true;
+    }
+    if (doubanDegraded) log('  ⚠️ 豆瓣接口疑似限流（探针无结果），本轮跳过豆瓣搜索与缺席写入');
+  }
   log(`▶ 补充数据：唯一影片 ${plan.size} | 待抓 ${work.length} | 本次 ${list.length} | 复用 ${todo.length - work.length}`);
   if (DRY) {
     for (const p of list.slice(0, 40)) log(`  · ${p.nameZh || p.nameEn} → key="${p.key}" year=${p.year ?? '-'}`);
@@ -320,7 +335,7 @@ async function main() {
     // ★ 必须先跑豆瓣再跑 IMDb：IMDb 的「重映回退」要拿豆瓣年份当证据
     //   （见 isReissueEvidence）。豆瓣挂了不影响 IMDb，两个 try 各自独立。
     // 已有 douban 且未过期时不重查（刷新周期比 IMDb 长）。
-    if (!NO_DUBAN) {
+    if (!NO_DUBAN && !doubanDegraded) {
       const dAt = row.douban?.at ? Date.parse(row.douban.at) : 0;
       const dFresh = row.douban && !row.douban.notFound && now - dAt <= DUBAN_REFRESH_DAYS * 864e5;
       const dRetry = row.douban?.notFound && now - dAt <= 7 * 864e5;
