@@ -346,21 +346,32 @@ export async function resolveDouban(movie, opt = {}) {
   //   所以剪下的片段必须整体由事件/格式词、连接词、数字或分隔符组成，
   //   且剪完的候选剥掉这些词后还要剩「片名主体」。
   const TRIM_WORDS_RE =
-    /(?:導演映後分享場|映後分享場|映後分享|電影分享會|分享會|現場直播|特別放映|特別加映|特別版|紀念放映|馬拉松|千秋樂|連映|應援場|應援|謝票場|謝票|見面場|見面會|首映場|優先場|優先購票|開畫日|首場|加場|加碼|安可|重映|encore|screener|fandub|dubbed|subbed|特典場|特典|畫冊|杯墊|限定|修復版|菲林版|數位版|日語版|粵語版|國語版|英語版|原聲版|劇場版|live\s+viewing|imax\s+with\s+laser|infinity\s+vision|imax|4dx|screenx|mx4d|cgs|luxe|dolby|atmos|cinity|dubox|dbox|laser|35mm|16mm|70mm|4k|2k|nt\s+live|the\s+met|royal\s+ballet|gff|hkjff|hklgff|hkiff|bc30|bcsunday)/i;
+    /(?:導演映後分享場|映後分享場|映後分享|電影分享會|分享會|現場直播|特別放映|特別加映|特別版|紀念放映|馬拉松|千秋樂|連映|應援場|應援|謝票場|謝票|見面場|見面會|首映場|優先場|優先購票|開畫日|首場|加場|加碼|安可|重映|encore|screener|fandub|dubbed|subbed|特典場|特典|畫冊|杯墊|限定|修復版|菲林版|數位版|日語版|粵語版|國語版|英語版|原聲版|劇場版|live\s+viewing|imax\s+with\s+laser|infinity\s+vision|imax|4dx|screenx|mx4d|cgs|luxe|dolby|atmos|cinity|dubox|dbox|laser|35mm|16mm|70mm|4k|2k|nt\s+live|the\s+met|royal\s+ballet|gff|hkjff|hklgff|hkiff|bc30|bcsunday|kino)/i;
   const TRIM_STRIP_RE = new RegExp(TRIM_WORDS_RE.source, 'gi');
   const TRIM_GLUE_RE = /^(?:with|and|&|x|×|\+|-|–|—|·|\||:)$/i;
   const isTrimChunk = (chunk) => {
     if (!chunk.trim()) return true;
     const tokens = chunk.split(/\s+/).filter(Boolean);
-    return tokens.every(
-      (t) =>
-        TRIM_WORDS_RE.test(t) ||
-        TRIM_GLUE_RE.test(t) ||
-        /^[\d\-–—·|:：x×()（）\[\]【】«»≪≫]+$/i.test(t),
-    );
+    return tokens.every((t) => {
+      if (TRIM_GLUE_RE.test(t)) return true;
+      if (/^[\d\-–—·|:：x×()（）\[\]【】«»≪≫]+$/i.test(t)) return true;
+      if (!TRIM_WORDS_RE.test(t)) return false;
+      // ★ 纯词要求：剥掉事件/版本词后不能再剩片名主体。
+      //   CJK 无空格分词时，“末日降臨開畫日特典首場”这类串
+      //   会因含“開畫日”而被 test() 误判为可剪，把片名一起剪掉。
+      const rest = t
+        .replace(TRIM_STRIP_RE, '')
+        .replace(/[\s\-–—·|:：x×()（）\[\]【】«»≪≫]+/gi, '');
+      return rest.length === 0;
+    });
   };
   const shrinkOk = (s) => {
-    if (!s || !longEnough(s)) return false;
+    if (!s) return false;
+    // ★ 放宽到 ≥ 2 个汉字（通用 longEnough 要求 ≥ 3）：修剪事件词后剩下的
+    //   2 字候选往往就是真片名（日麗/憐愛/曖昧 都是 bc30/KINO 系列）；单字仍挡
+    //   （「愛」会拿回韩内克《爱》—— 错配比缺数据严）。拉丁名仍要求 ≥ 2 词。
+    const cjkN = (s.match(/[぀-ヿ一-鿿]/g) || []).length;
+    if (!(cjkN ? cjkN >= 2 : s.split(/\s+/).filter(Boolean).length >= 2)) return false;
     // 候选剥掉事件/版本词后必须还剩真片名主体；否则「日語版」「開畫日特典首場」
     // 这类纯噪声查询会拿回一堆无关条目。
     const rest = s
