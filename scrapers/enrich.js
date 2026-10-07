@@ -247,18 +247,20 @@ async function main() {
   if (ONLY.length) {
     todo = todo.filter((p) => ONLY.some((s) => p.key.includes(enrichKey(s)) || p.key.includes(s.toLowerCase())));
   }
-  // FORCE_REFRESH 也要带上「還沒有任何 enrich 记录」的新片：过滤条件只看已有
-  // 记录的话，定时服务永远跳过新上映影片，评分卡一直停在搜索链接回退上。
-  // notFound 行继续按 7 天重试冷却跳过（needsWork 负责），避免反复搜索老缺席片。
+  // FORCE_REFRESH 除了刷已识别的行，还要抓两类：完全没有记录的新上映影片，
+  // 以及只有缺席记录且已过 7 天重试冷却的行；任一侧还在冷却期的不重搜，
+  // 避免每小时对老缺席片反复搜索。
   let work = FORCE_REFRESH
-    ? todo.filter(
-        (p) =>
-          !entries[p.key] ||
-          entries[p.key]?.imdb?.imdbId ||
-          entries[p.key]?.douban?.doubanId ||
-          manual[p.key]?.imdbId ||
-          needsWork(entries[p.key], now),
-      )
+    ? todo.filter((p) => {
+        const row = entries[p.key];
+        if (!row) return true;
+        if (row.imdb?.imdbId || row.douban?.doubanId || manual[p.key]?.imdbId) return true;
+        const imdbCooled =
+          row.imdb?.notFound && row.updatedAt && now - Date.parse(row.updatedAt) <= 7 * 864e5;
+        const doubanCooled =
+          row.douban?.notFound && row.douban.at && now - Date.parse(row.douban.at) <= 7 * 864e5;
+        return !imdbCooled && !doubanCooled;
+      })
     : todo.filter((p) => needsWork(entries[p.key], now));
   // DUBAN_ONLY：IMDb 已经新，不想重跑那 212 次搜索，只补豆瓣
   if (DUBAN_ONLY && !FORCE_REFRESH) {
@@ -323,7 +325,10 @@ async function main() {
       const dRetry = row.douban?.notFound && now - dAt <= 7 * 864e5;
       // 每小时强制刷新只查询已识别的豆瓣条目；无 ID 的影片沿用普通增量周期，
       // 避免反复搜索尚未上映/未匹配的片名。
-      if ((FORCE_REFRESH && row.douban?.doubanId) || (!FORCE_REFRESH && !dFresh && !dRetry)) {
+      if (
+        (FORCE_REFRESH && (row.douban?.doubanId || !row.douban)) ||
+        (!FORCE_REFRESH && !dFresh && !dRetry)
+      ) {
         try {
           const previousDouban = row.douban;
           const found = await resolveDouban({ zh: p.nameZh, en: p.nameEn, year: p.year });
@@ -359,11 +364,13 @@ async function main() {
     // 没有匹配 ID 的影片不必每小时重新跑标题搜索；沿用一周重试窗口。
     const retryDeferred =
       FORCE_REFRESH && !ov?.imdbId && !row.imdb?.imdbId && Number.isFinite(iAt) && now - iAt <= 7 * 864e5;
+    // FORCE 下没有已识别 ID 的行：新行或冷却已过的要真正发起搜索，而不是复用空记录。
+    const forceSearch =
+      FORCE_REFRESH && !DUBAN_ONLY && !ov?.imdbId && !row.imdb?.imdbId && !retryDeferred;
     try {
       // IMDb 也要按自己的新鲜度判：needsWork 会因为「豆瓣还没跑过」而放行，
       // 那时 IMDb 往往是刚抓的，不卡就会每轮重跑 212 次搜索。
       const iFresh =
-        (FORCE_REFRESH && !row.imdb?.imdbId && !ov?.imdbId) ||
         retryDeferred ||
         (!FORCE_REFRESH &&
           (DUBAN_ONLY ||
@@ -389,14 +396,14 @@ async function main() {
           votes: refreshed.rating != null ? refreshed.votes : row.imdb.votes ?? null,
         };
         if (refreshed.rating != null) hits++;
-      } else if (FORCE_REFRESH || DUBAN_ONLY || iFresh) {
-        reused++;
-      } else {
+      } else if (forceSearch || (!FORCE_REFRESH && !DUBAN_ONLY && !iFresh)) {
         const hit = await fetchImdb(p.queries, p.year, {
           doubanYear: row.douban?.doubanYear ?? null,
         });
         row.imdb = hit || { notFound: true };
         if (hit?.rating != null) hits++;
+      } else {
+        reused++;
       }
     } catch (e) {
       log(`  ⚠️ IMDb ${p.nameZh || p.nameEn}: ${e.message}`);
