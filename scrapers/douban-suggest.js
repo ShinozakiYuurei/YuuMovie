@@ -74,9 +74,12 @@ export async function doubanSubjectById(id, opt = {}) {
   // 限流/未登录响应带 code + msg（subject_ip_rate_limit / need_login），无 title
   if (j.code || !j.title) return null;
   const r = j.rating || null;
+  const count = r && r.count != null ? Number(r.count) : 0;
+  // 未上映条目回传 rating:0 / count:0，不能当 0 分写入（会显示 0.0）
+  const value = r && r.value != null ? Number(r.value) : null;
   return {
-    rating: r && r.value != null ? Number(r.value) : null,
-    count: r && r.count != null ? Number(r.count) : null,
+    rating: count > 0 && value != null && value > 0 ? value : null,
+    count,
     title: j.title || null,
     year: j.year || null,
   };

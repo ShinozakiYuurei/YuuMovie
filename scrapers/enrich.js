@@ -383,8 +383,10 @@ async function main() {
         await sleep(jitter(250, 450));
       } else if (
         // 未识别条目：搜索（量小，且受限流探针保护）。
-        (FORCE_REFRESH && (!row.douban || !dRetry)) ||
-        (!FORCE_REFRESH && !dFresh && !dRetry)
+        // ★ 已识别条目（有 doubanId）绝不走这里：by-ID 降级时宁可保持
+        //   旧数据，也不能回退到搜索 —— 那正是限流的来源。
+        (FORCE_REFRESH && !row.douban?.doubanId && (!row.douban || !dRetry)) ||
+        (!FORCE_REFRESH && !dFresh && !dRetry && !row.douban?.doubanId)
       ) {
         try {
           const previousDouban = row.douban;
