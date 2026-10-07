@@ -247,8 +247,18 @@ async function main() {
   if (ONLY.length) {
     todo = todo.filter((p) => ONLY.some((s) => p.key.includes(enrichKey(s)) || p.key.includes(s.toLowerCase())));
   }
+  // FORCE_REFRESH 也要带上「還沒有任何 enrich 记录」的新片：过滤条件只看已有
+  // 记录的话，定时服务永远跳过新上映影片，评分卡一直停在搜索链接回退上。
+  // notFound 行继续按 7 天重试冷却跳过（needsWork 负责），避免反复搜索老缺席片。
   let work = FORCE_REFRESH
-    ? todo.filter((p) => entries[p.key]?.imdb?.imdbId || entries[p.key]?.douban?.doubanId || manual[p.key]?.imdbId)
+    ? todo.filter(
+        (p) =>
+          !entries[p.key] ||
+          entries[p.key]?.imdb?.imdbId ||
+          entries[p.key]?.douban?.doubanId ||
+          manual[p.key]?.imdbId ||
+          needsWork(entries[p.key], now),
+      )
     : todo.filter((p) => needsWork(entries[p.key], now));
   // DUBAN_ONLY：IMDb 已经新，不想重跑那 212 次搜索，只补豆瓣
   if (DUBAN_ONLY && !FORCE_REFRESH) {
