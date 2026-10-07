@@ -336,25 +336,79 @@ export async function resolveDouban(movie, opt = {}) {
 
   let sawFailure = false;
   // ★ 逐段缩短回退（2026-10-08）
-  //   豆瓣 search_suggest 要求**每个词都命中**：
-  //   「復仇者聯盟4：終局之戰 加碼」能命中，加上「重映」就返回空。
-  //   事件词表再全也堵不住长尾，所以对每个查询再备「去掉最后 N 个词元」
-  //   的写法，从长到短依次尝试。只对空白分词生效，纯 CJK 单串不动。
+  //   豆瓣 search_suggest 对长查询很苛刻：事件/版本词（重映、特典場、開畫日…）
+  //   会让整条查询落空 ——「復仇者聯盟4：終局之戰 加碼」能命中，
+  //   加上「重映」就返回空。所以给每个查询再备「去掉尾部/头部若干词元」的写法。
+  //
+  //   ★ 只剪「事件/版本/格式词」构成的片段（同日二修）：早一版无条件从尾部截词，
+  //   把《GIANT – The Play》剪成「GIANT – The」、把《Fallen Angels by Noël Coward》
+  //   剪成「Fallen Angels」，拿回同名却毫不相干的条目 —— 错配比缺数据严，
+  //   所以剪下的片段必须整体由事件/格式词、连接词、数字或分隔符组成，
+  //   且剪完的候选剥掉这些词后还要剩「片名主体」。
+  const TRIM_WORDS_RE =
+    /(?:導演映後分享場|映後分享場|映後分享|電影分享會|分享會|現場直播|特別放映|特別加映|特別版|紀念放映|馬拉松|千秋樂|連映|應援場|應援|謝票場|謝票|見面場|見面會|首映場|優先場|優先購票|開畫日|首場|加場|加碼|安可|重映|encore|screener|fandub|dubbed|subbed|特典場|特典|畫冊|杯墊|限定|修復版|菲林版|數位版|日語版|粵語版|國語版|英語版|原聲版|劇場版|live\s+viewing|imax\s+with\s+laser|infinity\s+vision|imax|4dx|screenx|mx4d|cgs|luxe|dolby|atmos|cinity|dubox|dbox|laser|35mm|16mm|70mm|4k|2k|nt\s+live|the\s+met|royal\s+ballet|gff|hkjff|hklgff|hkiff|bc30|bcsunday)/i;
+  const TRIM_STRIP_RE = new RegExp(TRIM_WORDS_RE.source, 'gi');
+  const TRIM_GLUE_RE = /^(?:with|and|&|x|×|\+|-|–|—|·|\||:)$/i;
+  const isTrimChunk = (chunk) => {
+    if (!chunk.trim()) return true;
+    const tokens = chunk.split(/\s+/).filter(Boolean);
+    return tokens.every(
+      (t) =>
+        TRIM_WORDS_RE.test(t) ||
+        TRIM_GLUE_RE.test(t) ||
+        /^[\d\-–—·|:：x×()（）\[\]【】«»≪≫]+$/i.test(t),
+    );
+  };
+  const shrinkOk = (s) => {
+    if (!s || !longEnough(s)) return false;
+    // 候选剥掉事件/版本词后必须还剩真片名主体；否则「日語版」「開畫日特典首場」
+    // 这类纯噪声查询会拿回一堆无关条目。
+    const rest = s
+      .replace(TRIM_STRIP_RE, '')
+      .replace(/[\s\-–—·|:：x×()（）\[\]【】«»≪≫]+/gi, '');
+    return rest.length >= 2;
+  };
+  const cleanCand = (s) =>
+    s
+      .replace(/^[\s\-–—·|:：]+|[\s\-–—·|:：]+$/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  const pushCand = (out, cand, q) => {
+    const c = cleanCand(cand);
+    if (!c || c === q) return;
+    const branded = stripFormatBrands(c);
+    const variants = branded && branded !== c ? [c, branded] : [c];
+    for (const v of variants) {
+      const collapsed = v.replace(/([:：])\s+/g, '$1');
+      const forms = collapsed === v ? [v] : [v, collapsed];
+      for (const w of forms) {
+        if (w && w !== q && !out.includes(w) && shrinkOk(w)) out.push(w);
+      }
+    }
+  };
   const shrinkQueries = (q) => {
     const parts = q.split(/\s+/).filter(Boolean);
     const out = [];
+    // 去尾：保留前 n 个词元，剪掉的片段必须全部是事件/格式词（从长到短）
     for (let n = parts.length - 1; n >= 1; n--) {
-      const cand = parts.slice(0, n).join(' ');
-      // 至少保留一个「够长」的片名主体，避免退化成单字查询
-      if (cand && longEnough(cand)) out.push(cand);
+      if (!isTrimChunk(parts.slice(n).join(' '))) break;
+      pushCand(out, parts.slice(0, n).join(' '), q);
+    }
+    // 去头：保留后 n 个词元（事件词在头部的情形：開畫日特典首場 / 日語版 / 35mm 菲林版）
+    for (let n = 1; n < parts.length; n++) {
+      if (!isTrimChunk(parts.slice(0, n).join(' '))) break;
+      pushCand(out, parts.slice(n).join(' '), q);
     }
     return out;
   };
-  // 上限 12 条：缩短候选是「救急」，不能让单个片名的请求量失控
-  // （缩短只影响查询数量，命中即返回，正常片名第一条就命中）。
+  // 上限 12 条：缩短候选是「救急」，不能让单个片名的请求量失控。
+  // ★ 基础查询（原片名/清洗名/英文名）先全部占位，缩短候选只填剩余名额 ——
+  //   否则长片名的去尾候选可能把英文名挤出候选表。
   const expanded = [];
-  outer: for (const q of queries) {
+  for (const q of queries) {
     if (!expanded.includes(q)) expanded.push(q);
+  }
+  outer: for (const q of queries) {
     for (const alt of shrinkQueries(q)) {
       if (!expanded.includes(alt)) expanded.push(alt);
       if (expanded.length >= 12) break outer;
