@@ -55,9 +55,12 @@ export async function doubanSuggest(q, opt = {}) {
     },
     signal: AbortSignal.timeout(opt.timeoutMs || 12000),
   }).catch(() => null);
-  if (!res || !res.ok) return [];
+  // 请求失败返回 null（区别于「确实没有结果」的 []）：调用方据此避免把
+  // 限流/超时误记成「这部片在豆瓣不存在」，否则要等 7 天冷却才会重查。
+  if (!res || !res.ok) return null;
   const j = await res.json().catch(() => null);
-  const cards = Array.isArray(j?.cards) ? j.cards : [];
+  if (!j || !Array.isArray(j.cards)) return null;
+  const cards = j.cards;
   return cards
     .filter((c) => c && c.title && isMovieSubjectUrl((c.url || '').split('?')[0]))
     .map((c) => ({
@@ -286,8 +289,14 @@ export async function resolveDouban(movie, opt = {}) {
     queries.push(x.q);
   }
 
+  let sawFailure = false;
   for (const q of queries) {
     const cards = await doubanSuggest(q, opt);
+    if (cards === null) {
+      sawFailure = true;
+      await sleep(opt.delayMs ?? 250);
+      continue;
+    }
     if (cards.length) {
       const card = pickDoubanCard(cards, movie.year);
       if (card) {
@@ -300,5 +309,8 @@ export async function resolveDouban(movie, opt = {}) {
     }
     await sleep(opt.delayMs ?? 250);
   }
+  // 全部查询都没拿到有效响应时抛出，让 enrich.js 走告警分支：
+  // 不写 notFound，下一次刷新自然重试。
+  if (sawFailure) throw new Error('douban suggest request failed');
   return null;
 }

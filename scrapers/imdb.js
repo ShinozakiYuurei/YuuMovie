@@ -27,9 +27,10 @@ export async function imdbSuggest(title, opt = {}) {
     headers: { 'user-agent': UA, accept: 'application/json' },
     signal: AbortSignal.timeout(opt.timeoutMs || 15000),
   }).catch(() => null);
-  if (!res || !res.ok) return [];
+  // 请求失败返回 null（区别于「确实没有结果」的 []），见 douban-suggest.js 同款说明。
+  if (!res || !res.ok) return null;
   const j = await res.json().catch(() => null);
-  if (!j || !Array.isArray(j.d)) return [];
+  if (!j || !Array.isArray(j.d)) return null;
   return j.d
     .filter((x) => x && /^tt\d+$/.test(x.id || ''))
     .map((x) => ({ id: x.id, title: x.l || '', year: x.y || null, qid: x.qid || '' }));
@@ -233,11 +234,16 @@ export function pickImdbId(candidates, query, year, opt = {}) {
 export async function resolveImdbIds(queries, year, limit = 5) {
   const found = [];
   const seen = new Set();
+  let sawFailure = false;
   for (const pass of [false, true]) {
     for (const q of queries) {
       if (!q) continue;
       const cands = await imdbSuggest(q);
       await sleep(120);
+      if (cands === null) {
+        sawFailure = true;
+        continue;
+      }
       for (const c of rankImdbCandidates(cands, q, year, { reissue: pass })) {
         if (seen.has(c.id)) continue;
         seen.add(c.id);
@@ -246,6 +252,8 @@ export async function resolveImdbIds(queries, year, limit = 5) {
     }
     if (found.length >= limit) break;
   }
+  // 一条都没找到、且期间有请求失败：抛出让调用方告警重试，而不是记 notFound。
+  if (!found.length && sawFailure) throw new Error('imdb suggest request failed');
   return found.slice(0, limit);
 }
 
