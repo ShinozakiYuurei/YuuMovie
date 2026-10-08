@@ -35,16 +35,24 @@ echo "  main=$HEAD_SHA 旧版=$OLD_SHA"
 # 假重建：造出"发布后应有的最小站点"，供 verify_site 消费
 cat > "$T/rb-good.sh" <<'EOS'
 #!/bin/bash
-S="$1"; rm -rf "$S"; mkdir -p "$S/movie/real" "$S/cinema" "$S/showing"
+# 假重建：造出「发布后应有的最小站点」，供 verify_site 消费。
+# ★ 2026-10-09：补齐 09-23 / 09-24 新增的两个探针所需的产物形状。
+# 旧版假站点只有一个 movie 页，没有 data-page-nav、级别徽章与 _next/static/css，
+# 于是 check-nav-category / check-rating-badge 全部以 exit 2 判「没跑起来」；
+# 演练自 09-23 起就一直是红的，而它本该是改部署链路时的守门人。
+# 这里只造最小可通过形状：目的是验证部署链路，不是验证渲染。
+S="$1"; rm -rf "$S"; mkdir -p "$S/movie/real" "$S/cinema" "$S/showing" "$S/upcoming" "$S/_next/static/css"
 echo ok > "$S/index.html"
 printf '<a href="/movie/real/">r</a>' > "$S/cinema/index.html"
 printf '<a href="/movie/real/">r</a>' > "$S/showing/index.html"
-EOS
-cat > "$T/rb-bad.sh" <<'EOS'
-#!/bin/bash
-S="$1"; rm -rf "$S"; mkdir -p "$S/movie/real" "$S/cinema"
-echo ok > "$S/index.html"
-printf '<a href="/movie/does-not-exist/">x</a>' > "$S/cinema/index.html"
+printf '<a href="/movie/real/">r</a>' > "$S/upcoming/index.html"
+# 详情页：归属标记 + 面包屑 + 级别徽章（三个探针各自要求的那一点）。
+# 级别写定值 IIB（而非 TBC）：定级时 JSON-LD contentRating 必须与徽章逐字相同，
+# 两边一起写就天然一致（写 TBC 反而要求 JSON-LD 整项省略）。
+printf '%s' '<html><body data-page-nav="showing"><nav data-crumb><a href="/showing/">現正上映</a></nav><div>級別:<!-- --><span class="ml-1 rounded bg-veil-strong px-1.5 py-0.5 text-[11px] font-semibold text-fg">IIB</span></div><script type="application/ld+json">{"contentRating":"IIB"}</script></body></html>' > "$S/movie/real/index.html"
+# 頂欄色塊依赖的两條 CSS 规则（check-nav-category 会从产物 CSS 里找）。
+printf '%s' 'body:has([data-page-nav=showing]) a[data-nav=showing]{}
+body:has([data-page-nav=cinema]) a[data-nav=cinema]{}' > "$S/_next/static/css/app.css"
 EOS
 chmod +x "$T/rb-good.sh" "$T/rb-bad.sh"
 cp "$T/rb-good.sh" "$T/rb.sh"

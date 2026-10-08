@@ -75,7 +75,20 @@ fi
 # ---------- 0.5 外部评分刷新（可选）----------
 if [ "${ENRICH:-0}" = "1" ]; then
   echo "▶ 刷新 IMDb / 豆瓣评分（FORCE_REFRESH=${FORCE_REFRESH:-0}）..."
-  FORCE_REFRESH="${FORCE_REFRESH:-0}" node scrapers/enrich.js
+  # ★ 2026-10-09：ENRICH_OPTIONAL=1 时评分刷新失败不阻断重建。
+  #
+  # 为什么：评分要连外部网络（IMDb / 豆瓣），而部署路径上的重建一旦中止，
+  # 代码已经切到目标版本、站点却停在上一版 —— 正是 vps-deploy.sh 里点名的最坏结果。
+  # 刷不到分只是「沿用上一版分数」，一小时内 hk-movie-ratings.timer 会补上，
+  # 不值得拿整次发布去赌。默认 0（严格）保持评分定时器原有的语义。
+  if ! FORCE_REFRESH="${FORCE_REFRESH:-0}" node scrapers/enrich.js; then
+    if [ "${ENRICH_OPTIONAL:-0}" = "1" ]; then
+      echo "  ⚠️ 评分刷新失败，继续重建（沿用上一版评分）"
+    else
+      echo "  ✖ 评分刷新失败" >&2
+      exit 1
+    fi
+  fi
 else
   echo "▶ ENRICH=0，跳过评分刷新"
 fi

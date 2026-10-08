@@ -156,7 +156,7 @@ CUR=$(git rev-parse -q --verify HEAD 2>/dev/null || echo "")
 # ---------- 1 工作区护栏 ----------
 if [ -z "$CUR" ]; then
   take_over
-elif [ "$CUR" = "$TARGET" ] && [ -z "$(dirty_paths)" ] && [ "${SCRAPE:-0}" != "1" ] && [ -z "${ONLY:-}" ]; then
+elif [ "$CUR" = "$TARGET" ] && [ -z "$(dirty_paths)" ] && [ "${SCRAPE:-0}" != "1" ] && [ "${ENRICH:-0}" != "1" ] && [ -z "${ONLY:-}" ]; then
   log "服务器已是目标版本，不重建（仍复核站点）"
   verify_site
   exit 0
@@ -237,7 +237,7 @@ log "重建静态站（SCRAPE=${SCRAPE:-0} ENRICH=${ENRICH:-0} FORCE_REFRESH=${F
 REBUILD_OUT=$(mktemp)
 trap 'rm -f "$REBUILD_OUT"' EXIT
 set +e
-SCRAPE="${SCRAPE:-0}" ENRICH="${ENRICH:-0}" FORCE_REFRESH="${FORCE_REFRESH:-0}" POSTER_ORIGIN="$POSTER_ORIGIN" \
+SCRAPE="${SCRAPE:-0}" ENRICH="${ENRICH:-0}" FORCE_REFRESH="${FORCE_REFRESH:-0}" ENRICH_OPTIONAL="${ENRICH_OPTIONAL:-0}" POSTER_ORIGIN="$POSTER_ORIGIN" \
   eval "${REBUILD:-bash deploy/rebuild-static.sh}" 2>&1 | tee "$REBUILD_OUT"
 REBUILD_RC=${PIPESTATUS[0]}
 set -e

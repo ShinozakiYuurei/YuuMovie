@@ -228,10 +228,25 @@ vps "cat > /tmp/hkmovie-setup-slug-redirects.sh" < deploy/setup-slug-redirects.s
 vps "mkdir -p /tmp/hkmovie-deploy-scripts && cp /tmp/hkmovie-sync-nginx-conf.sh /tmp/hkmovie-deploy-scripts/sync-nginx-conf.sh && cp /tmp/hkmovie-setup-slug-redirects.sh /tmp/hkmovie-deploy-scripts/setup-slug-redirects.sh && cat > /tmp/hkmovie-deploy-scripts/nginx-static.conf" < deploy/nginx-static.conf
 vps "SITE_DOMAIN='$(echo "$SITE" | sed 's|https\?://||;s|/.*||')' bash /tmp/hkmovie-deploy-scripts/sync-nginx-conf.sh"
 
-vps "sudo -u hkmovie APP_DIR='$APP_DIR' SCRAPE='$DEPLOY_SCRAPE' ONLY='$DEPLOY_ONLY' bash /tmp/hkmovie-vps-deploy.sh '$BRANCH'"
+# ★ 2026-10-09：一次部署只重建一遍。
+#
+# 原先这条链路重建两次：vps-deploy 里那次（海报 + 构建），紧接着
+# setup-rating-timer.sh --run-now 又跑一次评分定时器（enrich + 整站重建）。
+# 两次实测各约 5.5 分钟，而且第二次构建会把第一次的产物整个覆盖掉 ——
+# 前一次的构建时间纯属白花，这是部署里最耗时的一段。
+#
+# 现在合并成一次：把评分刷新并进这次重建（ENRICH=1 FORCE_REFRESH=1），
+# rebuild-static.sh 内部顺序仍是「抓取 → 评分 → 简介 → 海报 → 构建」，
+# 海报本地化不会像合并到定时器那样被跳过（该 unit 里 POSTERS=0）。
+# 定时器只安装、不立即运行。
+#
+# ENRICH_OPTIONAL=1：评分要连 IMDb / 豆瓣，网络抖动或限流不该拖垮一次代码发布
+# —— 刷不到分只是沿用上一版分数，整点定时器会补上。
+# （rebuild-static.sh 里该开关默认 0，评分定时器仍保持「失败即失败」的严格语义。）
+vps "sudo -u hkmovie APP_DIR='$APP_DIR' SCRAPE='$DEPLOY_SCRAPE' ONLY='$DEPLOY_ONLY' ENRICH='1' FORCE_REFRESH='1' ENRICH_OPTIONAL='1' bash /tmp/hkmovie-vps-deploy.sh '$BRANCH'"
 
-# 评分数据也要同步更新静态页面；安装独立的每小时定时器，并立即跑首轮刷新。
-echo "▶ 安装并立即运行 IMDb / 豆瓣每小时刷新"
-vps "sudo APP_DIR='$APP_DIR' SERVICE_USER=hkmovie bash '$APP_DIR/deploy/setup-rating-timer.sh' --run-now" 5400
+# 安装独立的每小时评分定时器；首轮刷新已并入上面的重建，这里不再 --run-now。
+echo "▶ 安装 IMDb / 豆瓣每小时刷新定时器"
+vps "sudo APP_DIR='$APP_DIR' SERVICE_USER=hkmovie bash '$APP_DIR/deploy/setup-rating-timer.sh'"
 
 smoke
