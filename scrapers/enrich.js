@@ -488,9 +488,26 @@ async function main() {
     // ---------- IMDb ----------
     // 时间戳在 row 顶层（updatedAt），imdb 子对象里没这个字段。
     const iAt = row.updatedAt ? Date.parse(row.updatedAt) : 0;
+    // ★ 豆瓣是后到的：这次 IMDb 尝试发生在豆瓣条目落地之前。
+    //   豆瓣年份是 IMDb「重映回退」的**输入**（见 isReissueEvidence），
+    //   当初搜索时拿不到它，判据本身就是残缺的；白等一周冷却毫无意义。
+    //   实测 2026-10-09：HKJFF 等 13 部新片豆瓣先匹到、IMDb 侧因为没 ID
+    //   就一直停在无分，评分卡挂着「暫無評分」直到冷却过期。
+    //   这个条件是一次性的：重搜后 updatedAt 会越过 douban.at，
+    //   要等豆瓣下一次刷新（14 天）才会再次成立，所以不会每小时重复敲门。
+    const doubanLearnedLater =
+      !ov?.imdbId &&
+      !row.imdb?.imdbId &&
+      row.douban?.doubanYear != null &&
+      (row.douban.at ? Date.parse(row.douban.at) : 0) > iAt;
     // 没有匹配 ID 的影片不必每小时重新跑标题搜索；沿用一周重试窗口。
     const retryDeferred =
-      FORCE_REFRESH && !ov?.imdbId && !row.imdb?.imdbId && Number.isFinite(iAt) && now - iAt <= 7 * 864e5;
+      !doubanLearnedLater &&
+      FORCE_REFRESH &&
+      !ov?.imdbId &&
+      !row.imdb?.imdbId &&
+      Number.isFinite(iAt) &&
+      now - iAt <= 7 * 864e5;
     // FORCE 下没有已识别 ID 的行：新行或冷却已过的要真正发起搜索，而不是复用空记录。
     const forceSearch =
       FORCE_REFRESH && !DUBAN_ONLY && !ov?.imdbId && !row.imdb?.imdbId && !retryDeferred;
