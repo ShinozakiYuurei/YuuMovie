@@ -565,6 +565,27 @@ async function main() {
           rating: refreshed.rating ?? row.imdb.rating ?? null,
           votes: refreshed.rating != null ? refreshed.votes : row.imdb.votes ?? null,
         };
+        // ★ by-ID 刷新同样要过年份闸门（2026-10-09 审计补第二轮）。
+        //   上面的 imdbIdStale 只在**有分**时丢弃 ID，于是重搜后停在
+        //   「ID 留着、分被闸门挡掉」的状态；下一轮 FORCE 从这里按 ID
+        //   取分，又把错分装了回去 —— 实测 跟蹤 的 6.5 就是这样复活的。
+        //   这里补一道：刷新回来的分若仍与豆瓣原作年冲突，就不许装上。
+        //   ID 仍保留（详情页链接还要用），只是不再显示分数。
+        if (
+          row.imdb.rating != null &&
+          !imdbYearGateOk(row.imdb.imdbYear, row.douban?.doubanYear, true, row.imdb.imdbTitle, {
+            venueName: p.nameEn || p.nameZh,
+            hkYear: p.year,
+          })
+        ) {
+          log(
+            '  ⚠️ IMDb ' + (p.nameZh || p.nameEn) + ': ' + row.imdb.imdbId + ' 《' +
+              row.imdb.imdbTitle + '》' + row.imdb.imdbYear + ' 仍过年份闸门（豆瓣 ' +
+              row.douban?.doubanYear + '），不装回分数',
+          );
+          row.imdb.rating = null;
+          row.imdb.votes = null;
+        }
         if (refreshed.rating != null) hits++;
       } else if (forceSearch || (!FORCE_REFRESH && !DUBAN_ONLY && !iFresh)) {
         const hit = await fetchImdb(p.queries, p.year, {
