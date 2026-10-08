@@ -32,7 +32,10 @@ ln -s /opt/hk-movie/node_modules "$T/app2/node_modules"   # 复用依赖，不�
 md5sum "$T/app2/package-lock.json" | cut -d' ' -f1 > "$T/stamp"
 echo "  main=$HEAD_SHA 旧版=$OLD_SHA"
 
-# 假重建：造出"发布后应有的最小站点"，供 verify_site 消费
+# 假重建：造出「发布后应有的最小站点」，供 verify_site 消费。
+# ★ 2026-10-09：补齐 09-23 / 09-24 新增两个探针所需的产物形状（旧版假站点
+# 只有一页 movie、没有 data-page-nav / 导航项 data-nav / 级别徽章 / 产物 CSS，
+# 于是那两个探针一律以 exit 2 判「没跑起来」，演练自 09-23 起一直红）。
 cat > "$T/rb-good.sh" <<'EOS'
 #!/bin/bash
 # 假重建：造出「发布后应有的最小站点」，供 verify_site 消费。
@@ -54,6 +57,17 @@ printf '%s' '<html><body data-page-nav="showing"><nav data-crumb><a href="/showi
 printf '%s' '<html><body data-page-nav="upcoming"><nav data-crumb><a href="/upcoming/">即將上映</a></nav><div>級別:<!-- --><span class="ml-1 rounded bg-veil-strong px-1.5 py-0.5 text-[11px] font-semibold text-fg">TBC</span></div></body></html>' > "$S/movie/soon/index.html"
 # 顶栏色块依赖的两条 CSS 规则（check-nav-category 从产物 CSS 里找）。
 printf '%s' 'body:has([data-page-nav=showing]) a[data-nav=showing]{} body:has([data-page-nav=cinema]) a[data-nav=cinema]{}' > "$S/_next/static/css/app.css"
+EOS
+
+# 死链版：列表页链到不存在的详情页 —— verify_site 必须判死（用例 4）。
+cat > "$T/rb-bad.sh" <<'EOS'
+#!/bin/bash
+# 死链版：列表页链到不存在的详情页 —— verify_site 必须判死（用例 4）。
+S="$1"; rm -rf "$S"; mkdir -p "$S/movie/real" "$S/cinema" "$S/showing" "$S/upcoming" "$S/_next/static/css"
+echo ok > "$S/index.html"
+printf '%s' '<a href="/movie/does-not-exist/">x</a>' > "$S/cinema/index.html"
+printf '%s' '<a href="/movie/does-not-exist/">x</a>' > "$S/showing/index.html"
+printf '%s' '<a href="/movie/does-not-exist/">x</a>' > "$S/upcoming/index.html"
 EOS
 chmod +x "$T/rb-good.sh" "$T/rb-bad.sh"
 cp "$T/rb-good.sh" "$T/rb.sh"
