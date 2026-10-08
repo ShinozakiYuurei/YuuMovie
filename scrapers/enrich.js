@@ -387,18 +387,6 @@ async function main() {
      const dAt = row.douban?.at ? Date.parse(row.douban.at) : 0;
      const dFresh = row.douban && !row.douban.notFound && now - dAt <= DUBAN_REFRESH_DAYS * 864e5;
      const dRetry = row.douban?.notFound && now - dAt <= 7 * 864e5;
-      // 缓存里的条目不是电影（书籍/音乐）时，按 ID 刷新救不回来。
-      //   rexxar 是 movie 接口，拿 book/music 的 subject id 去问只会返回 null，
-      //   而按 ID 分支拿到 null 就只记一次 byIdFails —— 脏数据永远留着，
-      //   还会连带把 byIdFails 攒到 5 而降级整条 by-ID 通道，
-      //   害得后面正常条目的刷新也一起停摆。
-      //   2026-10-09 实测：坂本日常/次第花開/chiikawa 見面場 三条
-      //   书籍与音乐条目，rexxar 对它们全返 null。
-      //   所以脏条目一律当作「未识别」丢回搜索，让它重新匹一次。
-      if (row.douban?.doubanId && !isMovieSubjectUrl(row.douban.doubanUrl)) {
-        log('  ↻ 豆瓣 ' + (p.nameZh || p.nameEn) + ': 缓存条目 ' + row.douban.doubanUrl + ' 非电影，重新搜索匹对');
-        row.douban = null;
-      }
       // 缓存条目已经不合法时，按 ID 刷新救不回来，必须丢回搜索重匹。
       //   两种脏数据：
       //   1) 非电影条目（book/music）。rexxar 是 movie 接口，拿这类
