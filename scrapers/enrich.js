@@ -387,6 +387,9 @@ async function main() {
      const dAt = row.douban?.at ? Date.parse(row.douban.at) : 0;
      const dFresh = row.douban && !row.douban.notFound && now - dAt <= DUBAN_REFRESH_DAYS * 864e5;
      const dRetry = row.douban?.notFound && now - dAt <= 7 * 864e5;
+     // 缓存条目若被判为脏（见下方 staleDouban），dFresh/dRetry 就不再代表
+     // 「当前这条缓存」，必须让搜索分支放行。
+     let doubanStale = false;
       // 缓存条目已经不合法时，按 ID 刷新救不回来，必须丢回搜索重匹。
       //   两种脏数据：
       //   1) 非电影条目（book/music）。rexxar 是 movie 接口，拿这类
@@ -404,6 +407,12 @@ async function main() {
           (sameSourceTitle(p.nameZh, p.nameEn) && !crossYearOk(row.douban, p.year)));
       if (staleDouban) {
         row.douban = null;
+        // 清理发生在 dFresh/dRetry 算完之后，所以那两个标志描述的仍是**旧条目**，
+        //   而旧条目恰好「新鲜且不是 notFound」—— 直接沿用会把搜索分支挡掉，
+        //   结果是清理了却没重搜，脏条目原地不动（2026-10-09 实测：
+        //   queen budapest 连跑两次 REFRESH_DAYS=0 都仍是 1986 的《匈牙利狂想曲》）。
+        //   doubanStale 的意思是「这里没有可信的新鲜度可言，本轮必须重新搜」。
+        doubanStale = true;
         log('  ↻ 豆瓣 ' + (p.nameZh || p.nameEn) + ': 缓存条目已不合法，重新搜索匹对');
       }
       // ★ 已识别条目（有 doubanId）：按 ID 轻量刷新，不重新搜索片名。
@@ -441,7 +450,7 @@ async function main() {
         //   网页端被限时它常常仍可用（2026-10-08 实测）。
         !doubanDegraded &&
           ((FORCE_REFRESH && !row.douban?.doubanId && (!row.douban || !dRetry)) ||
-            (!FORCE_REFRESH && !dFresh && !dRetry && !row.douban?.doubanId))
+            (!FORCE_REFRESH && (doubanStale || (!dFresh && !dRetry)) && !row.douban?.doubanId))
       ) {
         try {
           const previousDouban = row.douban;
