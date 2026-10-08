@@ -488,6 +488,32 @@ async function main() {
     // ---------- IMDb ----------
     // 时间戳在 row 顶层（updatedAt），imdb 子对象里没这个字段。
     const iAt = row.updatedAt ? Date.parse(row.updatedAt) : 0;
+    // ★ 已识别的行也要重跑年份闸门（2026-10-09 审计补）。
+    //   by-ID 刷新只按 ID 取分、从不复核「这条 ID 还是不是这部片」，
+    //   于是闸门上线前挂上的错配永远留着 —— 实测 跟蹤 港映2026 仍挂着
+    //   IMDb《Following》2024（另一部片，差 17 年），而豆瓣侧已经是对的。
+    //   判据与搜索侧同款：有分 + 与豆瓣原作年差过大 + 不是剧院录制形态。
+    //   命中就当作「未识别」，丢掉 ID 让下面的搜索分支重新匹。
+    //
+    //   ★ 必须放在 retryDeferred / forceSearch **之前**：那两个条件要看
+    //     清空后的状态。放在后面会让三个分支全部落空、直接 reused++，
+    //     等于清了却不重搜（豆瓣侧刚踩过同一个顺序坑）。
+    if (
+      row.imdb?.imdbId &&
+      !row.imdb.notFound &&
+      row.imdb.rating != null &&
+      !imdbYearGateOk(row.imdb.imdbYear, row.douban?.doubanYear, true, row.imdb.imdbTitle, {
+        venueName: p.nameEn || p.nameZh,
+        hkYear: p.year,
+      })
+    ) {
+      log(
+        '  ↻ IMDb ' + (p.nameZh || p.nameEn) + ': ' + row.imdb.imdbId + ' 《' +
+          row.imdb.imdbTitle + '》' + row.imdb.imdbYear + ' 过年份闸门（豆瓣 ' +
+          row.douban?.doubanYear + '），丢弃 ID 重新搜索',
+      );
+      row.imdb = null;
+    }
     // ★ 豆瓣是后到的：这次 IMDb 尝试发生在豆瓣条目落地之前。
     //   豆瓣年份是 IMDb「重映回退」的**输入**（见 isReissueEvidence），
     //   当初搜索时拿不到它，判据本身就是残缺的；白等一周冷却毫无意义。
