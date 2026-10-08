@@ -115,6 +115,92 @@ export function matchesDoubanYear(candYear, doubanYear) {
   return Math.abs(candYear - doubanYear) <= REISSUE_YEAR_TOLERANCE;
 }
 
+/** 剧场/舞团录制条目标记（同一场演出的影像，不是另一部作品） */
+const STAGE_CAPTURE_RE =
+  /national theatre live|royal ballet|opera ballet|bolshoi ballet|\bnt live\b/i;
+
+/** IMDb 标题是否是剧场/舞团录制条目 */
+export function isStageCaptureTitle(title) {
+  return STAGE_CAPTURE_RE.test(title || '');
+}
+
+/**
+ * IMDb 条目年 vs 豆瓣原作年的展示层上限（2026-10-09 全站审计加）
+ *
+ * ★ 为什么这道闸门必须存在、且只能放在这里
+ *   matchesDoubanYear 只管「重映回退」那一步，管不到**首选条目**。
+ *   2026-10-09 全站审计（190 条两侧都有年份的记录）查出 14 部挂错片：
+ *     跟蹤        港映2026 → IMDb《Following》2024（另一部片）/ 豆瓣《跟踪》2007
+ *     玩謝麥高維治 → IMDb《Being **Related to** John Malkovich》2025 / 豆瓣 1999
+ *     危險人物     → IMDb《**Stealing** Pulp Fiction》2024 / 豆瓣《危险人物》1999
+ *     街霸        → IMDb《Street Fighter》**1994 动画版** / 豆瓣《街头霸王》2026
+ *   共同形态：标题子串够像就进了候选，而「这是哪一年那一部」没人把关。
+ *
+ * ★★ 阈值取 3，不是第一版写的 10 —— 是单测逼出来的
+ *   第一版按「差 >10 的 14 条全是错配、差 <=10 的没出错」设 10，
+ *   写完单测立刻挂了一条：覲見英女皇 IMDb《The Audience》2020 /
+ *   豆瓣《女王召见》2013 只差 7 年却是错配 —— 2020 那个是同名剧集电影
+ *   （7 分 17 人），正解是 tt3154822（NT Live 2015，8.5 分）。
+ *   逐条重核 gap 1–10 后的真实分布：
+ *     差 0–2 年 168 条全部正确；差 >=4 里已确认错配有
+ *     逆權司機(4)、羅沙尋媽路漫漫(6)、覲見英女皇(7)、十個拆彈的少年(9)。
+ *   差 3 这一档实测为空，取 3 就是贴着正确区间右缘、离错配区左缘。
+ *
+ * ★ 剧场录制条目为什么单独放宽（isStageCaptureTitle）
+ *   NT Live 与芭蕾舞团把一场演出录成影片：IMDb 条目记**录制年**、
+ *   豆瓣条目记**原作年**，天然差十年以上，而两者确实是同一部戏：
+ *     恨世者   IMDb 2026 / 豆瓣《恨世者》2017（差 9）
+ *     不可兒戲  IMDb 2025 / 豆瓣《不可儿戏》2015（差 10）
+ *     孽戀焚情  IMDb 2026 / 豆瓣《危险关系》1988（差 38）
+ *   这三条按 3 年闸门会被误杀，所以对录制条目放宽。
+ *   放宽只认**IMDb 标题里的录制标记**，不认院线名里的「NT Live」：
+ *   覲見英女皇的院线名同样写「NT Live」，但 IMDb 条目标题是光秃秃的
+ *   《The Audience》，没有录制标记 —— 正好被挡住。
+ *   分得清靠的不是「院线名有没有写 NT Live」，
+ *   而是「IMDb 那一条自己是不是录制条目」。
+ *
+ * 判**不通过**时宁可不给分（页面显示暫無評分），也不挂别的片的分数：
+ *   错配比缺数据严重得多 —— 缺分只少一个字段，错分会被用户当真。
+ *
+ * ★ 为什么只卡绝对值、不卡方向
+ *   豆瓣存的是原作首映年，港映年既可能更晚（经典重映），也可能更早
+ *   （日本新片提前来港）。两个方向都有正确用例（haiwaan 豆瓣2027/港映2026），
+ *   所以设上限而不设方向。
+ */
+export const IMDB_DOUBAN_YEAR_MAX_GAP = 3;
+
+/**
+ * 首选条目的年份闸门：与豆瓣原作年差过大就否决
+ *
+ * 只在**双方都拿得到年份**时生效：豆瓣没匹到（无 doubanYear）就放行，
+ *   那时没有第二轴可用，不该凭空否决已经过了标题分的那一条。
+ *
+ * @param {number|null} imdbYear IMDb 条目年份
+ * @param {number|null} doubanYear 豆瓣条目原作年份
+ * @param {boolean} hasRating 候选是否已确认有评分（无分的重映新条目不吃这道闸门）
+ * @param {string} [imdbTitle] IMDb 条目标题（用于识别剧场录制条目）
+ */
+export function imdbYearGateOk(imdbYear, doubanYear, hasRating, imdbTitle, opt = {}) {
+  if (!doubanYear || imdbYear == null) return true;
+ // 首选条目没分时，它多半是「为这次重映新开的条目」，年份天然对不上豆瓣原作年，
+ // 此时否决会把唯一正确的条目也否掉（重映回退反而依赖它排在前面）。
+ if (!hasRating) return true;
+ const gap = Math.abs(imdbYear - doubanYear);
+ if (gap <= IMDB_DOUBAN_YEAR_MAX_GAP) return true;
+  if (gap <= REISSUE_MAX_YEARS_STRONG && isStageCaptureTitle(imdbTitle)) return true;
+  // ★ 老戏的**新录一季**：IMDb 条目年 = 本季录制年 = 港映年，
+  //   而豆瓣记的是首演年。这形态不能靠 IMDb 标题认 ——
+  //   同一个 NT Live，恨世者那条标题带「National Theatre Live」、
+  //   吾子吾弟那条却是光秃秃的《All My Sons》(2026)，IMDb 自己并不统一。
+  //   改用「候选年贴着港映年」来认：老戏新录必然录在本次放映那一年。
+  //   这条也正是把覲見英女皇挡在外面的关键：它院线名同样写 NT Live，
+  //   但错配的《The Audience》是 2020 年的东西，离港映 2026 差 6 年。
+  if (isStageCaptureTitle(opt.venueName) && opt.hkYear != null) {
+    return Math.abs(imdbYear - opt.hkYear) <= 1;
+  }
+  return false;
+}
+
 /** 归一：小写、非字目字符转空格（保留 CJK 与日文假名） */
 const norm = (s) =>
   (s || '')

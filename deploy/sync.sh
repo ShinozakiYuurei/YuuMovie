@@ -127,6 +127,11 @@ else
   node --import tsx --test scripts/test-flight-records.mjs
   # 第三方简介（wmoov / kinohk）：索引/详情解析与「宁缺毋滥」的片名匹配，错了会静默配错片。
   node --import tsx --test scripts/test-synopsis-parsers.mjs
+  # IMDb 年份闸门：豆瓣侧有年份把关，IMDb 侧原本没有，于是「标题子串够像
+  # + 年份差很远」的条目被当正主挂上去（跟蹤 →《Following》2024 另一部片、
+  # 街霸 →《Street Fighter》1994 动画版）。错了不报错，页面照样显示一个看着
+  # 很正常的分数，所以钉死。阈值 3 与剧院录制放宽都在用例里写明理由。
+  node scripts/test-imdb-year-gate.mjs
   # 旧 slug → 新 slug 的 301 规则：错了不报错、页面照样 200，
   # 但会把活页面劫走或把旧链接送进 404 —— 都是只有用户点链接才发现的静默错误。
   node --import tsx --test scripts/test-slug-redirects.mts
@@ -164,6 +169,10 @@ else
   # 组级评分回退：notFound 冠名条目（4DX / Infinity Vision）不能挡住整组评分，
   # 且组内任一条目有分时展示条目必须有分（《復仇者聯盟4》重映实测踩过）。
   "$TSX" probe/check-rating-fallback.mts
+  # 豆瓣匹配：书籍/音乐条目不得出分（tag=movie 不保证返回电影），
+  # 同源名（中英双列写同一个词）必须过年份闸门。这类错配页面照样 200，
+  # 分数看起来也完全正常，只能靠域名与年份两条机械闸门拦。
+  "$TSX" probe/check-douban-match.mts
   # 卡片链接 → 静态页的覆盖面：movie 页是 dynamicParams=false 的静态导出，
   # 链接 slug 与 generateStaticParams 的 slug 一旦分叉就是线上 404。
   # 这个 bug 本地构建不报错、类型不报错，只在服务器部署后才被死链检查拦下 ——

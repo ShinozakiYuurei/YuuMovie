@@ -247,6 +247,43 @@ export function bracketTitle(s) {
   return m ? m[1].trim() : '';
 }
 
+/**
+ * 交叉轴判定用的归一化：只留字母数字与 CJK，抹掉大小写、空格与标点
+ *（「Queen Budapest (2026)」与「queen budapest」要能认出是同一个词）
+ */
+const normForCross = (s) =>
+  (s || '').toLowerCase().replace(/[^a-z0-9\u3040-\u30ff\u4e00-\u9fff]/g, '');
+
+/**
+ * 中英双列是否写同一个词（写同一个词 = 没有港译歧义可依赖）
+ *
+ * 「Queen Budapest (2026)」中英都这么写，中英互相验证等于自己对自己，
+ * 交叉轴失效，只能靠年份判断是哪一年那一部。
+ */
+export function sameSourceTitle(zh, en) {
+  const a = normForCross(zh);
+  return Boolean(a) && a === normForCross(en);
+}
+
+/**
+ * 同源名条目的年份闸门（比 pickDoubanCard 严得多）
+ *
+ * pickDoubanCard 允许往前 45 年，因为港译重映片原作可能早几十年
+ *（月黑高飛 港映 2026 →《肖申克的救赎》1994）。
+ * 但那只在**有独立交叉轴**时安全；同源名没有港译歧义可兜底，
+ * 豆瓣年份理应贴着港映年，此时宽容只会放进错配
+ *（Queen Budapest 港映 2026 →《匈牙利狂想曲》1986，差 40 年）。
+ *
+ * 3 年容差容纳跨年上映与次年上映的续集，绝不足以让差 40 年的
+ * 另一部作品蒙混过关。缺年份时不否决（无从判别，不因此丢真条目）。
+ */
+export function crossYearOk(card, year) {
+  const y = Number(year);
+  const cy = Number(card?.year);
+  if (!y || !cy) return true;
+  return Math.abs(cy - y) <= 3;
+}
+
 /** 去掉院线片名里的装饰：括号标记、【】、书名号、尾部噪声、多余空白 */
 export function cleanTitle(s) {
   let out = (s || '').replace(PAREN_RE, ' ');
@@ -492,6 +529,20 @@ export async function resolveDouban(movie, opt = {}) {
     if (cards.length) {
       const card = pickDoubanCard(cards, movie.year);
       if (card) {
+        // 同源名必须过年份闸门（2026-10-09 全站审计）
+        //   中英双列写同一个词时没有港译歧义可依赖，「哪一年那一部」
+        //   就是唯一的判别轴：
+        //     Queen Budapest 港映2026 → 《匈牙利狂想曲》1986（Queen 演唱会）
+        //     Lucky Star   港映2026 → 《幸运星》2007
+        //   豆瓣查不到真主时会拿相关性排序凑数，而 search_suggest
+        //   不比标题、只给相关性排序，所以这层只能靠年份兜。
+        //
+        //   只对同源名收紧：港译重映片天然差几十年
+        //   （月黑高飛 港映2026 →《肖申克的救赎》1994），
+        //   pickDoubanCard 的 45 年窗口对它们是必需的，不能一起收紧。
+        if (sameSourceTitle(zh, en) && !crossYearOk(card, movie.year)) {
+          continue;
+        }
         return {
           card,
           queriedWith: q,

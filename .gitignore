@@ -68,6 +68,10 @@ data.local-test/
 #     （挡详情页「級別」两种状态长得不一样：待映片的 TBC 曾是裸灰字，
 #       与已定级那枚灰底药丸不同壳；顺带钉住 JSON-LD contentRating 与徽章同源）
 #     同样必须扫产物，理由同上。
+#   - check-douban-match.mts 由 deploy/sync.sh 在本地自检阶段跑
+#     （挡豆瓣评分错配：书籍/音乐条目被当电影挂分 —— tag=movie 并不保证
+#       返回的是电影，「次第花開」照样拿回 book 的同名书籍（实测 8.3 分）。
+#       这类错配不报错，页面照样 200、分数看起来也完全正常）
 # 其余是抓包、逆向签名、基准测试等一次性调试现场（含 52MB HTML 转储），
 # 留在本机不进仓库。
 #
@@ -88,6 +92,7 @@ probe/*
 !probe/check-cinema-specs.mts
 !probe/check-english-title.mts
 !probe/check-rating-fallback.mts
+!probe/check-douban-match.mts
 !probe/check-slug-coverage.mts
 !probe/check-slug-redirects.mts
 !probe/check-published-links.mjs

@@ -32,7 +32,14 @@ import { fileURLToPath } from 'node:url';
 
 import { enrichKey } from '../lib/enrich-key.js';
 import { doubanSubjectById, isMovieSubjectUrl, parseDoubanCard, resolveDouban, stripFormatBrands } from './douban-suggest.js';
-import { imdbRatings, imdbUrl, isReissueEvidence, matchesDoubanYear, resolveImdbIds } from './imdb.js';
+import {
+  imdbRatings,
+  imdbUrl,
+  imdbYearGateOk,
+  isReissueEvidence,
+  matchesDoubanYear,
+  resolveImdbIds,
+} from './imdb.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -151,12 +158,26 @@ async function fetchImdb(names, year, opt = {}) {
   const cands = await resolveImdbIds(queries, year);
   if (!cands.length) return null;
 
-  // 首选候选：先看它自己有没有分。
-  // 开销考虑：拿到分就不再查后面的候选，否则 212 部×最多 5 个候选会把评分接口打爆。
+  // 首选候选：先看它自己有没有分，再过年份闸门。
+  //
+  // 闸门顺序是有意的 —— **必须先查分才知道该不该否决**：
+  //   imdbYearGateOk 只对「有分」的条目生效（无分条目多半是为这次重映
+  //   新开的条目，年份天然对不上豆瓣原作年，否决它反而会误杀）。
+  //   不预先取分就分不清这两种情况，所以只能多打这一次评分请求。
+  //
+  // 开销考虑：拿到分且过年份闸门就不再查后面的候选，
+  // 否则 212 部×最多 5 个候选会把评分接口打爆。
   const first = cands[0];
   const firstRating = await imdbRatings(first.id);
   await sleep(jitter(180, 420));
-  if (firstRating && firstRating.rating != null) {
+  const firstHasRating = Boolean(firstRating && firstRating.rating != null);
+  const firstVetoed =
+    firstHasRating &&
+    !imdbYearGateOk(first.year, opt.doubanYear, true, first.title, {
+      venueName: opt.venueName,
+      hkYear: year,
+    });
+  if (firstHasRating && !firstVetoed) {
     return shapeImdb(first, firstRating, cands);
   }
 
@@ -165,7 +186,10 @@ async function fetchImdb(names, year, opt = {}) {
   // 没有证据就保留首选条目（页面显示「暫無評分」），
   // 不冒把同名旧片分数挂到新片上的风险 —— 实测 11 个回退里 7 个是这么错的。
   // 证据来自豆瓣年份，所以调用方必须**先跑豆瓣再跑 IMDb**（见 main 循环）。
-  const allow = isReissueEvidence(opt.doubanYear, year);
+  // 被年份闸门否决时**无论有没有重映证据都要继续找**：
+  // 前者已确定首选是错片，后者只是没分；两种情况都得往下看候选，
+  // 否则否决掉首选就直接返回，等于把这部片打成无分。
+  const allow = firstVetoed || isReissueEvidence(opt.doubanYear, year);
   let best = null;
   if (allow) {
     for (let idx = 1; idx < cands.length; idx++) {
@@ -351,10 +375,22 @@ async function main() {
       }
       doubanDone++;
     }
-    if (!NO_DUBAN) {
-      const dAt = row.douban?.at ? Date.parse(row.douban.at) : 0;
-      const dFresh = row.douban && !row.douban.notFound && now - dAt <= DUBAN_REFRESH_DAYS * 864e5;
-      const dRetry = row.douban?.notFound && now - dAt <= 7 * 864e5;
+   if (!NO_DUBAN) {
+     const dAt = row.douban?.at ? Date.parse(row.douban.at) : 0;
+     const dFresh = row.douban && !row.douban.notFound && now - dAt <= DUBAN_REFRESH_DAYS * 864e5;
+     const dRetry = row.douban?.notFound && now - dAt <= 7 * 864e5;
+      // 缓存里的条目不是电影（书籍/音乐）时，按 ID 刷新救不回来。
+      //   rexxar 是 movie 接口，拿 book/music 的 subject id 去问只会返回 null，
+      //   而按 ID 分支拿到 null 就只记一次 byIdFails —— 脏数据永远留着，
+      //   还会连带把 byIdFails 攒到 5 而降级整条 by-ID 通道，
+      //   害得后面正常条目的刷新也一起停摆。
+      //   2026-10-09 实测：坂本日常/次第花開/chiikawa 見面場 三条
+      //   书籍与音乐条目，rexxar 对它们全返 null。
+      //   所以脏条目一律当作「未识别」丢回搜索，让它重新匹一次。
+      if (row.douban?.doubanId && !isMovieSubjectUrl(row.douban.doubanUrl)) {
+        log('  ↻ 豆瓣 ' + (p.nameZh || p.nameEn) + ': 缓存条目 ' + row.douban.doubanUrl + ' 非电影，重新搜索匹对');
+        row.douban = null;
+      }
       // ★ 已识别条目（有 doubanId）：按 ID 轻量刷新，不重新搜索片名。
       //   （走 rexxar 独立桶，即使网页端搜索被限流也照常刷新。）
       //   搜索端点是限流重灾区，而按 ID 走移动端 rexxar 独立限流桶，
@@ -466,6 +502,7 @@ async function main() {
       } else if (forceSearch || (!FORCE_REFRESH && !DUBAN_ONLY && !iFresh)) {
         const hit = await fetchImdb(p.queries, p.year, {
           doubanYear: row.douban?.doubanYear ?? null,
+          venueName: p.nameEn || p.nameZh,
         });
         row.imdb = hit || { notFound: true };
         if (hit?.rating != null) hits++;
