@@ -14,6 +14,7 @@
  * 跑法：node scripts/test-imdb-year-gate.mjs
  */
 import { imdbYearGateOk, IMDB_DOUBAN_YEAR_MAX_GAP } from '../scrapers/imdb.js';
+import { crossYearOk } from '../scrapers/douban-suggest.js';
 
 const ok = (imdbYear, doubanYear, title, hasRating = true, opt) =>
   imdbYearGateOk(imdbYear, doubanYear, hasRating, title, opt);
@@ -61,6 +62,17 @@ console.log('--- 4. 缺数据时放行 ---');
 check('豆瓣没匹到（无 doubanYear）', ok(2024, null, 'Following'), true);
 check('IMDb 条目无年份', ok(null, 2007, 'Children of Heaven'), true);
 check('首选无分（重映新条目，交给回退逻辑）', ok(2026, 1997, 'Children of Heaven', false), true);
+
+console.log('--- 5. 豆瓣同源名年份闸门（crossYearOk）---');
+// ★ 两个调用点传进来的形状不同，只认一个会让闸门静默失效。
+//   搜索路径传原始 card（字段 year），enrich 判缓存过期传 enrich 行
+//   （字段 doubanYear）。2026-10-09 实测踩过：只认 year 时
+//   queen budapest 的缓存行永远判不出脏，错分一直挂着。
+check('搜索卡片形状 {year}', crossYearOk({ year: 1986 }, 2026), false);
+check('enrich 行形状 {doubanYear}', crossYearOk({ doubanYear: 1986 }, 2026), false);
+check('enrich 行在容差内', crossYearOk({ doubanYear: 2026 }, 2026), true);
+check('enrich 行差 3 年（边界内）', crossYearOk({ doubanYear: 2023 }, 2026), true);
+check('两边都缺年份时放行', crossYearOk({}, 2026), true);
 
 const tail = bad ? bad + " 个用例不符" : "全部通过";
 console.log(tail);

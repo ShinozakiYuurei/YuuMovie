@@ -279,7 +279,12 @@ export function sameSourceTitle(zh, en) {
  */
 export function crossYearOk(card, year) {
   const y = Number(year);
-  const cy = Number(card?.year);
+  // 两个调用点传进来的形状不同，必须都认：
+  //   - 搜索路径传的是 doubanSuggest 的原始 card（字段 year）
+  //   - enrich 里判定缓存是否过期，传的是 enrich 行（字段 doubanYear）
+  //   只认 card.year 会让后者的年份恒为 NaN、闸门静默失效
+  //   （2026-10-09 实测：queen budapest 缓存行永远判不出脏）。
+  const cy = Number(card?.year ?? card?.doubanYear);
   if (!y || !cy) return true;
   return Math.abs(cy - y) <= 3;
 }
