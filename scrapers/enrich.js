@@ -31,7 +31,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { enrichKey } from '../lib/enrich-key.js';
-import { doubanSubjectById, isMovieSubjectUrl, parseDoubanCard, resolveDouban, stripFormatBrands } from './douban-suggest.js';
+import {
+  crossYearOk,
+  doubanSubjectById,
+  isMovieSubjectUrl,
+  parseDoubanCard,
+  resolveDouban,
+  sameSourceTitle,
+  stripFormatBrands,
+} from './douban-suggest.js';
 import {
   imdbRatings,
   imdbUrl,
@@ -390,6 +398,25 @@ async function main() {
       if (row.douban?.doubanId && !isMovieSubjectUrl(row.douban.doubanUrl)) {
         log('  ↻ 豆瓣 ' + (p.nameZh || p.nameEn) + ': 缓存条目 ' + row.douban.doubanUrl + ' 非电影，重新搜索匹对');
         row.douban = null;
+      }
+      // 缓存条目已经不合法时，按 ID 刷新救不回来，必须丢回搜索重匹。
+      //   两种脏数据：
+      //   1) 非电影条目（book/music）。rexxar 是 movie 接口，拿这类
+      //      subject id 去问只返回 null，而按 ID 分支拿到 null 只记一次
+      //      byIdFails —— 脏数据永远留着，还会攒到 5 次把整条 by-ID 通道
+      //      降级，害后面正常条目一起停更。2026-10-09 实测坂本日常、
+      //      次第花開、chiikawa 見面場 三条对 rexxar 全返 null。
+      //   2) 同源名年份不符。这类条目在 movie 域上看起来完全正常，
+      //      by-ID 刷新更救不了（ID 有效，只是匹错了片），只有重新搜索
+      //      才可能匹对 —— 而同源名年份闸门恰好只在搜索时生效。
+      //      Queen Budapest 港映 2026 挂着《匈牙利狂想曲》1986 就是这一类。
+      const staleDouban =
+        Boolean(row.douban?.doubanId) &&
+        (!isMovieSubjectUrl(row.douban.doubanUrl) ||
+          (sameSourceTitle(p.nameZh, p.nameEn) && !crossYearOk(row.douban, p.year)));
+      if (staleDouban) {
+        row.douban = null;
+        log('  ↻ 豆瓣 ' + (p.nameZh || p.nameEn) + ': 缓存条目已不合法，重新搜索匹对');
       }
       // ★ 已识别条目（有 doubanId）：按 ID 轻量刷新，不重新搜索片名。
       //   （走 rexxar 独立桶，即使网页端搜索被限流也照常刷新。）
