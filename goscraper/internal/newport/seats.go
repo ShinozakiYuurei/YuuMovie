@@ -1,19 +1,27 @@
-package chinachem
+package newport
 
 import (
 	"context"
+	"regexp"
 	"sync"
 
 	"github.com/ShinozakiYuurei/YuuMovie/goscraper/internal/model"
 )
 
+var (
+	// The seat plan marks each seat with a class; total counts every seat slot
+	// and available only those still bookable.
+	availableRe = regexp.MustCompile(`class="[^"]*\bavailable\b`)
+	totalSeatRe = regexp.MustCompile(`class="[^"]*\b(?:available|sold)\b`)
+)
+
 // fillSeatAvailability counts seats for every show, mirroring
 // fillSeatAvailability() in scrapers/other-circuits.js.
 //
-// It costs one extra request per show (93 on a real page), so it runs with a
-// small worker pool. A show whose request fails keeps null seats and no remain
-// rate rather than being dropped: the JS swallows the error the same way, and
-// dropping shows would make the schedule look emptier than it really is.
+// One extra request per show is the dominant cost of this circuit, so it runs
+// with a small worker pool. A failed lookup leaves seats nil rather than
+// removing the show: the JS swallows the error the same way, and a dropped show
+// would look like a cancelled screening.
 func (s *Scraper) fillSeatAvailability(ctx context.Context, shows []model.Show) {
 	const concurrency = 4
 	sem := make(chan struct{}, concurrency)
@@ -29,9 +37,8 @@ func (s *Scraper) fillSeatAvailability(ctx context.Context, shows []model.Show) 
 				return
 			}
 			page := string(body)
-			// total counts every seat slot, available only those marked AV.
-			total := len(availAnyRe.FindAllString(page, -1))
-			available := len(availRe.FindAllString(page, -1))
+			total := len(totalSeatRe.FindAllString(page, -1))
+			available := len(availableRe.FindAllString(page, -1))
 			if total <= 0 {
 				return
 			}

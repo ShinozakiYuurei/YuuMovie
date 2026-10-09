@@ -164,8 +164,8 @@ func (s *Scraper) Scrape(ctx context.Context) (*model.Snapshot, error) {
 						Date:       date,
 						Price:      price,
 						Tags:       []string{},
-						Version:    nullableString(version),
-						Language:   nullableString(dialect),
+						Version:    model.PtrToNullable(nullableString(version)),
+						Language:   model.PtrToNullable(nullableString(dialect)),
 						BookingURL: bookingURL,
 						Source:     model.SourceChinachem,
 					})

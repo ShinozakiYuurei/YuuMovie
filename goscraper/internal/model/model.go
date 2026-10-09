@@ -81,22 +81,22 @@ type Cinema struct {
 // that publish a sold/remaining percentage instead have it converted during
 // scraping; circuits that publish nothing leave both null. See lib/seat.ts.
 type Show struct {
-	ID         string   `json:"id"`
-	MovieID    string   `json:"movieId"`
-	CinemaID   string   `json:"cinemaId"`
-	HouseName  string   `json:"houseName"`
-	StartAt    string   `json:"startAt"` // ISO8601 with +08:00 offset
-	Date       string   `json:"date"`    // YYYY-MM-DD, Hong Kong local
-	Price      *float64 `json:"price"`
-	Seats      *int     `json:"seats"`
-	RemainRate *float64 `json:"remainRate"`
-	SoldOut    bool     `json:"soldOut"`
-	Tags       []string `json:"tags"`
-	Category   *string  `json:"category,omitempty"`
-	Version    *string  `json:"version"`
-	Language   *string  `json:"language"`
-	BookingURL string   `json:"bookingUrl"`
-	Source     Source   `json:"source"`
+	ID         string            `json:"id"`
+	MovieID    string            `json:"movieId"`
+	CinemaID   string            `json:"cinemaId"`
+	HouseName  string            `json:"houseName"`
+	StartAt    string            `json:"startAt"` // ISO8601 with +08:00 offset
+	Date       string            `json:"date"`    // YYYY-MM-DD, Hong Kong local
+	Price      *float64          `json:"price"`
+	Seats      *int              `json:"seats"`
+	RemainRate Nullable[float64] `json:"remainRate"`
+	SoldOut    bool              `json:"soldOut"`
+	Tags       []string          `json:"tags"`
+	Category   Nullable[string]  `json:"category"`
+	Version    Nullable[string]  `json:"version"`
+	Language   Nullable[string]  `json:"language"`
+	BookingURL string            `json:"bookingUrl"`
+	Source     Source            `json:"source"`
 }
 
 // Snapshot is what one circuit produces in a run, and what data/sources/<name>.json
