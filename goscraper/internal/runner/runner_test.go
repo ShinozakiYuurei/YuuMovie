@@ -136,7 +136,14 @@ func TestLoadSnapshotRejectsStaleData(t *testing.T) {
 // The run must refuse to publish an empty site rather than blanking it.
 func TestRunRefusesEmptyResult(t *testing.T) {
 	dir := t.TempDir()
-	_, err := Run(t.Context(), Options{DataDir: dir})
+	// Only ask for a circuit that cannot succeed, so the test does not depend on
+	// whether the live sites are reachable.
+	//
+	// Asking for ALL circuits, as this used to, made the test depend on the
+	// network being down: with every circuit failing it passed, and on a machine
+	// with working connectivity it failed after having scraped every cinema in
+	// Hong Kong. That is a property of the outside world, not of the runner.
+	_, err := Run(t.Context(), Options{DataDir: dir, Only: []string{"nonexistent"}})
 	if err == nil {
 		t.Fatal("expected an error when nothing could be scraped")
 	}
