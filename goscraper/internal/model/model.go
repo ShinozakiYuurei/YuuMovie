@@ -89,12 +89,12 @@ type Show struct {
 	Date       string   `json:"date"`    // YYYY-MM-DD, Hong Kong local
 	Price      *float64 `json:"price"`
 	Seats      *int     `json:"seats"`
-	RemainRate *float64 `json:"remainRate,omitempty"`
-	SoldOut    bool     `json:"soldOut,omitempty"`
+	RemainRate *float64 `json:"remainRate"`
+	SoldOut    bool     `json:"soldOut"`
 	Tags       []string `json:"tags"`
 	Category   *string  `json:"category,omitempty"`
-	Version    *string  `json:"version,omitempty"`
-	Language   *string  `json:"language,omitempty"`
+	Version    *string  `json:"version"`
+	Language   *string  `json:"language"`
 	BookingURL string   `json:"bookingUrl"`
 	Source     Source   `json:"source"`
 }
