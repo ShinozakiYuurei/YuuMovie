@@ -65,8 +65,13 @@ func DMYDate(day, month int, now time.Time) string {
 // MapSearch builds the Google Maps search URL the JS used, so the "open in
 // maps" link on cinema pages keeps pointing at the same place.
 func MapSearch(name, address string) string {
-	return "https://www.google.com/maps/search/?api=1&query=" +
-		encodeURIComponent(name+" "+address)
+	// The JS built the query as [name, address].filter(Boolean).join(' '),
+	// so an empty address contributes nothing — not even a trailing space.
+	query := name
+	if address != "" {
+		query += " " + address
+	}
+	return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(query)
 }
 
 var scriptStyleRe = regexp.MustCompile(`(?is)<script[^>]*>.*?</script>|<style[^>]*>.*?</style>`)
