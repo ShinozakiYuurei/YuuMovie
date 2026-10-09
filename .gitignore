@@ -98,3 +98,6 @@ probe/*
 !probe/check-published-links.mjs
 !probe/check-nav-category.mjs
 !probe/check-rating-badge.mjs
+# Go 抓取层移植的对照样本（goscraper/internal/chinachem 的测试要读）
+!probe/chinachem-home.html
+!probe/chinachem-reference.mjs
