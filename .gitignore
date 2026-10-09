@@ -7,6 +7,16 @@ dist/
 *.tsbuildinfo
 next-env.d.ts
 
+# ── Go module cache（服务器上 HOME 就是项目目录）──────────────
+# ★ 为什么必须排除：部署时以 hkmovie 身份跑 go build，而该用户的 HOME
+#   就是 /opt/hk-movie —— Go 默认把 module cache 放在 $HOME/go/pkg/mod，
+#   于是 682MB 的依赖源码落在**项目目录内**。
+#   后果（2026-10-09 实测踩到）：next build 的类型检查会扫到
+#   go/pkg/mod/.../minify/v2/bindings/js/src/*.ts，报
+#   「Cannot find module 'koffi'」直接构建失败 —— 线上因此没发出去。
+#   tsconfig 的 exclude 里也加了 go/（那里才是真正拦截的地方）。
+go/
+
 # ── 抓取数据：由服务器每 2 小时生成，绝不进仓库 ──────
 data/
 

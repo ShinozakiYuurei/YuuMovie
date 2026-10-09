@@ -112,14 +112,47 @@ type Text struct {
 // SetVariations 是空实现（库内 TODO）。而卡片标题必须是粗体，
 // 否则 1200px 宽的图上会是一片发丝般的细字，远看糊成一片。
 //
-// 描边 = 沿字形轮廓向外扩一圈，视觉上就是加粗。
 // 0.030 这个系数是实测定出来的：字号 58px 时约 1.7px 外扩，
 // 观感接近 600–700 字重；再粗（0.045 以上）笔画开始粘连。
 //
-// 注意描边宽度随字号线性缩放：同一个系数在 24px 的小字上只有 0.7px，
+// 注意宽度随字号线性缩放：同一个系数在 24px 的小字上只有 0.7px，
 // 在 58px 的标题上才是 1.7px —— 这正是排版上想要的比例关系。
 func boldStroke(sizePx float64) float64 {
 	return mm(sizePx * 0.030)
+}
+
+// boldOffsets 返回「多遍微移」模拟粗体时，每一遍相对原位的偏移量（毫米）。
+//
+// ===== 为什么不用 canvas.FontStroke =====
+//
+// FontStroke 内部走 Path.Offset → Settle → bentleyOttmann（贝塞尔曲线求交），
+// 在**复杂中文字形**上会直接 panic：
+//
+//   panic: impossible: first segment became vertical and needs reversal,
+//          but was already in the sweep status
+//   at canvas.splitAtIntersections / path_intersection.go:1275
+//
+// 2026-10-09 服务器实测：257 张卡片只写出 230 张就整体中断。
+// 那是库内的断言（不是我们的参数问题），换个描边宽度同样会撞。
+//
+// ===== 多遍微移为什么可行 =====
+//
+// 这是排版软件的经典手法（synthetic bold / poor man's bold）：
+// 同一行字按 8 个方向各画一遍、每次偏移一点点，叠加起来笔画自然变粗。
+// 全程是**填充绘制**，不碰路径求交，因此不会 panic；
+// 且偏移量按字号缩放，与 FontStroke 的观感一致。
+//
+// 9 遍（中心 + 8 方向）而不是 4 遍：4 遍在横竖笔画上够用，
+// 但中文的撇捺是斜向的，只补上下左右会让斜笔显得比横竖细。
+func boldOffsets(sizePx float64) [][2]float64 {
+	// 取描边宽度的一半：FontStroke(w) 是向外扩 w/2，
+	// 微移半径也用 w/2 才能得到同样的字重。
+	r := boldStroke(sizePx) * 0.5
+	return [][2]float64{
+		{0, 0},
+		{r, 0}, {-r, 0}, {0, r}, {0, -r},
+		{r, r}, {-r, -r}, {r, -r}, {-r, r},
+	}
 }
 
 // mm 把像素换算成画布单位（毫米），96 DPI。
@@ -136,10 +169,10 @@ func pt(px float64) float64 { return px * 72.0 / DPI }
 func fromTop(px float64) float64 { return mm(Height - px) }
 
 // face 按 Text 描述取一个可绘制的字体面。
+//
+// 注意 Bold **不在这里**处理：粗体靠绘制多遍实现（见 boldOffsets），
+// 字体面本身始终是普通字面 —— 用 canvas.FontStroke 会在复杂中文字形上 panic。
 func (f *Fonts) face(t Text) *canvas.FontFace {
-	if t.Bold {
-		return f.regular.Face(pt(t.Size), t.Color, canvas.FontStroke(boldStroke(t.Size), t.Color))
-	}
 	return f.regular.Face(pt(t.Size), t.Color)
 }
 
@@ -185,11 +218,22 @@ func (c *Card) Glow(cx, cy, radius float64, col color.RGBA) {
 }
 
 // Text 在 (x, y) 处画一行字。y 是**基线**位置（从顶部量）。
+//
+// Bold 时按 boldOffsets 多画几遍（每次偏移一点点）来加粗 ——
+// 理由见 boldOffsets 的注释：canvas.FontStroke 会在复杂中文字形上 panic。
 func (c *Card) Text(x, y float64, t Text) {
 	if t.Value == "" {
 		return
 	}
-	c.ctx.DrawText(mm(x), fromTop(y), canvas.NewTextLine(c.f.face(t), t.Value, canvas.Left))
+	face := c.f.face(t)
+	line := canvas.NewTextLine(face, t.Value, canvas.Left)
+	if !t.Bold {
+		c.ctx.DrawText(mm(x), fromTop(y), line)
+		return
+	}
+	for _, off := range boldOffsets(t.Size) {
+		c.ctx.DrawText(mm(x)+off[0], fromTop(y)+off[1], line)
+	}
 }
 
 // TextWidth 量一行字渲染后的宽度（像素）。用于居中与换行判断。
