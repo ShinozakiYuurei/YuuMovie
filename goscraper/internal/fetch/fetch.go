@@ -127,6 +127,17 @@ func (c *Client) PostJSON(ctx context.Context, rawURL string, body []byte) ([]by
 	}, body)
 }
 
+// Post sends body to rawURL with caller-supplied headers and returns the reply.
+//
+// The header map is applied after the defaults, so a caller can override
+// Accept and Content-Type, which the gRPC-Web circuit needs: its payloads are
+// length-prefixed protobuf rather than HTML or JSON, and answering a protobuf
+// request with an HTML error page is how a circuit that looks alive ends up
+// scraping a challenge page instead of data.
+func (c *Client) Post(ctx context.Context, rawURL string, body []byte, headers map[string]string) ([]byte, error) {
+	return c.do(ctx, http.MethodPost, rawURL, headers, body)
+}
+
 func (c *Client) do(ctx context.Context, method, rawURL string, headers map[string]string, body ...[]byte) ([]byte, error) {
 	var lastErr error
 	for attempt := 0; attempt <= c.retries; attempt++ {

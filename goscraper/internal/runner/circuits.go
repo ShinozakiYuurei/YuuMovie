@@ -10,6 +10,7 @@ import (
 	"github.com/ShinozakiYuurei/YuuMovie/goscraper/internal/grabticks"
 	"github.com/ShinozakiYuurei/YuuMovie/goscraper/internal/icirena"
 	"github.com/ShinozakiYuurei/YuuMovie/goscraper/internal/lumen"
+	"github.com/ShinozakiYuurei/YuuMovie/goscraper/internal/lux"
 	"github.com/ShinozakiYuurei/YuuMovie/goscraper/internal/mcl"
 	"github.com/ShinozakiYuurei/YuuMovie/goscraper/internal/model"
 	"github.com/ShinozakiYuurei/YuuMovie/goscraper/internal/newport"
@@ -110,7 +111,7 @@ func circuits() []circuit {
 			Name:  string(model.SourceLux),
 			Label: "lux",
 			Scrape: func(ctx context.Context, _ Options) (*model.Snapshot, error) {
-				return nil, fmt.Errorf("lux 尚未移植到 Go")
+				return lux.New().Scrape(ctx)
 			},
 		},
 		{

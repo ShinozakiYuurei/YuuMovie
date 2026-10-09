@@ -40,10 +40,13 @@ func (p *parser) argument() (any, error) {
 	if c == '"' {
 		return p.readString()
 	}
+	if c == 'v' && hasPrefixAt(p.src, p.pos, "void") {
+		return p.readVoid()
+	}
 	if c == '{' || c == '[' {
 		return p.value("")
 	}
-	if c == '-' || (c >= '0' && c <= '9') {
+	if c == '-' || c == '.' || (c >= '0' && c <= '9') {
 		return p.readNumber()
 	}
 	word := p.readIdentifier()
@@ -74,8 +77,12 @@ func (p *parser) value(where string) (any, error) {
 		return p.readObject(where)
 	case c == '[':
 		return p.readArray(where)
-	case c == '-' || c == '+' || (c >= '0' && c <= '9'):
+	case c == '-' || c == '+' || c == '.' || (c >= '0' && c <= '9'):
 		return p.readNumber()
+	}
+
+	if c == 'v' && hasPrefixAt(p.src, p.pos, "void") {
+		return p.readVoid()
 	}
 
 	word := p.readIdentifier()
@@ -248,6 +255,12 @@ func (p *parser) readNumber() (any, error) {
 		p.pos += len("-Infinity")
 		return nil, nil
 	}
+	// A leading dot is legal JavaScript: the minifier writes 0.5 as .5, and HK
+	// Movie 6's payload has one rating in that form. Left to the identifier path
+	// it fails the whole payload, so the dot has to start a number here too.
+	if p.pos < len(p.src) && p.src[p.pos] == '.' {
+		p.pos++
+	}
 	for p.pos < len(p.src) {
 		c := p.src[p.pos]
 		if (c >= '0' && c <= '9') || c == '.' || c == 'e' || c == 'E' || c == '+' || c == '-' {
@@ -266,6 +279,24 @@ func (p *parser) readNumber() (any, error) {
 
 func hasPrefixAt(s string, pos int, prefix string) bool {
 	return pos+len(prefix) <= len(s) && s[pos:pos+len(prefix)] == prefix
+}
+
+// readVoid reads a void expression, which is how devalue writes undefined.
+//
+// Golden Scene's payload only ever used the bare word "undefined", but HK Movie
+// 6 emits "void 0" inside an argument list, where the minifier has no name to
+// shorten. Both spell undefined; anything else after void is not part of this
+// grammar and is refused rather than half-read.
+func (p *parser) readVoid() (any, error) {
+	p.pos += len("void")
+	p.skipSpace()
+	if p.pos < len(p.src) && (p.src[p.pos] == '0' || p.src[p.pos] == '+' || p.src[p.pos] == '-') {
+		if _, err := p.readNumber(); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	}
+	return nil, fmt.Errorf("unexpected void expression %q", p.snippet())
 }
 
 func (p *parser) readString() (any, error) {
