@@ -116,22 +116,10 @@ else
   [ -x "$TSC" ] || { echo "✖ 缺 $TSC，先跑 npm ci --include=dev"; exit 1; }
   [ -x "$TSX" ] || { echo "✖ 缺 $TSX，先跑 npm ci --include=dev"; exit 1; }
   "$TSC" --noEmit
-  "$TSX" probe/check-danger.mts
-  node --import tsx --test scripts/test-poster-parsers.mjs
+  # Go 抓取层、解析器与规则单元测试（毫秒级跑完：包含危险对合并、版本语言、英文名清洗、豆瓣年份/域名闸门、MCL详情等）
+  (cd goscraper && go test ./...)
   # 支付方式是展示／篩選政策；防止 key、來源範圍或英皇香港／澳門覆寫回歸。
   "$TSX" --test scripts/test-cinema-payments.ts
-  # MCL 官方详情从数字 ID 抓取；片名不符要拒绝，且分类/片长/简介须进组级资料卡。
-  "$TSX" probe/check-mcl-details.mts
-  # React Flight 载荷的 `$ref` 还原（行 id 是十六进制）：还原不到就会把 "$3a"
-  # 当简介写进资料卡（2026-10-04 CineArt 实测），所以十进制／十六进制一起钉死。
-  node --import tsx --test scripts/test-flight-records.mjs
-  # 第三方简介（wmoov / kinohk）：索引/详情解析与「宁缺毋滥」的片名匹配，错了会静默配错片。
-  node --import tsx --test scripts/test-synopsis-parsers.mjs
-  # IMDb 年份闸门：豆瓣侧有年份把关，IMDb 侧原本没有，于是「标题子串够像
-  # + 年份差很远」的条目被当正主挂上去（跟蹤 →《Following》2024 另一部片、
-  # 街霸 →《Street Fighter》1994 动画版）。错了不报错，页面照样显示一个看着
-  # 很正常的分数，所以钉死。阈值 3 与剧院录制放宽都在用例里写明理由。
-  node scripts/test-imdb-year-gate.mjs
   # 旧 slug → 新 slug 的 301 规则：错了不报错、页面照样 200，
   # 但会把活页面劫走或把旧链接送进 404 —— 都是只有用户点链接才发现的静默错误。
   node --import tsx --test scripts/test-slug-redirects.mts
@@ -150,9 +138,6 @@ else
   # 类型标签：错了页面照样 200，只是多出「驚悚/驚險(恐怖)片/恐怖片」这种
   # 看着像重复的标签，或半简半繁（豆瓣 enrich 给的是简体）。同样钉死。
   "$TSX" probe/check-genres.mts
-  # 场次卡片的「版本·语言」文案：两个正交维度拼出来，边界碎，
-  # 写错了只是标签变得莫名其妙（「IMAX·加碼重映·英語」），不报错。
-  "$TSX" probe/check-version-text.mts
   # Esri 圖磚：逾時即 abort 的寫法下，慢請求會被親手砍掉、換節點又要重做 TLS
   # 握手 —— 頁面照樣 200，只是地圖靜默變一片空白 +「部分地圖未載入」。
   # 2026-09-26 線上實測（高德時期）：首屏 8 張瓦片 24 次請求全用盡仍不出圖。
@@ -161,18 +146,12 @@ else
   # 戲院影廳規格：推断了错了页面照样 200，只是「有 IMAX 的戲院」
   # 静默少几家 / 多几家 —— 用户筛 IMAX 看不到 K11 也只会以为它没有。
   "$TSX" probe/check-cinema-specs.mts
-  # 详情页中文标题下的英文副标题：来源（组级而非 primary）与清洗（剥版本/活动/
-  # 影展标记）是两个独立失效点，错了页面照样 200 —— 只是整行不见了，
-  # 或变成「4DX Avengers: Endgame Encore Infinity Vision」。
-  # 用户 2026-09-25 报的就是「整行不见了」那一类。
-  "$TSX" probe/check-english-title.mts
   # 组级评分回退：notFound 冠名条目（4DX / Infinity Vision）不能挡住整组评分，
   # 且组内任一条目有分时展示条目必须有分（《復仇者聯盟4》重映实测踩过）。
   "$TSX" probe/check-rating-fallback.mts
   # 豆瓣匹配：书籍/音乐条目不得出分（tag=movie 不保证返回电影），
   # 同源名（中英双列写同一个词）必须过年份闸门。这类错配页面照样 200，
   # 分数看起来也完全正常，只能靠域名与年份两条机械闸门拦。
-  "$TSX" probe/check-douban-match.mts
   # 卡片链接 → 静态页的覆盖面：movie 页是 dynamicParams=false 的静态导出，
   # 链接 slug 与 generateStaticParams 的 slug 一旦分叉就是线上 404。
   # 这个 bug 本地构建不报错、类型不报错，只在服务器部署后才被死链检查拦下 ——

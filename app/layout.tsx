@@ -12,6 +12,7 @@ import { NavLinks } from '@/components/NavLinks';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import localFont from 'next/font/local';
 import { cn } from "@/lib/utils";
+import { socialCard } from '@/lib/og';
 
 const inter = localFont({
   src: './fonts/Inter-Variable.woff2',
@@ -76,6 +77,13 @@ export const metadata: Metadata = {
     locale: 'zh_HK',
     siteName: 'YuuMovie',
   },
+  // 分享卡片：各页给各自的卡片（见 lib/og.ts），这里的 home 是兜底 ——
+  // 万一某页忘了声明，分享出去也不会是一张空白图。
+  ...socialCard({
+    key: 'home',
+    title: 'YuuMovie · 上映及即將上映',
+    description: '香港上映及即將上映電影資訊，整合百老匯、MCL 等院線場次、票價及官方購票連結。',
+  }),
   icons: {
     icon: [{ url: '/favicon.ico' }, { url: '/favicon.svg', type: 'image/svg+xml' }],
   },

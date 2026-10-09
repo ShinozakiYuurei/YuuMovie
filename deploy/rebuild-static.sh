@@ -63,12 +63,14 @@ cd "${APP_DIR}"
 # 保证 Go 二进制存在（优先使用 bin/，未编译时自动构建）
 ensure_go_bins() {
   mkdir -p "${APP_DIR}/bin"
-  if [ ! -x "${APP_DIR}/bin/scrape" ] || [ ! -x "${APP_DIR}/bin/enrich-run" ] || [ ! -x "${APP_DIR}/bin/synopsis-run" ]; then
+  if [ ! -x "${APP_DIR}/bin/scrape" ] || [ ! -x "${APP_DIR}/bin/enrich-run" ] || [ ! -x "${APP_DIR}/bin/synopsis-run" ] || [ ! -x "${APP_DIR}/bin/check-links" ]; then
     echo "  编译 Go 抓取工具链..."
     ( cd "${APP_DIR}/goscraper" && \
       go build -o "${APP_DIR}/bin/scrape" ./cmd/scrape && \
       go build -o "${APP_DIR}/bin/enrich-run" ./cmd/enrich-run && \
-      go build -o "${APP_DIR}/bin/synopsis-run" ./cmd/synopsis-run )
+      go build -o "${APP_DIR}/bin/synopsis-run" ./cmd/synopsis-run && \
+      go build -o "${APP_DIR}/bin/check-links" ./cmd/check-links && \
+      go build -o "${APP_DIR}/bin/ogcardgen" ./cmd/ogcardgen )
   fi
 }
 echo "▶ $(date -Iseconds) 重建静态站点"
@@ -170,6 +172,38 @@ fi
 # 注意：不要 mv 掉 out/ 目录再建新的 —— nginx 容器的 bind mount
 # 绑定的是目录 inode，替换目录会让容器看不到文件（曾踩过这个坑）。
 # 直接构建到原目录即可。
+
+# ---------- 1.8 分享卡片（OG / X Card）----------
+# ★ 必须在构建前：页面 metadata 引用的是 /og/*.jpg，图要先落 public/og/
+#   才能被 next build 拷进 out/，再同步到 nginx 目录。
+#
+# 为什么要生成（用户 2026-10-09 提出）：
+#   1. 首页 / /showing / /upcoming / /cinema / 影院详情页原先**没有任何图**，
+#      贴到 X 上只有一行干巴巴的文字；
+#   2. 电影页原先直接拿**竖版海报**当 og:image，而 X 的大图卡片是 1.91:1 ——
+#      竖图会被裁掉上下两端，恰好裁掉片名与主视觉。
+#   现在按页生成 1200×630 横版卡片，任何页面分享出去都有为该页定制的图。
+#
+# 两步分工（详见各自注释）：
+#   gen-og-plan.mts（TS）算「写什么」—— 复用 lib/data.ts 的分组与文案规则；
+#   bin/ogcardgen（Go） 画「长什么样」—— 解 woff2 中文字体 + 合成海报。
+# 在 Go 里重写分组规则会与页面慢慢分叉，而「卡片片名与页面不一致」极难发现。
+#
+# 非致命：脚本自身增量（已存在即跳过），且 lib/og.ts 对缺失的卡片会回退到
+#   品牌卡 —— 单张失败不该阻断整站重建。
+# OG=0 可跳过。
+if [ "${OG:-1}" = "1" ]; then
+  echo "▶ 生成分享卡片..."
+  T_OG=$(date +%s)
+  if node --import tsx scripts/gen-og-plan.mts && APP_DIR="${APP_DIR}" "${APP_DIR}/bin/ogcardgen"; then
+    echo "  卡片耗时 $(( $(date +%s) - T_OG ))s"
+  else
+    echo "  ⚠️ 分享卡片生成失败，页面将回退到品牌卡（不影响其余内容）"
+  fi
+else
+  echo "▶ OG=0，跳过分享卡片生成"
+fi
+
 echo "▶ 构建中（约 90 秒）..."
 rm -rf "${APP_DIR}/out"
 export NEXT_PUBLIC_SITE_URL="${SITE_URL}"

@@ -1,12 +1,18 @@
 import type { Metadata } from 'next';
 import { getShowingGroups, getMeta } from '@/lib/data';
 import { MovieGroupCard } from '@/components/MovieGroupCard';
+import { socialCard } from '@/lib/og';
 
 // 动态渲染：数据运行时读取
 
 export const metadata: Metadata = {
   title: '全部上映中電影',
   description: '香港現正上映電影完整清單，含各格式版本（IMAX / 4DX / 菲林 / 特典場）與場次。',
+  ...socialCard({
+    key: 'showing',
+    title: '全部上映中電影',
+    description: '香港現正上映電影完整清單，含各格式版本（IMAX / 4DX / 菲林 / 特典場）與場次。',
+  }),
 };
 
 /**

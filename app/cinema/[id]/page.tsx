@@ -8,6 +8,7 @@ import { CinemaMapButton } from '@/components/CinemaMapButton';
 import { CinemaShowtimes } from '@/components/CinemaShowtimes';
 import { bookingFeeOf } from '@/lib/booking-fee';
 import { cinemaCoord } from '@/lib/cinema-geo';
+import { socialCard, cardFileName } from '@/lib/og';
 
 // 静态导出：预先列出所有戏院 id，让每间戏院的详情页都被生成出来。
 // 不写这个的话，out/ 里只会有 /cinema 列表页，详情页全部 404。
@@ -28,6 +29,12 @@ export async function generateMetadata({
   return {
     title: `${cinema.nameZh}｜場次`,
     description: `${cinema.nameZh}${cinema.address ? `（${cinema.address}）` : ''}今日及近期電影場次、票價及購票連結。`,
+    // 分享卡片：构建期生成的戏院专属卡（名称 + 地址 + 影厅规格 + 正在放的片）
+    ...socialCard({
+      key: `cinema-${cardFileName(cinema.id)}`,
+      title: `${cinema.nameZh}｜場次`,
+      description: `${cinema.nameZh}${cinema.address ? `（${cinema.address}）` : ''}今日及近期電影場次、票價及購票連結。`,
+    }),
   };
 }
 

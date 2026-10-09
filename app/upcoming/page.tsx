@@ -2,12 +2,18 @@ import type { Metadata } from 'next';
 import { getUpcomingGroupsByMonth, getMeta } from '@/lib/data';
 import { MovieGroupCard } from '@/components/MovieGroupCard';
 import { formatMonth } from '@/lib/format';
+import { socialCard } from '@/lib/og';
 
 // 动态渲染：数据运行时读取
 
 export const metadata: Metadata = {
   title: '即將上映電影',
   description: '香港即將上映電影一覽，按月歸類，包含上映日期、片長及場次資訊。',
+  ...socialCard({
+    key: 'upcoming',
+    title: '即將上映電影',
+    description: '香港即將上映電影一覽，按月歸類，包含上映日期、片長及場次資訊。',
+  }),
 };
 
 /**

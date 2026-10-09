@@ -78,17 +78,22 @@ verify_site() {
   log "线上 HTML 页数 $n"
   # 阈值可注入：真实站点 240+ 页，沙箱里的假构建只有几页。
   [ "$n" -gt "$min" ] || die "页数只有 $n，低于阈值 $min，站点疑似残缺"
-  if [ -f probe/check-published-links.mjs ]; then
+  if [ -x bin/check-links ]; then
+    bin/check-links "$SITE_DIR" || rc=$?
+    if [ "$rc" = "1" ]; then
+      die "存在死链，判定发布不健康"
+    elif [ "$rc" != "0" ]; then
+      die "死链检查未能执行（exit $rc），不能当作通过"
+    fi
+  elif [ -f probe/check-published-links.mjs ]; then
     node probe/check-published-links.mjs "$SITE_DIR" || rc=$?
-    # 1 = 真有死链；2 = 检查根本没跑起来。两者都要判死，但原因不同，
-    # 不能用 && 串联（set -e 下先失败的那个会吞掉后面的分支）。
     if [ "$rc" = "1" ]; then
       die "存在死链，判定发布不健康"
     elif [ "$rc" != "0" ]; then
       die "死链检查未能执行（exit $rc），不能当作通过"
     fi
   else
-    log "⚠️ 缺 probe/check-published-links.mjs，本次未做死链检查"
+    log "⚠️ 缺 bin/check-links 与 probe/check-published-links.mjs，本次未做死链检查"
   fi
 
   # 詳情頁歸屬（用戶 2026-09-23 回報：待映片詳情頁被標成現正上映，頂欄色塊也亮錯）。
@@ -105,6 +110,26 @@ verify_site() {
     fi
   else
     log "⚠️ 缺 probe/check-nav-category.mjs，本次未做詳情頁歸屬檢查"
+  fi
+
+  # 分享卡片（OG / X Card）：核對產物 HTML 引用的 /og/*.jpg 是否真實存在，
+  # 以及 twitter:card / og:image 尺寸 / 絕對 URL 這三項。
+  #
+  # ★ 為什麼必須檢查：卡片文件名在 lib/og.ts 與 Go 的 ogcardgen 裡**各算一次**，
+  #   兩邊差一個字符，頁面就會引用一個不存在的圖 —— 構建不報錯、頁面照常 200、
+  #   死鏈檢查也掃不到（它只掃 /movie/ 連結），只有把鏈接貼到 X 上才發現是空卡片，
+  #   而且 X 側還會緩存空卡一段時間。用戶 2026-10-09 提出的正是「發鏈接要有卡片」，
+  #   所以這條必須在發布前攔下。
+  if [ -f probe/check-og-cards.mjs ]; then
+    rc=0
+    node probe/check-og-cards.mjs "$SITE_DIR" || rc=$?
+    if [ "$rc" = "1" ]; then
+      die "分享卡片缺失或格式不對，判定發布不健康"
+    elif [ "$rc" != "0" ]; then
+      die "分享卡片檢查未能執行（exit $rc），不能當作通過"
+    fi
+  else
+    log "⚠️ 缺 probe/check-og-cards.mjs，本次未做分享卡片檢查"
   fi
 
   # 詳情頁「級別」的長相（用戶 2026-09-25 回報：待映片的 TBC 是一行裸灰字，
@@ -212,7 +237,9 @@ if command -v go >/dev/null 2>&1 && [ -d goscraper ]; then
   ( cd goscraper && \
     go build -o ../bin/scrape ./cmd/scrape && \
     go build -o ../bin/enrich-run ./cmd/enrich-run && \
-    go build -o ../bin/synopsis-run ./cmd/synopsis-run )
+    go build -o ../bin/synopsis-run ./cmd/synopsis-run && \
+    go build -o ../bin/check-links ./cmd/check-links && \
+    go build -o ../bin/ogcardgen ./cmd/ogcardgen )
 fi
 # ---------- 4 重建静态站 ----------
 # rebuild-static.sh 默认只抓院线数据；ENRICH=1 时可在构建前增量刷新评分。

@@ -19,6 +19,15 @@ data/
 public/posters/*
 !public/posters/.gitkeep
 
+# ── 分享卡片（OG / X Card）：由构建期生成 ─────────────────────
+# 为什么排除：257 张 JPEG 约 15MB，且完全能从 data/ 重建
+# （goscraper/cmd/ogcardgen 读 data/og-plan.json + public/posters/ 现场画）。
+# 服务器上由 rebuild-static.sh 第 1.8 步生成，不进仓库。
+# 保留目录本身：next build 只把**已存在**的 public/ 子目录拷进 out/，
+# 目录不存在时 out/og/ 不会生成，页面引用的卡片就全 404。
+public/og/*
+!public/og/.gitkeep
+
 # ── 服务器私有：密钥、缓存、备份 ────────────────────
 # .ssh/ 必须排除：hkmovie 的 HOME 就是本目录，
 # 只读部署私钥落在仓库内，一旦被 git add -A 扫到就泄进版本库。
@@ -99,6 +108,9 @@ probe/*
 !probe/check-published-links.mjs
 !probe/check-nav-category.mjs
 !probe/check-rating-badge.mjs
+# 分享卡片：核對產物 HTML 引用的 /og/*.jpg 是否存在（見 deploy/vps-deploy.sh）。
+# 放伺服器自檢而非本地：卡片是構建期產物，本機在 next build 之前沒有 out/ 可掃。
+!probe/check-og-cards.mjs
 # Go 抓取层移植的对照样本（goscraper/internal/chinachem 的测试要读）
 !probe/chinachem-home.html
 !probe/chinachem-reference.mjs

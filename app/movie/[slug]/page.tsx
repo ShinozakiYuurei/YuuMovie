@@ -12,6 +12,7 @@ import { buildIntro } from '@/lib/intro';
 import { MovieJsonLd } from '@/components/MovieJsonLd';
 import { MovieIntro } from '@/components/MovieIntro';
 import { MovieShowtimes } from '@/components/MovieShowtimes';
+import { socialCard, cardFileName } from '@/lib/og';
 
 // 静态导出：预先列出所有电影 slug。
 // 只导出「组」的代表 slug（每个版本自己的 slug 由组内跳转，不需要单独页面）。
@@ -52,11 +53,18 @@ export async function generateMetadata({
   return {
     title: `${a.title}｜場次及購票`,
     description: `${a.title}${a.subtitle ? `（${a.subtitle}）` : ''}。${bits.join('，')}。查看全港戲院場次、票價及官方購票連結。`,
-    openGraph: {
+    // 分享卡片：用构建期生成的 1200×630 横版卡，而不是竖版海报。
+    //
+    // ★ 为什么不能直接把 displayPoster 当 og:image（原先就是这么写的）：
+    //   海报是 2:3 竖图，而 X 的大图卡片是 1.91:1 —— 竖图会被裁掉上下两端，
+    //   而海报上的片名与主视觉恰好都在被裁掉的位置，分享出去是一张残图。
+    //   横版卡片把海报完整放在左侧、片名与场次信息排在右侧，两边都保住。
+    ...socialCard({
+      key: `movie-${cardFileName(group.slug)}`,
       title: a.title,
-      description: a.summary?.slice(0, 150),
-      images: group.displayPoster ? [group.displayPoster] : undefined,
-    },
+      description: a.summary?.slice(0, 150) || `${a.title}｜場次及購票`,
+      alt: `${a.title}${a.subtitle ? `（${a.subtitle}）` : ''} 場次及購票`,
+    }),
     alternates: { canonical: `/movie/${group.slug}` },
   };
 }

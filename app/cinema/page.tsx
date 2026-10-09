@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getCinemaFacets, getCinemaRows } from '@/lib/data';
 import { CinemaExplorer } from '@/components/CinemaExplorer';
+import { socialCard } from '@/lib/og';
 
 // 动态渲染：数据从 data/*.json 实时读取，抓取后无需重建
 // （构建时静态化会把数据固化进 HTML，导致更新失效）
@@ -8,6 +9,11 @@ import { CinemaExplorer } from '@/components/CinemaExplorer';
 export const metadata: Metadata = {
   title: '戲院一覽',
   description: '香港各院線戲院地址、地圖、影廳規格（IMAX / 4DX / 全景聲…）及場次資訊。',
+  ...socialCard({
+    key: 'cinema',
+    title: '戲院一覽',
+    description: '香港各院線戲院地址、地圖、影廳規格（IMAX / 4DX / 全景聲…）及場次資訊。',
+  }),
 };
 
 export default function CinemaListPage() {
