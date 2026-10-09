@@ -38,6 +38,17 @@ func main() {
 	doubanOnly := flag.Bool("douban-only", false, "refresh Douban and leave IMDb alone")
 	flag.Parse()
 
+	rootVal := *root
+	outVal := *out
+	if args := flag.Args(); len(args) > 0 {
+		rootVal = args[0]
+		if len(args) > 1 {
+			outVal = args[1]
+		}
+	}
+	forceVal := *force || os.Getenv("FORCE_REFRESH") == "1"
+	noDoubanVal := *noDouban || os.Getenv("NO_DOUBAN") == "1" || os.Getenv("DOUBAN") == "0"
+
 	var filters []string
 	if *only != "" {
 		for _, part := range strings.Split(*only, ",") {
@@ -51,10 +62,10 @@ func main() {
 		Limit:             *limit,
 		Only:              filters,
 		Dry:               *dry,
-		ForceRefresh:      *force,
+		ForceRefresh:      forceVal,
 		RefreshDays:       *refreshDays,
 		DoubanRefreshDays: *doubanDays,
-		NoDouban:          *noDouban,
+		NoDouban:          noDoubanVal,
 		DoubanOnly:        *doubanOnly,
 		Log:               func(line string) { fmt.Println(line) },
 	}
@@ -63,7 +74,7 @@ func main() {
 	defer cancel()
 
 	start := time.Now()
-	runner := enrich.NewRunner(*root, opts)
+	runner := enrich.NewRunner(rootVal, opts)
 	result, err := runner.Run(ctx)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "enrich failed:", err)
@@ -74,14 +85,14 @@ func main() {
 		result.IMDBHits, result.DoubanHits, result.Reused,
 		time.Since(start).Round(time.Second))
 
-	if *out != "" {
+	if outVal != "" {
 		raw, err := runner.CacheJSON()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "encode failed:", err)
 			os.Exit(1)
 		}
 		var buf []byte
-		if *dry || *force {
+		if *dry || forceVal {
 			buf, err = json.MarshalIndent(json.RawMessage(raw), "", " ")
 		} else {
 			buf = raw
@@ -90,11 +101,11 @@ func main() {
 			fmt.Fprintln(os.Stderr, "format failed:", err)
 			os.Exit(1)
 		}
-		if err := os.WriteFile(*out, append(buf, '\n'), 0o644); err != nil {
+		if err := os.WriteFile(outVal, append(buf, '\n'), 0o644); err != nil {
 			fmt.Fprintln(os.Stderr, "write failed:", err)
 			os.Exit(1)
 		}
-		fmt.Println("wrote " + *out)
+		fmt.Println("wrote " + outVal)
 	}
 	_ = strconv.Itoa
 }

@@ -205,6 +205,15 @@ else
   echo "$LOCK_HASH" > "$STAMP"
 fi
 
+# ---------- 3.5 构建 Go 抓取工具链 ----------
+if command -v go >/dev/null 2>&1 && [ -d goscraper ]; then
+  log "构建 Go 抓取工具链"
+  mkdir -p bin
+  ( cd goscraper && \
+    go build -o ../bin/scrape ./cmd/scrape && \
+    go build -o ../bin/enrich-run ./cmd/enrich-run && \
+    go build -o ../bin/synopsis-run ./cmd/synopsis-run )
+fi
 # ---------- 4 重建静态站 ----------
 # rebuild-static.sh 默认只抓院线数据；ENRICH=1 时可在构建前增量刷新评分。
 # 常规定时抓取与发布默认 ENRICH=0，评分由独立的每小时 service/timer 处理。

@@ -31,7 +31,7 @@ echo "════════════════════════�
 echo "▶ [1/7] 安装系统依赖"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq curl ca-certificates gnupg nginx >/dev/null
+apt-get install -y -qq curl ca-certificates gnupg nginx golang-go >/dev/null
 
 # --skip-build 模式下不需要 Node 构建工具链，但仍需 node 运行服务与抓取
 
@@ -46,7 +46,7 @@ if [ "${NEED_NODE}" -eq 1 ]; then
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash - >/dev/null 2>&1
   apt-get install -y -qq nodejs >/dev/null
 fi
-echo "  Node $(node -v) | npm $(npm -v)"
+echo "  Node $(node -v) | npm $(npm -v) | Go $(go version 2>/dev/null || echo missing)"
 
 # ---------- 2. 用户 ----------
 echo "▶ [2/7] 创建服务用户"

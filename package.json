@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "scrape": "node scrape.js",
+    "scrape": "go run ./goscraper/cmd/scrape",
     "posters": "node scripts/fetch-posters.mjs",
     "poster-colors": "node scripts/poster-colors.mjs",
     "test:live": "node scripts/test-live-filter.cjs",

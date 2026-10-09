@@ -60,13 +60,25 @@ POSTER_ORIGIN="${POSTER_ORIGIN:-}"
 SERVICE_USER="${SERVICE_USER:-hkmovie}"
 
 cd "${APP_DIR}"
+# 保证 Go 二进制存在（优先使用 bin/，未编译时自动构建）
+ensure_go_bins() {
+  mkdir -p "${APP_DIR}/bin"
+  if [ ! -x "${APP_DIR}/bin/scrape" ] || [ ! -x "${APP_DIR}/bin/enrich-run" ] || [ ! -x "${APP_DIR}/bin/synopsis-run" ]; then
+    echo "  编译 Go 抓取工具链..."
+    ( cd "${APP_DIR}/goscraper" && \
+      go build -o "${APP_DIR}/bin/scrape" ./cmd/scrape && \
+      go build -o "${APP_DIR}/bin/enrich-run" ./cmd/enrich-run && \
+      go build -o "${APP_DIR}/bin/synopsis-run" ./cmd/synopsis-run )
+  fi
+}
 echo "▶ $(date -Iseconds) 重建静态站点"
 
 # ---------- 0. 抓取 ----------
 if [ "${SCRAPE:-1}" = "1" ]; then
   echo "▶ 抓取数据（ONLY=${ONLY:-全部}）..."
   T_SCRAPE=$(date +%s)
-  node scrape.js
+  ensure_go_bins
+  "${APP_DIR}/bin/scrape"
   echo "  抓取耗时 $(( $(date +%s) - T_SCRAPE ))s"
 else
   echo "▶ SCRAPE=0，跳过院线抓取"
@@ -81,7 +93,8 @@ if [ "${ENRICH:-0}" = "1" ]; then
   # 代码已经切到目标版本、站点却停在上一版 —— 正是 vps-deploy.sh 里点名的最坏结果。
   # 刷不到分只是「沿用上一版分数」，一小时内 hk-movie-ratings.timer 会补上，
   # 不值得拿整次发布去赌。默认 0（严格）保持评分定时器原有的语义。
-  if ! FORCE_REFRESH="${FORCE_REFRESH:-0}" node scrapers/enrich.js; then
+  ensure_go_bins
+  if ! FORCE_REFRESH="${FORCE_REFRESH:-0}" "${APP_DIR}/bin/enrich-run"; then
     if [ "${ENRICH_OPTIONAL:-0}" = "1" ]; then
       echo "  ⚠️ 评分刷新失败，继续重建（沿用上一版评分）"
     else
@@ -102,7 +115,8 @@ fi
 if [ "${SYNOPSIS:-1}" = "1" ]; then
   echo "▶ 补全院线缺失的简介..."
   # SYNOPSIS_FORCE=1 才强制重查（缓存的「查不到」有 7 天 TTL，正常重跑不会敲门）
-  SYNOPSIS_FORCE="${SYNOPSIS_FORCE:-0}" node scrapers/synopsis.js || echo "  ⚠️ 简介补全失败（不影响重建）"
+  ensure_go_bins
+  SYNOPSIS_FORCE="${SYNOPSIS_FORCE:-0}" "${APP_DIR}/bin/synopsis-run" || echo "  ⚠️ 简介补全失败（不影响重建）"
 else
   echo "▶ SYNOPSIS=0，跳过简介补全"
 fi

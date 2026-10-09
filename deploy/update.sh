@@ -36,7 +36,8 @@ rollback() {
 # ---------- 2. 抓取 ----------
 echo "▶ 抓取数据 ..."
 export NODE_ENV=production
-if ! MCL_PROXY="${MCL_PROXY}" node scrape.js; then
+if [ -x "${APP_DIR}/bin/scrape" ]; then SCRAPE_CMD="${APP_DIR}/bin/scrape"; else SCRAPE_CMD="go run ./goscraper/cmd/scrape"; fi
+if ! MCL_PROXY="${MCL_PROXY}" $SCRAPE_CMD; then
   rollback
 fi
 
