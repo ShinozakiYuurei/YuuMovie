@@ -293,7 +293,7 @@ func normalize(cfg Channel, raw *rawPage, now time.Time) *model.Snapshot {
 			ID:          cfg.Source + "-" + id,
 			NameZh:      nameZh,
 			NameEn:      nameEn,
-			OpeningDate: scrapeutil.NullableString(opening),
+			OpeningDate: model.NullablePtr(model.PtrToNullable(scrapeutil.NullableString(opening))),
 			Duration:    nullableNumberToInt(m["duration"]),
 			Category:    scrapeutil.NullableString(firstString(m["category"])),
 			Dialect:     scrapeutil.NullableString(grabLang(records, firstNonNil(m["dialect_lang"], m["dialect"]))),

@@ -41,7 +41,7 @@ func (s *Scraper) scrapeUpcoming(ctx context.Context, html string, concurrency i
 			Slug:        slugify(nameLang["zh_hk"], correctedEnglish(nameLang["en"]), id),
 			NameZh:      nameLang["zh_hk"],
 			NameEn:      correctedEnglish(nameLang["en"]),
-			OpeningDate: nullableString(hktDate(stringOr(m, "openingDate"))),
+			OpeningDate: model.NullablePtr(model.PtrToNullable(nullableString(hktDate(stringOr(m, "openingDate"))))),
 			Duration:    nullishInt(m, "duration"),
 			Category:    nullish(m, "category"),
 			Dialect:     nullish(m, "dialect"),

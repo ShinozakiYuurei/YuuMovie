@@ -51,7 +51,7 @@ func (s *Scraper) scrapeMovieDetail(ctx context.Context, id int, ticketingRecord
 		Slug:        slugify(nameLang["zh_hk"], correctedEnglish(nameLang["en"]), id),
 		NameZh:      nameLang["zh_hk"],
 		NameEn:      correctedEnglish(nameLang["en"]),
-		OpeningDate: scrapeutilNullable(hktDate(stringOr(movie, "openingDate"))),
+		OpeningDate: model.NullablePtr(model.PtrToNullable(scrapeutilNullable(hktDate(stringOr(movie, "openingDate"))))),
 		Duration:    nullishInt(movie, "duration"),
 		Category:    nullish(movie, "category"),
 		Dialect:     nullish(movie, "dialect"),
@@ -82,7 +82,7 @@ func minimalMovie(records map[int]string, m map[string]any, id int) model.Movie 
 		Slug:        slugify(lang["zh_hk"], nameEn, id),
 		NameZh:      lang["zh_hk"],
 		NameEn:      nameEn,
-		OpeningDate: nullableString(hktDate(stringOr(m, "openingDate"))),
+		OpeningDate: model.NullablePtr(model.PtrToNullable(nullableString(hktDate(stringOr(m, "openingDate"))))),
 		Duration:    nullishInt(m, "duration"),
 		// The listing publishes an empty dialect/subtitle on about a quarter of
 		// its films; `?? null` keeps those as "" rather than null.

@@ -178,7 +178,7 @@ func (s *Scraper) Scrape(ctx context.Context, withDetails bool, concurrency int)
 				detail.NameEn = correctedEnglish(lang["en"])
 			}
 			if d := hktDate(stringOr(m, "openingDate")); d != "" {
-				detail.OpeningDate = &d
+				detail.OpeningDate = model.NullablePtr(model.SomeNullable(d))
 			}
 			showing = append(showing, *detail)
 			continue

@@ -163,7 +163,7 @@ func (s *Scraper) normalizeFilm(f rawFilm, status string) model.Movie {
 		ID:          string(src) + "-" + key,
 		NameZh:      filmNameZh(f.FilmName),
 		NameEn:      f.FilmEnName,
-		OpeningDate: openingDate,
+		OpeningDate: model.NullablePtr(model.PtrToNullable(openingDate)),
 		Duration:    f.Duration,
 		Category:    category,
 		Dialect:     nullable(f.FilmLang),

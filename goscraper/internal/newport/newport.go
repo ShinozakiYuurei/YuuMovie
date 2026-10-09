@@ -149,7 +149,7 @@ func Parse(english, chinese string, now time.Time) *model.Snapshot {
 				ID:          "newport-" + movieID,
 				NameZh:      chineseNames[movieID],
 				NameEn:      title,
-				OpeningDate: scrapeutil.NullableString(openingDate),
+				OpeningDate: model.NullablePtr(model.PtrToNullable(scrapeutil.NullableString(openingDate))),
 				Duration:    scrapeutil.NullableInt(duration),
 				Category:    scrapeutil.NullableString(category),
 				Dialect:     scrapeutil.NullableString(dialect),

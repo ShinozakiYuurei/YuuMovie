@@ -79,9 +79,12 @@ func Parse(html string) *model.Snapshot {
 		}
 		// Later events overwrite earlier ones, matching the JS Map.set.
 		movies[movieID] = model.Movie{
-			ID:          movieID,
-			NameZh:      nameZh,
-			NameEn:      nameEn,
+			ID:     movieID,
+			NameZh: nameZh,
+			NameEn: nameEn,
+			// Sunbeam publishes the key with a null value; the field has to be
+			// present rather than omitted, which is what the shared type allows.
+			OpeningDate: model.NullablePtr(model.Nullable[string]{}),
 			Genres:      []string{},
 			Description: "",
 			Poster:      poster,

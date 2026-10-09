@@ -37,24 +37,29 @@ var KnownSources = []Source{
 // (IMAX / 4DX / ...); grouping into a single movie happens in lib/data.ts,
 // never here.
 type Movie struct {
-	ID          string   `json:"id"`
-	Slug        string   `json:"slug"`
-	NameZh      string   `json:"nameZh"`
-	NameEn      string   `json:"nameEn"`
-	OpeningDate *string  `json:"openingDate"`
-	Duration    *int     `json:"duration"`
-	Category    *string  `json:"category"`
-	Dialect     *string  `json:"dialect"`
-	Subtitle    *string  `json:"subtitle"`
-	Genres      []string `json:"genres"`
-	Director    *string  `json:"director"`
-	Cast        *string  `json:"cast"`
-	Description string   `json:"description"`
-	Poster      *string  `json:"poster"`
-	Trailer     *string  `json:"trailer"`
-	DetailURL   string   `json:"detailUrl"`
-	Status      string   `json:"status"` // showing | upcoming
-	Source      Source   `json:"source"`
+	ID     string `json:"id"`
+	Slug   string `json:"slug"`
+	NameZh string `json:"nameZh"`
+	NameEn string `json:"nameEn"`
+
+	// OpeningDate is omittable because the circuits disagree: most write null,
+	// while MCL has no release date at all and writes no key. A plain pointer
+	// with omitempty would drop the null those circuits publish, so the choice
+	// lives in the value.
+	OpeningDate *Nullable[string] `json:"openingDate,omitempty"`
+	Duration    *int              `json:"duration"`
+	Category    *string           `json:"category"`
+	Dialect     *string           `json:"dialect"`
+	Subtitle    *string           `json:"subtitle"`
+	Genres      []string          `json:"genres"`
+	Director    *string           `json:"director"`
+	Cast        *string           `json:"cast"`
+	Description string            `json:"description"`
+	Poster      *string           `json:"poster"`
+	Trailer     *string           `json:"trailer"`
+	DetailURL   string            `json:"detailUrl"`
+	Status      string            `json:"status"` // showing | upcoming
+	Source      Source            `json:"source"`
 	// Cross-circuit merge fields, only set when the same film runs elsewhere.
 	AlsoAt  []Source `json:"alsoAt,omitempty"`
 	Sources []Source `json:"sources,omitempty"`
