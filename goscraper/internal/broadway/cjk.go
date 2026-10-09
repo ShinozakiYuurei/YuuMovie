@@ -6,6 +6,6 @@ import "regexp"
 //
 // The character class is written with literal runes: Go's regexp does not
 // accept the \uXXXX escapes that the JS original used.
-var cjkRe = regexp.MustCompile("[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]")
+var cjkRe = regexp.MustCompile("[㐀-䶿一-鿿豈-﫿]")
 
 func hasCJK(s string) bool { return cjkRe.MatchString(s) }
