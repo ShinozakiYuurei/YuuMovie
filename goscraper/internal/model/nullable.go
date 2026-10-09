@@ -2,6 +2,15 @@ package model
 
 import "encoding/json"
 
+// BoolPtr returns a pointer to v, for the fields a circuit either writes or
+// omits entirely.
+func BoolPtr(v bool) *bool { return &v }
+
+// NullablePtr wraps a value in the three-state container and returns a
+// pointer to it, which is how Show.Category expresses "key absent" against
+// "key present but null".
+func NullablePtr[T any](v Nullable[T]) *Nullable[T] { return &v }
+
 // Nullable is a JSON value that is always written, as null when unset.
 //
 // Why this exists instead of `*T` + omitempty: the Node scrapers are not

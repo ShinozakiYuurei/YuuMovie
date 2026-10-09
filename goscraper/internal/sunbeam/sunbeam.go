@@ -114,11 +114,13 @@ func Parse(html string) *model.Snapshot {
 				Date:       date,
 				Price:      price,
 				Tags:       []string{},
-				Category:   model.Nullable[string]{},
+				Category:   model.NullablePtr(model.Nullable[string]{}),
 				Version:    model.Nullable[string]{},
 				Language:   model.Nullable[string]{},
 				BookingURL: Base + "/schedule",
-				Source:     model.SourceSunbeam,
+				// Sunbeam publishes no seat data, so the key is present and false.
+				SoldOut: model.BoolPtr(false),
+				Source:  model.SourceSunbeam,
 			}
 			showOrder = append(showOrder, showID)
 		}

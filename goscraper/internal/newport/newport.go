@@ -183,11 +183,13 @@ func Parse(english, chinese string, now time.Time) *model.Snapshot {
 				Date:       date,
 				Price:      scrapeutil.ParsePrice(row[7]),
 				Tags:       []string{},
-				Category:   model.PtrToNullable(scrapeutil.NullableString(category)),
+				Category:   model.NullablePtr(model.PtrToNullable(scrapeutil.NullableString(category))),
 				Version:    model.Nullable[string]{},
 				Language:   model.PtrToNullable(scrapeutil.NullableString(dialect)),
 				BookingURL: Base + "/en/ticketing/seatplan/" + sessionID,
-				Source:     model.SourceNewport,
+				// The key is always present here; the seat pass overwrites it.
+				SoldOut: model.BoolPtr(false),
+				Source:  model.SourceNewport,
 			})
 		}
 	}

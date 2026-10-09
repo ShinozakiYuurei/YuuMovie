@@ -31,7 +31,7 @@ func main() {
 		if s.Price != nil {
 			priced++
 		}
-		if s.SoldOut {
+		if s.SoldOut != nil && *s.SoldOut {
 			soldOut++
 		}
 	}

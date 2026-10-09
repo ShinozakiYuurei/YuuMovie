@@ -37,7 +37,7 @@ func main() {
 		if s.Seats != nil {
 			withSeats++
 		}
-		if s.SoldOut {
+		if s.SoldOut != nil && *s.SoldOut {
 			soldOut++
 		}
 	}

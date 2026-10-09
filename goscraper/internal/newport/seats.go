@@ -52,7 +52,7 @@ func (s *Scraper) fillSeatAvailability(ctx context.Context, shows []model.Show) 
 			seats := total
 			shows[idx].Seats = &seats
 			shows[idx].RemainRate = model.SomeNullable(rate)
-			shows[idx].SoldOut = available <= 0
+			shows[idx].SoldOut = model.BoolPtr(available <= 0)
 		}(i)
 	}
 	wg.Wait()

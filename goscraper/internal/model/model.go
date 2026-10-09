@@ -90,9 +90,16 @@ type Show struct {
 	Price      *float64          `json:"price"`
 	Seats      *int              `json:"seats"`
 	RemainRate Nullable[float64] `json:"remainRate"`
-	SoldOut    bool              `json:"soldOut"`
-	Tags       []string          `json:"tags"`
-	Category   Nullable[string]  `json:"category"`
+	// SoldOut is a pointer because three circuits omit the key entirely when
+	// the source does not publish availability: the JS writes
+	// `soldOut: undefined`, and JSON.stringify drops it. A plain bool would
+	// turn those into a hard `false`, claiming the show is bookable.
+	SoldOut *bool    `json:"soldOut,omitempty"`
+	Tags    []string `json:"tags"`
+	// Category is likewise per-circuit: Broadway, Chinachem and Lumen have no
+	// category on a screening, while Sunbeam, Newport and the GrabTicks
+	// circuits write one (often null). nil means the key is absent.
+	Category   *Nullable[string] `json:"category,omitempty"`
 	Version    Nullable[string]  `json:"version"`
 	Language   Nullable[string]  `json:"language"`
 	BookingURL string            `json:"bookingUrl"`

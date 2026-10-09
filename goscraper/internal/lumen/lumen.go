@@ -151,7 +151,9 @@ func (s *Scraper) Scrape(ctx context.Context) (*model.Snapshot, error) {
 				Tags:       []string{},
 				Version:    model.PtrToNullable(scrapeutil.NullableString(htmlx.FirstMatch(altRe, anchor))),
 				BookingURL: abs,
-				Source:     model.SourceLumen,
+				// The key is always present here; fillSoldOut sets it later.
+				SoldOut: model.BoolPtr(false),
+				Source:  model.SourceLumen,
 			})
 		}
 	}
@@ -344,7 +346,7 @@ func (s *Scraper) fillSoldOut(ctx context.Context, shows []model.Show) {
 	for i := range shows {
 		sessionID := strings.TrimPrefix(shows[i].ID, "lumen-")
 		if sold, ok := soldOut[sessionID]; ok && sold {
-			shows[i].SoldOut = true
+			shows[i].SoldOut = model.BoolPtr(true)
 		}
 	}
 }

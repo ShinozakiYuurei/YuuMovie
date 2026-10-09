@@ -167,7 +167,10 @@ func (s *Scraper) Scrape(ctx context.Context) (*model.Snapshot, error) {
 						Version:    model.PtrToNullable(nullableString(version)),
 						Language:   model.PtrToNullable(nullableString(dialect)),
 						BookingURL: bookingURL,
-						Source:     model.SourceChinachem,
+						// This circuit always publishes the key; the seat pass
+						// overwrites it once availability is known.
+						SoldOut: model.BoolPtr(false),
+						Source:  model.SourceChinachem,
 					})
 				}
 			}
