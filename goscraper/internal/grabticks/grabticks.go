@@ -451,7 +451,7 @@ func normalize(cfg Channel, raw *rawPage, now time.Time) *model.Snapshot {
 			RemainRate: remain,
 			SoldOut:    model.BoolPtr(hasAvailable && available <= 0),
 			Tags:       tags,
-			Category:   model.NullablePtr(model.PtrToNullable(scrapeutil.NullableString(firstString(movie["category"])))),
+			Category:   model.CategoryPresent(firstString(movie["category"])),
 			Version:    model.PtrToNullable(scrapeutil.NullableString(version)),
 			Language:   model.PtrToNullable(scrapeutil.NullableString(grabLang(records, firstNonNil(movie["dialect_lang"], movie["dialect"])))),
 			BookingURL: cfg.Base + "/" + cfg.Route + "/show/" + id,

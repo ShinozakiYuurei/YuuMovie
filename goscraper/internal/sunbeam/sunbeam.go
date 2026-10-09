@@ -117,7 +117,7 @@ func Parse(html string) *model.Snapshot {
 				Date:       date,
 				Price:      price,
 				Tags:       []string{},
-				Category:   model.NullablePtr(model.Nullable[string]{}),
+				Category:   model.CategoryNull(),
 				Version:    model.Nullable[string]{},
 				Language:   model.Nullable[string]{},
 				BookingURL: Base + "/schedule",

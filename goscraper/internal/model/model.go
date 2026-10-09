@@ -102,13 +102,14 @@ type Show struct {
 	SoldOut *bool    `json:"soldOut,omitempty"`
 	Tags    []string `json:"tags"`
 	// Category is likewise per-circuit: Broadway, Chinachem and Lumen have no
-	// category on a screening, while Sunbeam, Newport and the GrabTicks
-	// circuits write one (often null). nil means the key is absent.
-	Category   *Nullable[string] `json:"category,omitempty"`
-	Version    Nullable[string]  `json:"version"`
-	Language   Nullable[string]  `json:"language"`
-	BookingURL string            `json:"bookingUrl"`
-	Source     Source            `json:"source"`
+	// category on a screening, while Sunbeam, Newport, Golden Scene and the
+	// GrabTicks circuits write one (often null). See Category for the three
+	// states that keeps apart.
+	Category   Category         `json:"category,omitzero"`
+	Version    Nullable[string] `json:"version"`
+	Language   Nullable[string] `json:"language"`
+	BookingURL string           `json:"bookingUrl"`
+	Source     Source           `json:"source"`
 }
 
 // Snapshot is what one circuit produces in a run, and what data/sources/<name>.json
@@ -161,3 +162,7 @@ type Integrity struct {
 	MoviesWithoutPoster    int `json:"moviesWithoutPoster"`
 	CinemasWithoutAddress  int `json:"cinemasWithoutAddress"`
 }
+
+// omitzero, not omitempty: only an unwritten field should be dropped, and
+// omitempty ignores IsZero on a type with its own marshaller, which would
+// write every absent category as an explicit null.

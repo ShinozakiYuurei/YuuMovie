@@ -183,7 +183,7 @@ func Parse(english, chinese string, now time.Time) *model.Snapshot {
 				Date:       date,
 				Price:      scrapeutil.ParsePrice(row[7]),
 				Tags:       []string{},
-				Category:   model.NullablePtr(model.PtrToNullable(scrapeutil.NullableString(category))),
+				Category:   model.CategoryPresent(category),
 				Version:    model.Nullable[string]{},
 				Language:   model.PtrToNullable(scrapeutil.NullableString(dialect)),
 				BookingURL: Base + "/en/ticketing/seatplan/" + sessionID,

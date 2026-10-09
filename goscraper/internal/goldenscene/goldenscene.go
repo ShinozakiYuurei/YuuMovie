@@ -252,7 +252,7 @@ func (s *Scraper) buildShow(item map[string]any, movieID, date, pageURL, categor
 		RemainRate: model.SomeNullable(rate),
 		SoldOut:    model.BoolPtr(soldOut),
 		Tags:       []string{},
-		Category:   model.NullablePtr(model.PtrToNullable(nullable(category))),
+		Category:   model.CategoryPresent(category),
 		// The version tags are a list of localised objects; the site shows them
 		// as one space-joined label.
 		Version:    model.PtrToNullable(scrapeutil.NullableString(strings.Join(nameList(item["versionTags"]), " "))),

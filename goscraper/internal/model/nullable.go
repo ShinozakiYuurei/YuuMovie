@@ -26,6 +26,15 @@ func NullablePtr[T any](v Nullable[T]) *Nullable[T] { return &v }
 // record-count check does not.
 //
 // Unset marshals as JSON null, matching the Node behaviour for these fields.
+//
+// Read back through a POINTER to Nullable, a null decodes to Set=false and the
+// key then disappears on the next write, which loses the difference between
+// "the circuit wrote null" and "the circuit wrote no key". Show.Category is
+// stored that way because the circuits disagree about which one they write, so
+// decode tracks the two cases separately:
+//
+//	Present *Nullable[T]  nil     → key absent
+//	Present *Nullable[T]  &{null} → key present, value null
 type Nullable[T any] struct {
 	Value T
 	Set   bool
