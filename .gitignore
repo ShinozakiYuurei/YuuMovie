@@ -124,3 +124,15 @@ probe/*
 # Go 抓取层移植的对照样本（goscraper/internal/chinachem 的测试要读）
 !probe/chinachem-home.html
 !probe/chinachem-reference.mjs
+
+# ── 301 重定向表生成物：生成物，不入库 ───────────────
+# deploy/nginx-slug-redirects.conf 是 scripts/gen-slug-redirects.mts 的**输出**，
+# 不是手写配置：它每次重建都按当前数据重算（详情页 slug 是「组内场次最多的条目」，
+# 场次此消彼长会让代表条目换人 → 旧网址 404）。真正生效的那份由服务器上的
+# rebuild-static.sh 生成到 nginx 的 include 目录，本机这份只是「看一眼」。
+#
+# ★ 为什么要显式忽略：脚本自己的文件头写着「生成物，不进仓库」，但没有规则兜着，
+#   本机跑一次生成脚本它就变成 untracked，随后 deploy/sync.sh 的 `git add -A`
+#   会把它一起提交 —— 既污染仓库，又会在下次部署时与服务器侧的生成物撞车。
+#   （2026-10-10 排查 301 表被拒绝写出时顺手撞到，跑完生成脚本就出现了。）
+deploy/nginx-slug-redirects.conf
