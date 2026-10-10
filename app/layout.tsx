@@ -169,7 +169,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
            */}
           <div className="mx-auto flex h-full max-w-6xl flex-nowrap items-center gap-2 px-4 sm:gap-6">
             <Link href="/" className="shrink-0 text-lg font-bold tracking-tight">
-              Yuu<span className="text-accent">Movie</span>
+              Yuu<span className="hkm-brand-accent">Movie</span>
             </Link>
             {/*
              * 主导航：文案与落点见 components/NavLinks.tsx
@@ -241,7 +241,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               {/* 列 1：品牌 + 免责说明 */}
               <div className="max-w-md sm:col-span-2 lg:col-span-1">
                 <Link href="/" className="text-lg font-bold tracking-tight">
-                  Yuu<span className="text-accent">Movie</span>
+                  Yuu<span className="hkm-brand-accent">Movie</span>
                 </Link>
                 <p className="mt-4 text-xs leading-relaxed text-fg-dim">
                   本網站僅提供電影資訊聚合服務，所有場次及票價資料來自各院線官方網站，僅供參考。

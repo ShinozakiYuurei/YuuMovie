@@ -256,10 +256,20 @@
   --hkm-skeleton-a: rgb(255 255 255 / 0.04);
   --hkm-skeleton-b: rgb(255 255 255 / 0.09);
 
-  /* 渐变强调字的第二端（.hkm-grad-text） */
-  --hkm-grad-2: #67e8f9;
-  /* ★ 这里必须留一份：@theme 的 --color-accent2 指向它，
-     而 to-accent2（首页区块标题的渐变端）靠那个 @theme key 生成。
+  /* 渐变强调字的两端（.hkm-grad-text）
+   *
+   * 2026-10-10 用户要求：暗色下这些强调字改成白色，跟 logo 的
+   * 「Movie」一致 —— 首页首屏三块紫（logo + 两个区块标题）撞在
+   * 一起，反而互相削弱，谁也不再是重点。
+   *
+   * 两端取同一个值而不是删掉渐变：类本身不区分主题，明暗差异
+   * 全部由令牌承担（浅色 / 淡粉仍取各自的品牌色）。
+   */
+  --hkm-grad-1: var(--hkm-fg);
+  --hkm-grad-2: var(--hkm-fg);
+  /* accent2 属于「取自海报主色」那条链路，与上面的 --hkm-grad-2 是两回事，
+     所以这里必须留一份：@theme 的 --color-accent2 指向它，
+     而 to-accent2（页面上那条细竖条）靠那个 @theme key 生成。
      明色主题下它被换成 #0e7490（浅青在浅底上只有 1.4:1，等于消失）。 */
   --hkm-accent2: #67e8f9;
 
@@ -329,6 +339,28 @@
    *   这条是那次扫描顺手拓出来的（不在原改造范围内，但同属「白字要看得清」）。 */
   --hkm-btn-primary-1: #8b7cff;
   --hkm-btn-primary-2: #6d5cf0;
+
+  /* ---- 品牌文字与首页 CTA（2026-10-10 用户指定）----
+   *
+   * 同样是暗色下改白，但**不能**直接把 --hkm-accent 改成白：
+   * accent 全站还有别的职责（分级徽章边框、场次 hover、重试链接、
+   * 聚焦环），那些地方仍需要品牌色来表达「可交互 / 有状态」。
+   * 所以这里只把「品牌标识 + 首页 CTA」这一类换白，交互反馈仍归 accent。
+   *
+   * 浅色与淡粉主题必须在各自块里覆写（见下方两处）：
+   * 浅底 / 粉底上白字等于消失，那三处必须回到品牌深色。
+   */
+  --hkm-brand-fg: var(--hkm-fg);
+
+  /* CTA 按钮：透明玻璃 + 白字 + 发丝边（用户指定不是实心白） */
+  --hkm-cta-fg: #ffffff;
+  --hkm-cta-border: rgb(255 255 255 / 0.28);
+  --hkm-cta-border-hover: rgb(255 255 255 / 0.5);
+  --hkm-cta-bg-1: rgb(255 255 255 / 0.1);
+  --hkm-cta-bg-2: rgb(255 255 255 / 0.03);
+  --hkm-cta-inset-top: rgb(255 255 255 / 0.22);
+  --hkm-cta-outer: rgb(0 0 0 / 0.55);
+  --hkm-cta-outer-hover: rgb(0 0 0 / 0.7);
 
   /* 暗色卡片上的评分用柔和亮黄文字，不再依赖彩色胶囊底色。 */
   --hkm-score-fg: #facc15;
@@ -457,6 +489,7 @@ html[data-theme='pink'] {
   --hkm-accent-soft: #6b46e5;
   --hkm-accent-glow-rgb: 91 57 214;
   --hkm-accent2: #0e7490;
+  --hkm-grad-1: var(--hkm-accent-soft);
   --hkm-grad-2: #0e7490;
 
   /* 主按钮：白字压在 #8B7CFF 上只有 3.4:1，明色下换成深紫 #6B46E5
@@ -464,6 +497,17 @@ html[data-theme='pink'] {
      全站所有 CTA 的观感，不在本次范围内。 */
   --hkm-btn-primary-1: #6b46e5;
   --hkm-btn-primary-2: #5b39d6;
+  /* 暗色下改白的那几处，本主题必须回到品牌深色，否则浅底白字 */
+  --hkm-brand-fg: var(--hkm-accent);
+
+  --hkm-cta-fg: #ffffff;
+  --hkm-cta-border: rgb(255 255 255 / 0);
+  --hkm-cta-border-hover: rgb(255 255 255 / 0);
+  --hkm-cta-bg-1: var(--hkm-btn-primary-1);
+  --hkm-cta-bg-2: var(--hkm-btn-primary-2);
+  --hkm-cta-inset-top: rgb(255 255 255 / 0.45);
+  --hkm-cta-outer: rgb(var(--hkm-accent-glow-rgb) / 0.8);
+  --hkm-cta-outer-hover: rgb(var(--hkm-accent-glow-rgb) / 0.95);
 
   --hkm-score-fg: #b45309;
 
@@ -634,9 +678,21 @@ html[data-theme='pink'] {
   --hkm-accent-soft: #a51d58;
   --hkm-accent-glow-rgb: 146 24 76;
   --hkm-accent2: #9d174d;
+  --hkm-grad-1: var(--hkm-accent-soft);
   --hkm-grad-2: #9d174d;
   --hkm-btn-primary-1: #b42362;
   --hkm-btn-primary-2: #92184c;
+  /* 暗色下改白的那几处，本主题必须回到品牌深色，否则浅底白字 */
+  --hkm-brand-fg: var(--hkm-accent);
+
+  --hkm-cta-fg: #ffffff;
+  --hkm-cta-border: rgb(255 255 255 / 0);
+  --hkm-cta-border-hover: rgb(255 255 255 / 0);
+  --hkm-cta-bg-1: var(--hkm-btn-primary-1);
+  --hkm-cta-bg-2: var(--hkm-btn-primary-2);
+  --hkm-cta-inset-top: rgb(255 255 255 / 0.45);
+  --hkm-cta-outer: rgb(var(--hkm-accent-glow-rgb) / 0.8);
+  --hkm-cta-outer-hover: rgb(var(--hkm-accent-glow-rgb) / 0.95);
 
   --hkm-glass-border: rgb(190 24 84 / 0.15);
   --hkm-glass-bg: rgb(255 236 244 / 0.86);
@@ -1616,6 +1672,18 @@ html[data-theme='pink'] .hkm-accent-panel {
 }
 
 /* ============================================================
+   品牌词的强调色（logo 的「Movie」）
+
+   ★ 为什么不直接用 text-accent：accent 是「可交互 / 有状态」的信号色
+     （见 MovieIntro 的分级徽章、CinemaShowtimes 的 hover 态），
+     logo 不是交互提示，只是站名。暗色下它要与前面的「Yuu」同为白色，
+     所以走独立的 --hkm-brand-fg。
+   ============================================================ */
+.hkm-brand-accent {
+  color: var(--hkm-brand-fg);
+}
+
+/* ============================================================
    标题强调字（渐变文字）
 
    ★ 抽成类的原因：原先这段渐变在 5 个页面里各写一遍
@@ -1627,7 +1695,7 @@ html[data-theme='pink'] .hkm-accent-panel {
    保留品牌辨识度，但不再抢内容。
    ============================================================ */
 .hkm-grad-text {
-  background-image: linear-gradient(100deg, var(--hkm-accent-soft), var(--hkm-grad-2));
+  background-image: linear-gradient(100deg, var(--hkm-grad-1), var(--hkm-grad-2));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -1666,6 +1734,42 @@ html[data-theme='pink'] .hkm-accent-panel {
     inset 0 -1px 0 0 rgb(0 0 0 / 0.25),
     0 10px 26px -12px rgb(var(--hkm-accent-glow-rgb) / 0.95);
   filter: brightness(1.06);
+}
+
+/*
+ * 首页区块条的「查看全部」按钮
+ *
+ * ★ 为什么不复用 .hkm-btn-primary：
+ *   那是品牌紫实心块，另有两处在用（详情页「看场次」、
+ *   戏院卡「查看场次」），那些不在本次范围内。
+ *   这里单开一个类，明暗差异全部由 --hkm-cta-* 令牌承担：
+ *   暗色 = 透明玻璃 + 白字 + 发丝边（用户指定），
+ *   浅色 / 淡粉 = 与改前完全一致的紫渐变实心块。
+ *
+ * ★ 与 .hkm-btn-ghost 的区别：ghost 是次级按钮（本来就该低调），
+ *   这颗是首页两个区块的出口，需要一点存在感，
+ *   所以保留内高光与外投影，只是把「色」从品牌紫换成白。
+ */
+.hkm-btn-cta {
+  position: relative;
+  border: 1px solid var(--hkm-cta-border);
+  background-image: linear-gradient(
+    145deg,
+    var(--hkm-cta-bg-1) 0%,
+    var(--hkm-cta-bg-2) 100%
+  );
+  color: var(--hkm-cta-fg);
+  box-shadow:
+    inset 0 1px 0 0 var(--hkm-cta-inset-top),
+    0 4px 14px -8px var(--hkm-cta-outer);
+  transition: border-color 0.25s ease, background-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+.hkm-btn-cta:hover {
+  border-color: var(--hkm-cta-border-hover);
+  box-shadow:
+    inset 0 1px 0 0 var(--hkm-cta-inset-top),
+    0 8px 22px -10px var(--hkm-cta-outer-hover);
 }
 
 /*

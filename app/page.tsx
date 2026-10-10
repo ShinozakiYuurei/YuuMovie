@@ -44,7 +44,7 @@ function SectionBar({
         <h2 className="text-xl font-bold tracking-tight text-fg">{title}</h2>
         <p className="mt-1 text-sm text-fg-muted">{subtitle}</p>
       </div>
-      <span className="hkm-btn-primary shrink-0 rounded-full px-4 py-2 text-xs font-semibold">
+      <span className="hkm-btn-cta shrink-0 rounded-full px-4 py-2 text-xs font-semibold">
         {cta} →
       </span>
     </Link>
