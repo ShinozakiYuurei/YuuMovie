@@ -178,10 +178,16 @@ export function buildRedirects(): RedirectEntry[] {
  *   但**容器下一次重启就会起不来**，而且这个 nginx 还带着另外三个站。
  *   所以宁可「本次不更新表」（沿用旧表，旧 slug 可能 404）也不写出坏文件。
  *
- * 实测（2026-10-04，530 条真实数据）：最长 key/value 均 108 字符。
- * 上限按 bucket_size 算，再留 8 字符余量给将来。
+ * ★★ 2026-10-10：128 → 256，上限随之从 120 放宽到 248 ★★
+ *
+ *   起因：CHIIKAWA 特典場那条 key 实测 122 字符，**撞破**了 120 上限，
+ *   脚本拒绝写表并沿用上一版 —— 那个旧地址就一直 404。
+ *   而这不是偶然：条目 slug = slugify(片名) + 院线 id，片名**没有长度上限**
+ *   （抓取器不截断），长英文片名轻易破 100。
+ *   nginx 侧已同步提到 256（见 deploy/nginx-static.conf，
+ *   且要跑 sync-nginx-conf.sh 才真正上线上）。
  */
-const NGINX_BUCKET_SIZE = 128;
+const NGINX_BUCKET_SIZE = 256;
 const MAX_KEY_LEN = NGINX_BUCKET_SIZE - 8;
 
 /** 渲染成 nginx map 块 */
@@ -262,7 +268,8 @@ function main() {
     );
     for (const s of tooLong.slice(0, 5)) console.error(`    ${s.length} 字符：${s}`);
     console.error(
-      `  处理：提高 deploy/nginx-static.conf 的 map_hash_bucket_size（同步记得走 sync-nginx-conf.sh）`
+      `  处理：提高 deploy/nginx-static.conf 的 map_hash_bucket_size 与本文件的 NGINX_BUCKET_SIZE` +
+        `（同步记得走 sync-nginx-conf.sh）`
     );
     process.exitCode = 1;
     return;
