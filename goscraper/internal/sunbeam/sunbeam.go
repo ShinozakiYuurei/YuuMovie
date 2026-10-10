@@ -24,6 +24,23 @@ import (
 // Base is the circuit's site root.
 const Base = "https://www.sunbeamwhampoa.com"
 
+// CoverBase is the host that actually serves the cover images.
+//
+// ★ 2026-10-10：海报 21 张全 404 的根因就是这个主机名。
+//
+//	页面里的 coverUrl 是**相对**路径（whampoa/covers/xxx.jpg），
+//	拼哪个主机决定生死，而两者行为相反（实测同一张图）：
+//	  www.sunbeamwhampoa.com/whampoa/covers/...  → 404（返回 112KB 的 HTML 错误页）
+//	  cdn.sunbeamwhampoa.com/whampoa/covers/...  → 200（14MB JPEG）
+//	原先这里传的是 Base（www），于是数据里存下一批**永远取不到**的 URL；
+//	scripts/fetch-posters.mjs 下载失败后按设计保留旧记录并回退，
+//	而旧记录也指向失效的 www —— 于是这几张海报既没本地化、也取不到远端。
+//
+// 这与原 JS 一致：它传给 absoluteUrl 的 base 也是 cdn.sunbeamwhampoa.com
+// （见 deep_parity_test.go 里「JS 传 cdn」那句注释）。
+// 之前 Go 版传 Base 是照抄了页面 host，属于误读。
+const CoverBase = "https://cdn.sunbeamwhampoa.com"
+
 // cinemaID is the single venue this circuit operates.
 const cinemaID = "sunbeam-1"
 
@@ -72,7 +89,7 @@ func Parse(html string) *model.Snapshot {
 		movieID := "sunbeam-" + eventID
 		nameZh := scrapeutil.DecodeJSString(html[ev[8]:ev[9]])
 		nameEn := scrapeutil.DecodeJSString(html[ev[10]:ev[11]])
-		poster := ParsePoster(body, Base)
+		poster := ParsePoster(body, CoverBase)
 
 		if _, seen := movies[movieID]; !seen {
 			movieOrder = append(movieOrder, movieID)

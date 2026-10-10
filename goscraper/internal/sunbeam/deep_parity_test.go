@@ -13,12 +13,7 @@ import (
 // retyped while the record count stays identical, which is exactly the class of
 // bug the Chinachem port had to chase.
 //
-// Two differences are expected and asserted rather than ignored:
-//
-//   - poster host. The JS passes cdn.sunbeamwhampoa.com as the base, but the
-//     page's own coverUrl values are absolute on www.sunbeamwhampoa.com, so
-//     resolving them yields the www host. Both serve the same object; the www
-//     form is what the page itself links to.
+// One difference is expected and asserted rather than ignored:
 //
 //   - null vs absent for category/version/language. Chinachem omits these keys
 //     while Sunbeam writes null. Every reader is a truthiness test, so the two
@@ -92,9 +87,15 @@ func diffRecords(t *testing.T, kind string, got, want any) {
 	}
 }
 
-// samePosterObject reports whether two URLs point at the same cover, ignoring
-// the host. The JS resolves relative covers against cdn.sunbeamwhampoa.com
-// while the page's own values are absolute on www.sunbeamwhampoa.com.
+// samePosterObject compares two URLs by path, ignoring the host.
+//
+// ★ 2026-10-10：这**曾经是个 bug**。它当年把 www 与 cdn 当成等价，
+//
+//	而实测两者行为相反：www 返回 404、cdn 返回 200。于是 Go 产出的一批
+//	www 地址通过了这项断言、被当成与 Node 一致，实际全是死链，
+//	最终 21 张海报在生产环境 404。
+//	现在 Go 与 JS 都用 cdn.sunbeamwhampoa.com，主机本来就相同，
+//	所以路径相同即视为相等；这项断言退化成一道兜底而不再是「已知差异」。
 func samePosterObject(a, b string) bool {
 	if a == b {
 		return true

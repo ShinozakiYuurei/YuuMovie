@@ -5,7 +5,7 @@ import (
 )
 
 func TestParsePosterUnit(t *testing.T) {
-	CDN := "https://cdn.sunbeamwhampoa.com"
+	CDN := CoverBase
 	s1 := `eventNameTc:"影片",coverUrl:"whampoa/covers/a.jpg",censorshipImageUrl:null`
 	p1 := ParsePoster(s1, CDN)
 	if p1 == nil || *p1 != "https://cdn.sunbeamwhampoa.com/whampoa/covers/a.jpg" {
@@ -28,5 +28,23 @@ func TestParsePosterUnit(t *testing.T) {
 	p4 := ParsePoster(s4, CDN)
 	if p4 != nil {
 		t.Errorf("got %v, want nil", p4)
+	}
+}
+
+// ★ 2026-10-10 新增（21 张海报 404 的回归守卫）：
+//
+//	相对封面路径必须解析到 cdn.sunbeamwhampoa.com，**不能**是 www。
+//	实测同一张图 www 返回 404（HTML 错误页）、cdn 返回 200（JPEG），
+//	而 Parse() 传的 base 决定拼出哪个主机 —— 这条断言就是那道守卫。
+func TestCoverBaseServesImages(t *testing.T) {
+	if CoverBase != "https://cdn.sunbeamwhampoa.com" {
+		t.Errorf("CoverBase = %q, want cdn host", CoverBase)
+	}
+	got := ParsePoster(`coverUrl:"whampoa/covers/a.jpg"`, CoverBase)
+	if got == nil {
+		t.Fatal("ParsePoster returned nil")
+	}
+	if *got != "https://cdn.sunbeamwhampoa.com/whampoa/covers/a.jpg" {
+		t.Errorf("got %q, want the cdn form", *got)
 	}
 }
