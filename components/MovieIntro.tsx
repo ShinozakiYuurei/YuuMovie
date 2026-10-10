@@ -417,7 +417,7 @@ export function MovieIntro({ group }: { group: MovieGroup }) {
             {group.totalShows > 0 && (
               <a
                 href="#versions"
-                className="hkm-btn-primary flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold"
+                className="hkm-btn-ghost flex items-center gap-2 rounded-full px-5 py-2.5 text-sm"
               >
                 {/*
                  * ★ 2026-09-21 用户要求：把「查看 358 個場次」换成「图标 + 場次」。

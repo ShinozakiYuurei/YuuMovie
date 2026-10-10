@@ -330,16 +330,6 @@
   --hkm-accent-soft: #a78bfa;
   --hkm-accent-glow-rgb: 124 108 255;
 
-  /* 主按钮的渐变两端
-   *
-   * ★ 明色主题下必须换深一档，理由不是「好看」而是可读性：
-   *   按钮上是**白字**，白字压在 #8B7CFF 上只有 3.4:1，不达 AA。
-   *   暗色主题下这个值看着没问题（大面积饱和色块 + 白字，观感上「亮」），
-   *   但它本来就不达 AA —— 明色主题要求把全站过一遍对比度，
-   *   这条是那次扫描顺手拓出来的（不在原改造范围内，但同属「白字要看得清」）。 */
-  --hkm-btn-primary-1: #8b7cff;
-  --hkm-btn-primary-2: #6d5cf0;
-
   /* ---- 品牌文字与首页 CTA（2026-10-10 用户指定）----
    *
    * 同样是暗色下改白，但**不能**直接把 --hkm-accent 改成白：
@@ -492,22 +482,19 @@ html[data-theme='pink'] {
   --hkm-grad-1: var(--hkm-accent-soft);
   --hkm-grad-2: #0e7490;
 
-  /* 主按钮：白字压在 #8B7CFF 上只有 3.4:1，明色下换成深紫 #6B46E5
-     （白字 5.6:1）。暗色主题下那颗按钮的颜色维持原样 —— 改它会牵动
-     全站所有 CTA 的观感，不在本次范围内。 */
-  --hkm-btn-primary-1: #6b46e5;
-  --hkm-btn-primary-2: #5b39d6;
   /* 暗色下改白的那几处，本主题必须回到品牌深色，否则浅底白字 */
   --hkm-brand-fg: var(--hkm-accent);
 
-  --hkm-cta-fg: #ffffff;
-  --hkm-cta-border: rgb(255 255 255 / 0);
-  --hkm-cta-border-hover: rgb(255 255 255 / 0);
-  --hkm-cta-bg-1: var(--hkm-btn-primary-1);
-  --hkm-cta-bg-2: var(--hkm-btn-primary-2);
-  --hkm-cta-inset-top: rgb(255 255 255 / 0.45);
-  --hkm-cta-outer: rgb(var(--hkm-accent-glow-rgb) / 0.8);
-  --hkm-cta-outer-hover: rgb(var(--hkm-accent-glow-rgb) / 0.95);
+  /* 首页「查看全部」：全站不再留紫色实心块（2026-10-10 用户指定），
+     本主题与暗色一样走玻璃 + 品牌深色字，只是底是白的。 */
+  --hkm-cta-fg: var(--hkm-accent);
+  --hkm-cta-border: rgb(9 9 11 / 0.14);
+  --hkm-cta-border-hover: rgb(var(--hkm-accent-glow-rgb) / 0.5);
+  --hkm-cta-bg-1: rgb(255 255 255 / 0.8);
+  --hkm-cta-bg-2: rgb(255 255 255 / 0.45);
+  --hkm-cta-inset-top: rgb(255 255 255 / 0.9);
+  --hkm-cta-outer: rgb(9 9 11 / 0.12);
+  --hkm-cta-outer-hover: rgb(var(--hkm-accent-glow-rgb) / 0.5);
 
   --hkm-score-fg: #b45309;
 
@@ -680,19 +667,19 @@ html[data-theme='pink'] {
   --hkm-accent2: #9d174d;
   --hkm-grad-1: var(--hkm-accent-soft);
   --hkm-grad-2: #9d174d;
-  --hkm-btn-primary-1: #b42362;
-  --hkm-btn-primary-2: #92184c;
   /* 暗色下改白的那几处，本主题必须回到品牌深色，否则浅底白字 */
   --hkm-brand-fg: var(--hkm-accent);
 
-  --hkm-cta-fg: #ffffff;
-  --hkm-cta-border: rgb(255 255 255 / 0);
-  --hkm-cta-border-hover: rgb(255 255 255 / 0);
-  --hkm-cta-bg-1: var(--hkm-btn-primary-1);
-  --hkm-cta-bg-2: var(--hkm-btn-primary-2);
-  --hkm-cta-inset-top: rgb(255 255 255 / 0.45);
-  --hkm-cta-outer: rgb(var(--hkm-accent-glow-rgb) / 0.8);
-  --hkm-cta-outer-hover: rgb(var(--hkm-accent-glow-rgb) / 0.95);
+  /* 首页「查看全部」：全站不再留紫色实心块（2026-10-10 用户指定），
+     本主题与浅色一样走玻璃 + 品牌深色字。 */
+  --hkm-cta-fg: var(--hkm-accent);
+  --hkm-cta-border: rgb(190 24 84 / 0.2);
+  --hkm-cta-border-hover: rgb(var(--hkm-accent-glow-rgb) / 0.5);
+  --hkm-cta-bg-1: rgb(255 255 255 / 0.85);
+  --hkm-cta-bg-2: rgb(255 255 255 / 0.5);
+  --hkm-cta-inset-top: rgb(255 255 255 / 0.95);
+  --hkm-cta-outer: rgb(120 35 72 / 0.14);
+  --hkm-cta-outer-hover: rgb(var(--hkm-accent-glow-rgb) / 0.5);
 
   --hkm-glass-border: rgb(190 24 84 / 0.15);
   --hkm-glass-bg: rgb(255 236 244 / 0.86);
@@ -1709,46 +1696,19 @@ html[data-theme='pink'] .hkm-accent-panel {
    让分数融入信息行，而不是像额外状态标签一样跳出来。
    ============================================================ */
 
-/*
- * 主要按钮：品牌紫渐变 + 一层玻璃光泽
- *
- * ★ 为什么**不能**给它加 backdrop-filter：
- *   主按钮是不透明的紫色渐变，背景完全不透 —— 模糊身后内容根本看不见，
- *   纯属白交性能费。它的「玻璃感」来自顶部那道内高光（模拟光打在
- *   按钮上沿的折射），而不是通透度。
- */
-.hkm-btn-primary {
-  position: relative;
-  background: linear-gradient(135deg, var(--hkm-btn-primary-1), var(--hkm-btn-primary-2));
-  color: #fff;
-  box-shadow:
-    /* 上沿亮、下沿暗：一根圆柱形玻璃棒的受光 */
-    inset 0 1px 0 0 rgb(255 255 255 / 0.45),
-    inset 0 -1px 0 0 rgb(0 0 0 / 0.25),
-    0 6px 20px -12px rgb(var(--hkm-accent-glow-rgb) / 0.8);
-  transition: box-shadow 0.25s ease, transform 0.25s ease, filter 0.25s ease;
-}
-.hkm-btn-primary:hover {
-  box-shadow:
-    inset 0 1px 0 0 rgb(255 255 255 / 0.6),
-    inset 0 -1px 0 0 rgb(0 0 0 / 0.25),
-    0 10px 26px -12px rgb(var(--hkm-accent-glow-rgb) / 0.95);
-  filter: brightness(1.06);
-}
 
 /*
  * 首页区块条的「查看全部」按钮
  *
- * ★ 为什么不复用 .hkm-btn-primary：
- *   那是品牌紫实心块，现在只剩详情页「場次」一处在用，
- *   不在本次范围内。
- *   这里单开一个类，明暗差异全部由 --hkm-cta-* 令牌承担：
- *   暗色 = 透明玻璃 + 白字 + 发丝边（用户指定），
- *   浅色 / 淡粉 = 与改前完全一致的紫渐变实心块。
+ * ★ 三套主题都是玻璃，不再有实心色块（2026-10-10 用户指定
+ *   「全站别再留紫色实心」；此前只有暗色改白，浅色 / 淡粉仍是
+ *   紫渐变实心块）。差异全部由 --hkm-cta-* 令牌承担：
+ *   暗色 = 透明玻璃 + 白字 + 发丝边；
+ *   浅色 / 淡粉 = 白色玻璃 + 品牌深色字（浅底白字会消失）。
  *
  * ★ 与 .hkm-btn-ghost 的区别：ghost 是次级按钮（本来就该低调），
- *   这颗是首页两个区块的出口，需要一点存在感，
- *   所以保留内高光与外投影，只是把「色」从品牌紫换成白。
+ *   这颗是首页两个区块的出口，需要一点存在感 ——
+ *   所以底色更实、内高光与外投影更明显。
  */
 .hkm-btn-cta {
   position: relative;
