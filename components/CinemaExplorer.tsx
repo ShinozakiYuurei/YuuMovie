@@ -302,7 +302,7 @@ export function CinemaExplorer({ rows, facets }: { rows: CinemaRow[]; facets: Ci
                   <div className="mt-auto flex gap-2 pt-3.5">
                     <Link
                       href={`/cinema/${c.id}`}
-                      className="hkm-btn-primary rounded-full px-3.5 py-1.5 text-xs font-semibold"
+                      className="hkm-btn-ghost rounded-full px-3.5 py-1.5 text-xs"
                     >
                       查看場次
                     </Link>
