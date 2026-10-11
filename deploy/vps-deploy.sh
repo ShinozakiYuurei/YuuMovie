@@ -124,8 +124,20 @@ verify_site() {
   # ★ 為什麼在伺服器而不是本地自檢：照片由 rebuild-static.sh 在**伺服器上**抓取，
   #   清單（data/cinema-photos.json）只有跑完那一步才存在 —— 本地自檢時它必然
   #   缺失，檢查會永遠跳過（假綠）。這裡掃的是已同步的產物，才是真正的那一份。
+  #
+  # ★ 2026-10-11 修：這裡原本只寫 || rc=$? 而**沒有檢查 rc** —— 下一個區塊
+  #   開頭的 rc=0 會把它覆蓋掉，於是照片全缺／清單與產物不一致時部署照樣
+  #   報成功。這正是這條檢查存在的理由（清單指向不存在的圖 = 一片碎圖，
+  #   頁面仍 200），所以必須像上面幾條一樣：exit 1 判定不健康、
+  #   其他非零判定「檢查沒能執行」，不能默默放行。
   if [ -f probe/check-cinema-photos.mjs ]; then
+    rc=0
     node probe/check-cinema-photos.mjs "$SITE_DIR" || rc=$?
+    if [ "$rc" = "1" ]; then
+      die "戲院場館照清單與產物不一致，判定發布不健康"
+    elif [ "$rc" != "0" ]; then
+      die "場館照檢查未能執行（exit $rc），不能當作通過"
+    fi
   else
     log "⚠️ 缺 probe/check-cinema-photos.mjs，本次未做場館照檢查"
   fi

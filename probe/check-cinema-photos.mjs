@@ -44,6 +44,12 @@ try {
 }
 
 const ids = Object.keys(manifest);
+
+// 清單值可能帶 ?v=<cropVersion>（見 cmd/cinemaphotos 的 cropVersion 註釋），
+// 那是給瀏覽器／CDN 的緩存鍵，不是檔案名的一部分 —— 查檔案前必須剝掉，
+// 否則每條都會被判成「產物裡沒有這個文件」。
+const stripQuery = (p) => p.split('?')[0];
+
 if (ids.length === 0) {
   console.log('ℹ️  照片清單是空的：跳過校驗');
   process.exit(0);
@@ -59,7 +65,7 @@ for (const id of ids) {
     continue;
   }
   // 清單存的是站內路徑；產物裡對應 out/cinemas/<file>
-  const file = path.join(ROOT, ref.replace(/^\//, ''));
+  const file = path.join(ROOT, stripQuery(ref).replace(/^\//, ''));
   if (!fs.existsSync(file)) {
     fail(`${id}: 清單指向 ${ref}，但產物裡沒有這個文件`);
     continue;
@@ -96,7 +102,7 @@ const walk = (dir) => {
     for (const m of html.matchAll(RE_REF)) {
       refs++;
       // 允許帶圖片子域前綴（POSTER_ORIGIN）；只取 /cinemas/ 之後的部分
-      const rel = m[1].slice(m[1].indexOf('/cinemas/') + 1);
+      const rel = stripQuery(m[1].slice(m[1].indexOf('/cinemas/') + 1));
       if (!fs.existsSync(path.join(ROOT, rel))) {
         fail(`${path.relative(ROOT, full)} 引用 ${m[1]}，但產物裡沒有這個文件`);
       }

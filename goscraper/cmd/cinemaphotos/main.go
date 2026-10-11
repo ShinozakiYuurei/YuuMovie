@@ -59,6 +59,8 @@ import (
 	_ "image/png"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	xdraw "golang.org/x/image/draw"
@@ -71,14 +73,29 @@ const (
 	// PhotoWidth / PhotoHeight 是写出的横幅尺寸。
 	//
 	// 16:9 1600x900：与影院页 hero 的显示比例一致（桌面端满宽约 1120px，
-	// HiDPI 屏需要 2240 物理像素，但原图里有大量 535x370 的小图 ——
-	// 1600 是「大图够清晰、小图不放大」与体积之间的平衡点：
-	// 实测 59 张合计约 3.5MB（平均 60KB），与海报同一量级。
+	// HiDPI 屏需要 2240 物理像素，而 hkmovie6 的原图大量只有 535x370 ——
+	// 1600 是「放大后仍不算太软」与体积之间的平衡点。
+	// ★ 填满画布后单张体积比早期的「黑边版」大：大片纯黑压得极省，
+	//   现在每个像素都是照片内容。
 	PhotoWidth  = 1600
 	PhotoHeight = 900
 	// quality 取 80：横幅是背景图，压在深色渐变与文字之下，
 	// 比海报更能容忍压缩。
 	quality = 80
+
+	// cropVersion 是裁切管线的版本号；改了任何影响像素输出的逻辑（裁切比例、
+	// 放大策略、质量）都要 +1。
+	//
+	// ★ 为什么必须有它（2026-10-11 加）：增量逻辑只看「文件是否存在且非空」，
+	//   不比对内容 —— 改了裁切而版本号没动，已存在的旧图会被**永远跳过**：
+	//   线上继续是带黑边的老图，而日志里只有「跳过 N 张」，看不出异常。
+	//   版本不符时本次全量重下，跑完写回新版本。
+	//
+	// ★ 它同时是 URL 上的缓存键（见 photoURL）：圖片子域與瀏覽器都按檔名
+	//   （这里是 /cinemas/<id>.jpg）缓存 1 天，换了裁切但 URL 不变的话，
+	//   老读者最长 24 小时仍看到旧图 —— 那正是「明明修了却没变」的观感。
+	//   带上版本号后，新图立刻是新的 URL，无需等缓存过期。
+	cropVersion = 2
 )
 
 func main() {
@@ -97,6 +114,17 @@ func main() {
 }
 
 func run(ctx context.Context, root string, force, dry bool) error {
+	// 裁切管线换版 → 磁盘上的旧图是按旧规则烘的，必须整批重来（见 cropVersion）。
+	// 放在最前面：下面的循环只判「文件在不在」，到那里就晚了。
+	markerPath := filepath.Join(root, "data", "cinema-photos.version")
+	if !force {
+		raw, err := os.ReadFile(markerPath)
+		if err != nil || strings.TrimSpace(string(raw)) != strconv.Itoa(cropVersion) {
+			force = true
+			fmt.Printf("裁切管线版本与 %s 不符（want %d），本次全量重下\n", markerPath, cropVersion)
+		}
+	}
+
 	cinemas, err := readCinemas(filepath.Join(root, "data", "cinemas.json"))
 	if err != nil {
 		return err
@@ -161,13 +189,13 @@ func run(ctx context.Context, root string, force, dry bool) error {
 		if !force && !dry {
 			if info, err := os.Stat(target); err == nil && info.Size() > 0 {
 				skipped++
-				manifest[id] = "/cinemas/" + id + ".jpg"
+				manifest[id] = photoURL(id)
 				continue
 			}
 		}
 		if dry {
 			fmt.Printf("  · %s（%s）→ %s\n", id, venue.Name, venue.Photo)
-			manifest[id] = "/cinemas/" + id + ".jpg"
+			manifest[id] = photoURL(id)
 			continue
 		}
 
@@ -178,15 +206,17 @@ func run(ctx context.Context, root string, force, dry bool) error {
 		if err != nil {
 			fmt.Printf("  ⚠️ %s 下载失败：%v\n", id, err)
 			failed++
+			dropStale(target)
 			continue
 		}
 		if err := encodeBanner(data, target); err != nil {
 			fmt.Printf("  ⚠️ %s 转码失败：%v\n", id, err)
 			failed++
+			dropStale(target)
 			continue
 		}
 		downloaded++
-		manifest[id] = "/cinemas/" + id + ".jpg"
+		manifest[id] = photoURL(id)
 	}
 
 	if dry {
@@ -197,16 +227,53 @@ func run(ctx context.Context, root string, force, dry bool) error {
 	if err := writeManifest(filepath.Join(root, "data", "cinema-photos.json"), manifest); err != nil {
 		return err
 	}
+	// 记下本次用的裁切版本，下次增量跑靠它判断旧图能不能复用。
+	// 写在收尾（而非开头）是有意的：中途失败时保持旧版本号，
+	// 下次仍然全量重下 —— 不会把「没跑完」当成「跑过了」。
+	if err := os.WriteFile(markerPath, []byte(strconv.Itoa(cropVersion)+"\n"), 0o644); err != nil {
+		return err
+	}
 	fmt.Printf("下载 %d 张 / 跳过 %d 张 / 失败 %d 张，清单 %d 条\n",
 		downloaded, skipped, failed, len(manifest))
 	return nil
 }
 
+// photoURL builds the manifest value for one cinema banner.
+//
+// 帶 ?v=<cropVersion> 是為了繞開快取：檔名固定（就是戲院 id），而內容會隨
+// 裁切管線改變 —— 見 cropVersion 的註釋。查詢串不影響 nginx 的 location
+// 匹配與靜態檔案查找，只改變瀏覽器／CDN 的快取鍵。
+func photoURL(id string) string {
+	return "/cinemas/" + id + ".jpg?v=" + strconv.Itoa(cropVersion)
+}
+
+// dropStale removes a previously written banner whose replacement failed.
+//
+// ★ 为什么必须删（2026-10-11）：清单是每轮**重建**的，失败的 id 不会写进去，
+// 于是旧文件会变成「产物有、清单没有」的孤儿 —— 这正是
+// probe/check-cinema-photos.mjs 的反向覆盖要拦的情况（部署会被判失败）。
+// 删掉后状态重新一致：页面回退纯文字头部，且文件不存在 → 下一轮增量
+// 会**只重试这一家**，不会因为要等下一次换版而永远停在旧图上。
+//
+// 注意不是「失败就放弃」：删掉的是可以随时重生成的产物（源图在 hkmovie6）。
+func dropStale(target string) {
+	if err := os.Remove(target); err != nil && !os.IsNotExist(err) {
+		fmt.Printf("    ⚠️ 清理旧图 %s 失败：%v\n", target, err)
+	}
+}
+
 // encodeBanner decodes whatever the CDN served and writes a 16:9 JPEG.
 //
 // 源图尺寸差异极大（实测 460x300 到 8192x5464，还有 PNG），
-// 因此统一按 cover 裁到 16:9：先等比缩放到「填满目标框」，再居中裁。
+// 因此统一按 cover 裁到 16:9：先在源图上取居中的那一块 16:9，再缩放填满画布。
 // 直接拉伸会把人拍扁，而 hero 的宽度是固定的，留白又会露出底色。
+//
+// ★ 小图也必须放大（2026-10-11 用户反馈「要求图片能填充满，不要留这么大黑边」）。
+// 此前这里是「源图窄于目标宽就不放大，原尺寸居中贴上去」，而 hkmovie6
+// 的场馆照大多只有 535x370 —— 于是 1600x900 的画布四周全是黑。
+// 更糟的是黑边**烘进了 JPEG**：页面上的 object-cover 只按容器裁，裁不掉
+// 图里本来就有的黑，52 家里 42 家如此。放大确实更软，但 hero 上压着由下
+// 往上的黑渐变与文字，轻微发软远好过一多半面积是纯黑。
 //
 // ===== 为什么是 JPEG 而不是海报用的 WebP =====
 //
@@ -227,26 +294,36 @@ func encodeBanner(data []byte, target string) error {
 		return fmt.Errorf("empty image")
 	}
 
-	// cover：缩放比取「填满目标框」所需的最大值，这样两边都不会有留白。
-	scale := PhotoWidth / float64(sw)
-	if s := PhotoHeight / float64(sh); s > scale {
-		scale = s
+	// cover：先在源图上取居中的 16:9 那一块，再把它缩放进画布。
+	//
+	// ★ 顺序是「先裁后缩」而不是「先缩后裁」（2026-10-11 改）：
+	//   先缩整张的话，中间缓冲按「填满」的尺寸膨胀 —— 一张 400x3000 的竖图
+	//   要 1600x12000 的 RGBA（约 77MB），而线上是 2C2G 的机器。
+	//   先裁后缩的中间产物只有目标画布那么大，而且只重采样一次，更清晰。
+	//
+	// ★ 小图同样放大（见上方注释）—— 不放大就会在画布四周留下烘死的黑边。
+	targetAR := float64(PhotoWidth) / float64(PhotoHeight)
+	cw, ch := sw, sh
+	if float64(sw)/float64(sh) > targetAR {
+		// 源图比 16:9 更宽：裁掉左右两侧。
+		cw = int(float64(sh)*targetAR + 0.5)
+	} else {
+		// 源图比 16:9 更高：裁掉上下两端。
+		ch = int(float64(sw)/targetAR + 0.5)
 	}
-	// 小图不放大：535x370 的源拉到 1600 只会更糊，保持原尺寸居中放置。
-	if sw < PhotoWidth {
-		scale = 1
+	if cw < 1 {
+		cw = 1
 	}
-	dw := int(float64(sw)*scale + 0.5)
-	dh := int(float64(sh)*scale + 0.5)
+	if ch < 1 {
+		ch = 1
+	}
+	crop := image.Rect(
+		b.Min.X+(sw-cw)/2, b.Min.Y+(sh-ch)/2,
+		b.Min.X+(sw-cw)/2+cw, b.Min.Y+(sh-ch)/2+ch,
+	)
 
-	scaled := image.NewRGBA(image.Rect(0, 0, dw, dh))
-	xdraw.CatmullRom.Scale(scaled, scaled.Bounds(), src, b, xdraw.Src, nil)
-
-	// 居中裁出 16:9。图比目标小时先铺一块同尺寸的底再叠上去（不放大）。
 	out := image.NewRGBA(image.Rect(0, 0, PhotoWidth, PhotoHeight))
-	offX := (PhotoWidth - dw) / 2
-	offY := (PhotoHeight - dh) / 2
-	xdraw.Draw(out, image.Rect(offX, offY, offX+dw, offY+dh), scaled, image.Point{}, xdraw.Src)
+	xdraw.CatmullRom.Scale(out, out.Bounds(), src, crop, xdraw.Src, nil)
 
 	var buf bytes.Buffer
 	if err := jpeg.Encode(&buf, out, &jpeg.Options{Quality: quality}); err != nil {
