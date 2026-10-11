@@ -29,10 +29,11 @@ const appKey = "500000"
 
 // API method names.
 const (
-	methodCinemas    = "gop.alipic.icirena.own.cinema.getCinemas"
-	methodShowing    = "gop.alipic.icirena.own.film.showing"
-	methodComingSoon = "gop.alipic.icirena.own.film.comingsoon"
-	methodSchedule   = "gop.alipic.icirena.own.filmschedule.list"
+	methodCinemas      = "gop.alipic.icirena.own.cinema.getCinemas"
+	methodShowing      = "gop.alipic.icirena.own.film.showing"
+	methodComingSoon   = "gop.alipic.icirena.own.film.comingsoon"
+	methodSchedule     = "gop.alipic.icirena.own.filmschedule.list"
+	methodCinemaDetail = "gop.alipic.icirena.own.cinema.getCinemaDetail"
 )
 
 // Config describes one circuit on the platform.

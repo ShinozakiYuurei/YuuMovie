@@ -67,6 +67,7 @@ import (
 
 	"github.com/ShinozakiYuurei/YuuMovie/goscraper/internal/cinemaphoto"
 	"github.com/ShinozakiYuurei/YuuMovie/goscraper/internal/fetch"
+	"github.com/ShinozakiYuurei/YuuMovie/goscraper/internal/venuephoto"
 )
 
 const (
@@ -95,7 +96,11 @@ const (
 	//   （这里是 /cinemas/<id>.jpg）缓存 1 天，换了裁切但 URL 不变的话，
 	//   老读者最长 24 小时仍看到旧图 —— 那正是「明明修了却没变」的观感。
 	//   带上版本号后，新图立刻是新的 URL，无需等缓存过期。
-	cropVersion = 2
+	//
+	// 2026-10-11 第二次 +1（2 → 3）：改用院线官网的宣傳照（前台/大堂/外立面），
+	// 见 internal/venuephoto。换的不只是像素，还有「每家取哪一张」——
+	// 增量逻辑只认文件在不在，不换版本号的话 13 家旧图会被永远跳过。
+	cropVersion = 3
 )
 
 func main() {
@@ -168,6 +173,22 @@ func run(ctx context.Context, root string, force, dry bool) error {
 	matched := cinemaphoto.Match(cinemas, withPhoto, displayNames, coords)
 	fmt.Printf("匹配到 %d / %d 家\n", len(matched), len(cinemas))
 
+	// 官方宣传照优先（2026-10-11 用户要求：前台/大堂/外立面，不要影廳內景）。
+	// hkmovie6 的 og:image 只作回退 —— 它在 13 家里给的是影廳內景或散景斑點圖。
+	official := map[string]venuephoto.Source{}
+	for _, id := range venuephoto.StaticIDs() {
+		src, _ := venuephoto.Static(id)
+		official[id] = src
+	}
+	if got, err := venuephoto.FetchIcirena(ctx); err != nil {
+		fmt.Printf("⚠️ icirena 官方照抓取失败（该三条线沿用 hkmovie6）：%v\n", err)
+	} else {
+		for id, src := range got {
+			official[id] = src
+		}
+	}
+	fmt.Printf("官方宣传照：%d 家\n", len(official))
+
 	outDir := filepath.Join(root, "public", "cinemas")
 	if !dry {
 		if err := os.MkdirAll(outDir, 0o755); err != nil {
@@ -181,7 +202,12 @@ func run(ctx context.Context, root string, force, dry bool) error {
 
 	for _, id := range cinemaphoto.SortedIDs(matched) {
 		venue := matched[id]
-		if venue.Photo == "" {
+		// 官方宣传照优先；官方没有才回退 hkmovie6 的 og:image。
+		src, referer, origin := venue.Photo, cinemaphoto.Referer, "hkmovie6"
+		if officialSrc, ok := official[id]; ok {
+			src, referer, origin = officialSrc.URL, officialSrc.Referer, officialSrc.Note
+		}
+		if src == "" {
 			fmt.Printf("  · %s（%s）：无照片\n", id, venue.Name)
 			continue
 		}
@@ -194,13 +220,13 @@ func run(ctx context.Context, root string, force, dry bool) error {
 			}
 		}
 		if dry {
-			fmt.Printf("  · %s（%s）→ %s\n", id, venue.Name, venue.Photo)
+			fmt.Printf("  · %s（%s）→ %s [%s]\n", id, venue.Name, src, origin)
 			manifest[id] = photoURL(id)
 			continue
 		}
 
-		data, err := client.GetWithHeaders(ctx, venue.Photo, map[string]string{
-			"Referer": cinemaphoto.Referer,
+		data, err := client.GetWithHeaders(ctx, src, map[string]string{
+			"Referer": referer,
 			"Accept":  "image/avif,image/webp,image/*,*/*;q=0.8",
 		})
 		if err != nil {
