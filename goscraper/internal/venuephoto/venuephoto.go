@@ -74,13 +74,17 @@ var broadwayPhotos = map[string]string{
 // 戏院页 MCLCinema.aspx?ci=<3位> 上是 img_cinema_<code>.jpg，在
 // https://cdn.mclcinema.com/MovieMedia/images/ 下。
 //
-// ★ mcl-019（am）官网给的就是影廳內景，故不在表内；
+// ★ 官网给的就是影廳內景的**不列**（2026-10-11 逐张看过原图，不是看缩略图）：
 //
-//	mcl-018/021/022 官网只有 subtitle 字标条，没有照片，也不列。
+//	  mcl-016（cp，4500x3002 的 LUXE 影廳全景）与 mcl-019（am，小影廳）。
+//	  第一次审图时把 cp 误认成「外立面＋售票处」写进了表里，结果线上换过去
+//	  仍是影廳內景 —— 大图缩成缩略图后座椅排列很像售票区，所以要按原图判断。
+//	  mcl-018/021/022 官网只有 subtitle 字标条，没有照片，同样不列。
 //
-// ★ mcl-016（cp）是 4500x3002 的**外立面＋售票处**，是这批里最贴用户
+//		mcl-018/021/022 官网只有 subtitle 字标条，没有照片，也不列。
 //
-//	要求的一张（原图 2.2MB，会被统一裁成 1600x900）。
+//
+//		要求的一张（原图 2.2MB，会被统一裁成 1600x900）。
 var mclPhotos = map[string]string{
 	"mcl-002": "img_cinema_cm.jpg",   // 圆形大堂
 	"mcl-003": "img_cinema_gw.jpg",   // 大堂圆形吊顶
@@ -90,7 +94,6 @@ var mclPhotos = map[string]string{
 	"mcl-013": "img_cinema_gc.jpg",   // 大堂圆形吊顶
 	"mcl-014": "img_cinema_mt.jpg",   // 木质前台
 	"mcl-015": "img_cinema_csw.jpg",  // 大堂
-	"mcl-016": "img_cinema_cp.jpg",   // 外立面＋售票处
 	"mcl-017": "img_cinema_k11.jpg",  // 售票处大堂
 }
 
