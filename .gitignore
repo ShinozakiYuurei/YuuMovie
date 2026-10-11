@@ -38,6 +38,16 @@ public/posters/*
 public/og/*
 !public/og/.gitkeep
 
+# ── 戲院場館照：由 goscraper/cmd/cinemaphotos 生成 ──────────────
+# 为什么排除：約 52 張 1600x900 JPEG 共約 3MB，且完全能从 data/cinema-photos.json
+# 的原始 URL 重建（图源在 storage.movie6.com，抓取要香港出口，见该命令注释）。
+# 与海报同一套理由：产物不入库，重建链路自己会跑。
+#
+# 保留目录本身：next build 只把**已存在**的 public/ 子目录拷进 out/，
+# 目录不存在时 out/cinemas/ 不会生成，页面引用的场馆照就全 404。
+public/cinemas/*
+!public/cinemas/.gitkeep
+
 # ── 服务器私有：密钥、缓存、备份 ────────────────────
 # .ssh/ 必须排除：hkmovie 的 HOME 就是本目录，
 # 只读部署私钥落在仓库内，一旦被 git add -A 扫到就泄进版本库。
@@ -121,6 +131,8 @@ probe/*
 # 分享卡片：核對產物 HTML 引用的 /og/*.jpg 是否存在（見 deploy/vps-deploy.sh）。
 # 放伺服器自檢而非本地：卡片是構建期產物，本機在 next build 之前沒有 out/ 可掃。
 !probe/check-og-cards.mjs
+# 戲院場館照：清單與產物必須對得上（頁面引用的圖缺一張就是碎圖，本地構建不報）。
+!probe/check-cinema-photos.mjs
 # Go 抓取层移植的对照样本（goscraper/internal/chinachem 的测试要读）
 !probe/chinachem-home.html
 !probe/chinachem-reference.mjs

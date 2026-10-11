@@ -120,6 +120,15 @@ verify_site() {
   #   死鏈檢查也掃不到（它只掃 /movie/ 連結），只有把鏈接貼到 X 上才發現是空卡片，
   #   而且 X 側還會緩存空卡一段時間。用戶 2026-10-09 提出的正是「發鏈接要有卡片」，
   #   所以這條必須在發布前攔下。
+  # 戲院場館照：清單指到的圖必須真實存在，且產物引用的每一條都要在清單裡。
+  # ★ 為什麼在伺服器而不是本地自檢：照片由 rebuild-static.sh 在**伺服器上**抓取，
+  #   清單（data/cinema-photos.json）只有跑完那一步才存在 —— 本地自檢時它必然
+  #   缺失，檢查會永遠跳過（假綠）。這裡掃的是已同步的產物，才是真正的那一份。
+  if [ -f probe/check-cinema-photos.mjs ]; then
+    node probe/check-cinema-photos.mjs "$SITE_DIR" || rc=$?
+  else
+    log "⚠️ 缺 probe/check-cinema-photos.mjs，本次未做場館照檢查"
+  fi
   if [ -f probe/check-og-cards.mjs ]; then
     rc=0
     node probe/check-og-cards.mjs "$SITE_DIR" || rc=$?

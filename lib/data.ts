@@ -1869,6 +1869,47 @@ export interface CinemaFacets {
   payments: { value: string; label: string; count: number }[];
 }
 
+/**
+ * 戲院場館照清單：戲院 id → /cinemas/<id>.jpg
+ *
+ * ===== 為什麼需要它（2026-10-11 用戶要求）=====
+ *
+ * 用戶：「優化電影院點進去的頁面，像圖二一樣添加影院的圖片」。
+ * 戲院詳情頁此前只有標題與場次，沒有任何場館照片。
+ *
+ * 照片由 goscraper/cmd/cinemaphotos 在構建前抓取並轉成 1600×900 的同源圖，
+ * 寫到 public/cinemas/ 與本清單。**必須先落盤再構建** —— 頁面引用的是
+ * /cinemas/*.jpg，圖不在 public/ 裡就不會被 next build 拷進 out/，
+ * 線上就是一排碎圖。
+ *
+ * ★ 為什麼要這張清單而不是直接拼路徑：
+ *   照片是**可選**的 —— 兩個院線源都給不出（新光黃埔在 hkmovie6 上就沒有
+ *   橫幅圖，英皇戲院總部是辦公地址），抓取失敗也可能缺某一家。
+ *   拼路徑會得到 404 與碎圖；查這張表則自然回退到純文字頭部。
+ *   與 posterThumbPath 同一套取捨（那裡也是「查得到才用」）。
+ *
+ * 惰性讀取（不是模組級常量）：readJson 定義在本檔案下方，模組級求值會踩 TDZ。
+ */
+let _cinemaPhotos: Record<string, string> | null = null;
+
+function cinemaPhotoMap(): Record<string, string> {
+  if (_cinemaPhotos) return _cinemaPhotos;
+  // quiet：清單可缺失（首次部署尚未跑抓圖），屬預期情況，不刷錯誤日誌
+  _cinemaPhotos = readJson<Record<string, string>>('cinema-photos.json', {}, true);
+  return _cinemaPhotos;
+}
+
+/**
+ * 取某間戲院的場館照路徑；沒有照片時回傳 null（頁面自行決定怎麼降級）。
+ *
+ * 與 posterUrl 同一條規則：設了圖片子域就指向子域（灰雲、直連香港），
+ * 否則保持同源。
+ */
+export function cinemaPhotoPath(id: string): string | null {
+  const name = cinemaPhotoMap()[id];
+  if (!name) return null;
+  return POSTER_ORIGIN ? `${POSTER_ORIGIN}${name}` : name;
+}
 export function getCinemaRows(): CinemaRow[] {
   return getAllCinemas().map((c) => {
     const paymentInfo = paymentMethodsOf(c.id, c.source);

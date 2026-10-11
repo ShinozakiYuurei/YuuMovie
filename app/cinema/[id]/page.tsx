@@ -1,7 +1,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import Image from 'next/image';
 import { notFound } from 'next/navigation';
-import { getCinemaById, getCinemaShowtimeDays, SOURCE_LABEL } from '@/lib/data';
+import {
+  getCinemaById,
+  getCinemaShowtimeDays,
+  cinemaPhotoPath,
+  SOURCE_LABEL,
+} from '@/lib/data';
 import { getCinemas } from '@/lib/data';
 import { FeeLine } from '@/components/FeeLine';
 import { CinemaMapButton } from '@/components/CinemaMapButton';
@@ -38,6 +44,36 @@ export async function generateMetadata({
   };
 }
 
+/**
+ * 戲院頭部：場館照 + 名稱 + 地址 + 手續費 + 地圖按鈕
+ *
+ * ===== 為什麼要這塊（2026-10-11 用戶要求）=====
+ *
+ * 用戶：「優化電影院點進去的頁面，像圖二一樣添加影院的圖片」——
+ * 圖二是 hkmovie6 的戲院頁：一張橫幅場館照打底，名字與資訊壓在上面。
+ *
+ * 此前這裡是純文字頭部（標題 + 地址 + 手續費 + 地圖按鈕），
+ * 十幾個院線源都不給場館照，所以一直沒有圖。照片現由
+ * goscraper/cmd/cinemaphotos 從 hkmovie6 抓取、轉成 1600×900 同源圖，
+ * 清單見 lib/data.ts 的 cinemaPhotoPath。
+ *
+ * ===== 沒有照片時必須完全回退 =====
+ *
+ * 不是每家都拿得到（新光黃埔在 hkmovie6 上沒有橫幅圖、英皇戲院總部是
+ * 辦公地址、抓取也可能失敗）。沒有照片時渲染的就是**原先那份純文字頭部**，
+ * 而不是一個空的黑框 —— 空框比沒有框更糟，它讓頁面看起來是壞的。
+ *
+ * ===== 為什麼是 <img> 而不是 next/image =====
+ *
+ * 橫幅是「填滿容器、按容器比例裁切」的背景式圖片（object-fit: cover），
+ * 而 next/image 在 unoptimized: true（靜態導出的必須設定，見 next.config.ts）
+ * 下不做任何優化，只是一個包裝層 —— 卻要為此在 <head> 塞進它的
+ * 尺寸推導與 loading 策略。這裡直接用 <img> 並顯式寫寬高，
+ * 瀏覽器能立刻算出長寬比、不會有佈局抖動。
+ *
+ * ★ priority 的等價物：這張圖是 LCP 元素，加 fetchPriority="high"
+ *   讓它與首屏其餘資源並行抓取，而不是排在後面。
+ */
 export default async function CinemaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const cinema = getCinemaById(id);
@@ -58,6 +94,9 @@ export default async function CinemaPage({ params }: { params: Promise<{ id: str
   const days = getCinemaShowtimeDays(cinema.id);
   // 網上手續費（每張票）；規則與出處見 lib/booking-fee.ts
   const fee = bookingFeeOf(cinema.id, cinema.source);
+  // 場館照；沒有時為 null，頭部回退成純文字（見上方註釋）
+  const photo = cinemaPhotoPath(cinema.id);
+  const hasCoord = Boolean(cinemaCoord(cinema.id));
 
   return (
     <>
@@ -79,44 +118,114 @@ export default async function CinemaPage({ params }: { params: Promise<{ id: str
         <span className="text-fg-muted">{cinema.nameZh}</span>
       </nav>
 
-      <header className="mb-7">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h1 className="text-3xl font-bold tracking-tight text-fg">{cinema.nameZh}</h1>
-          <span className="hkm-chip">{SOURCE_LABEL[cinema.source]}</span>
+      {photo ? (
+        /*
+         * 有照片：整塊頭部就是那張橫幅（與圖二同構）——
+         * 圖打底、上方壓一層由下往上的暗色漸變，資訊疊在底部。
+         *
+         * ★ 漸變不是裝飾：照片明暗不一（實測從昏暗的戲院大堂到
+         *   全白的日間外牆都有），白字直接壓上去時亮圖上完全讀不出。
+         *   由下往上的深色漸變保證文字區永遠有足夠的對比，
+         *   同時讓照片上半部保持原樣。
+         *
+         * ★ 比例固定 16:9（照片就是按這個比例裁的，見 cmd/cinemaphotos）：
+         *   不固定的話每家的頭部高度都不一樣，跨頁瀏覽時版面會跳。
+         */
+        <header className="mb-7">
+          <div className="relative isolate overflow-hidden rounded-2xl">
+            {/* 用原生 <img>：靜態導出下 next/image 不做優化，只多一層包裝（理由見上） */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={photo}
+              alt={`${cinema.nameZh} 場館照`}
+              width={1600}
+              height={900}
+              fetchPriority="high"
+              decoding="async"
+              className="aspect-video w-full object-cover"
+            />
+            {/* 漸變遮罩：保證底部文字區的對比度（理由見上） */}
+            <div
+              aria-hidden
+              className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent"
+            />
+            <div className="hkm-on-photo absolute inset-x-0 bottom-0 p-4 sm:p-6">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <h1 className="text-3xl font-bold tracking-tight text-white">{cinema.nameZh}</h1>
+                <span className="hkm-chip">{SOURCE_LABEL[cinema.source]}</span>
+              </div>
+              {cinema.address && (
+                <p className="mt-1.5 text-sm text-white/80">{cinema.address}</p>
+              )}
+              {/*
+               * 手續費與地圖按鈕都壓在照片上：兩者的顏色由 .hkm-on-photo
+               * 作用域接管（見 globals.css）—— 它們自帶的類優先級高於
+               * Tailwind 工具類，逐個加 text-white 是不生效的。
+               */}
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                <FeeLine
+                  amount={fee.amount}
+                  note={fee.note}
+                />
+                {hasCoord && (
+                  <CinemaMapButton
+                    cinemaId={cinema.id}
+                    name={cinema.nameZh}
+                    address={cinema.address}
+                    variant="onPhoto"
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        </header>
+      ) : (
+        /*
+         * 沒有照片：原先那份純文字頭部，一行不改。
+         *
+         * ★ 為什麼不保留「空照片框」：那會讓頁面看起來是壞的。
+         *   沒有圖就老老實實用文字排版 —— 這與海報缺失時卡片
+         *   不渲染縮圖是同一套取捨（見 CinemaShowtimes）。
+         */
+        <header className="mb-7">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h1 className="text-3xl font-bold tracking-tight text-fg">{cinema.nameZh}</h1>
+            <span className="hkm-chip">{SOURCE_LABEL[cinema.source]}</span>
+            {/*
+             * 完整地址（★ 2026-09-21 用戶：「把戲院後面的地區區域補充為完整地址」）
+             *
+             * 戲院名右邊原本什麼都沒有（地址那行被手續費佔了，
+             * 地址只剩地圖按鈕的 hover）。現把完整地址放回戲院名旁邊，
+             * 手續費仍獨立成行 —— 兩者都是選戲院要看的資訊，不互相頂替。
+             */}
+            {cinema.address && (
+              <span className="text-sm text-fg-muted">{cinema.address}</span>
+            )}
+          </div>
+          {/* 手續費獨立一行，以一般次要文字顯示，不套用玻璃或標籤樣式。 */}
+          <FeeLine amount={fee.amount} note={fee.note} className="mt-2" />
           {/*
-           * 完整地址（★ 2026-09-21 用戶：「把戲院後面的地區區域補充為完整地址」）
+           * 地圖按鈕（改開彈層，不再外鏈 Google Maps）
            *
-           * 戲院名右邊原本什麼都沒有（地址那行被手續費佔了，
-           * 地址只剩地圖按鈕的 hover）。現把完整地址放回戲院名旁邊，
-           * 手續費仍獨立成行 —— 兩者都是選戲院要看的資訊，不互相頂替。
+           * ★ 用戶 2026-09-21：改用開源地圖，且大陸可直接訪問。
+           * ★ 2026-09-30 起底圖為 Esri World Street Map（繁體標註），
+           *   深色主題下以濾鏡轉深色。選型與實測見 components/CinemaMapDialog.tsx。
+           *
+           * 按鈕文案去掉了「↗」——它不再開新視窗（本來的箭頭會誤導），
+           * 彈層內的高德／Google 連結才是真正的外鏈。
+           *
+           * 只在有座標時渲染：英皇戲院總部是辦公地址、不放映，
+           * 座標表裡沒有它（見 lib/cinema-geo.ts 的已知缺項說明）。
            */}
-          {cinema.address && (
-            <span className="text-sm text-fg-muted">{cinema.address}</span>
+          {hasCoord && (
+            <CinemaMapButton
+              cinemaId={cinema.id}
+              name={cinema.nameZh}
+              address={cinema.address}
+            />
           )}
-        </div>
-        {/* 手續費獨立一行，以一般次要文字顯示，不套用玻璃或標籤樣式。 */}
-        <FeeLine amount={fee.amount} note={fee.note} className="mt-2" />
-        {/*
-         * 地圖按鈕（改開彈層，不再外鏈 Google Maps）
-         *
-         * ★ 用戶 2026-09-21：改用開源地圖，且大陸可直接訪問。
-         * ★ 2026-09-30 起底圖為 Esri World Street Map（繁體標註），
-         *   深色主題下以濾鏡轉深色。選型與實測見 components/CinemaMapDialog.tsx。
-         *
-         * 按鈕文案去掉了「↗」——它不再開新視窗（本來的箭頭會誤導），
-         * 彈層內的高德／Google 連結才是真正的外鏈。
-         *
-         * 只在有座標時渲染：英皇戲院總部是辦公地址、不放映，
-         * 座標表裡沒有它（見 lib/cinema-geo.ts 的已知缺項說明）。
-         */}
-        {cinemaCoord(cinema.id) && (
-          <CinemaMapButton
-            cinemaId={cinema.id}
-            name={cinema.nameZh}
-            address={cinema.address}
-          />
-        )}
-      </header>
+        </header>
+      )}
 
       <CinemaShowtimes days={days} />
     </>

@@ -63,14 +63,15 @@ cd "${APP_DIR}"
 # 保证 Go 二进制存在（优先使用 bin/，未编译时自动构建）
 ensure_go_bins() {
   mkdir -p "${APP_DIR}/bin"
-  if [ ! -x "${APP_DIR}/bin/scrape" ] || [ ! -x "${APP_DIR}/bin/enrich-run" ] || [ ! -x "${APP_DIR}/bin/synopsis-run" ] || [ ! -x "${APP_DIR}/bin/check-links" ]; then
+  if [ ! -x "${APP_DIR}/bin/scrape" ] || [ ! -x "${APP_DIR}/bin/enrich-run" ] || [ ! -x "${APP_DIR}/bin/synopsis-run" ] || [ ! -x "${APP_DIR}/bin/check-links" ] || [ ! -x "${APP_DIR}/bin/cinemaphotos" ]; then
     echo "  编译 Go 抓取工具链..."
     ( cd "${APP_DIR}/goscraper" && \
       go build -o "${APP_DIR}/bin/scrape" ./cmd/scrape && \
       go build -o "${APP_DIR}/bin/enrich-run" ./cmd/enrich-run && \
       go build -o "${APP_DIR}/bin/synopsis-run" ./cmd/synopsis-run && \
       go build -o "${APP_DIR}/bin/check-links" ./cmd/check-links && \
-      go build -o "${APP_DIR}/bin/ogcardgen" ./cmd/ogcardgen )
+      go build -o "${APP_DIR}/bin/ogcardgen" ./cmd/ogcardgen && \
+      go build -o "${APP_DIR}/bin/cinemaphotos" ./cmd/cinemaphotos )
   fi
 }
 echo "▶ $(date -Iseconds) 重建静态站点"
@@ -130,6 +131,32 @@ if [ "${SHOWS}" -lt 100 ]; then
 fi
 echo "  数据校验通过：${SHOWS} 场次"
 
+# ---------- 1.6 戲院場館照 ----------
+# ★ 必須在構建前：戲院詳情頁引用的是 /cinemas/*.jpg，圖要先落
+#   public/cinemas/ 才能被 next build 拷進 out/，再同步到 nginx 目錄。
+#
+# 為什麼需要（用戶 2026-10-11）：「像圖二一樣添加影院的圖片」——
+#   戲院頁此前沒有場館照，而十三個院線源都不提供。照片取自 hkmovie6
+#   的戲院頁（og:image），匹配規則與取捨見 goscraper/internal/cinemaphoto。
+#
+# ⚠️ 只有香港 VPS 跑得動：storage.movie6.com 與 hkmovie6.com 都在
+#   Cloudflare 後面，大陸直連 403（本機實測）。
+#
+# 非致命：腳本自身增量（圖已存在即跳過），且 lib/data.ts 對清單裡沒有的
+#   戲院會回退到純文字頭部 —— 外部站抖動不該阻斷整站重建。
+# CINEMA_PHOTOS=0 可跳過。
+if [ "${CINEMA_PHOTOS:-1}" = "1" ]; then
+  echo "▶ 戲院場館照..."
+  T_CINEMA=$(date +%s)
+  ensure_go_bins
+  if "${APP_DIR}/bin/cinemaphotos" --root "${APP_DIR}"; then
+    echo "  場館照耗時 $(( $(date +%s) - T_CINEMA ))s"
+  else
+    echo "  ⚠️ 場館照抓取失敗，戲院頁將回退到純文字頭部（不影響其餘內容）"
+  fi
+else
+  echo "▶ CINEMA_PHOTOS=0，跳過場館照"
+fi
 # ---------- 1.7 海报本地化 ----------
 # ★ 必须在构建前：页面引用的是 /posters/*.webp，图片要先落 public/posters/
 #   才能被 next build 拷进 out/，再同步到 nginx 目录。
