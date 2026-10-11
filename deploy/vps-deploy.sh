@@ -187,10 +187,31 @@ fi
 
 CUR=$(git rev-parse -q --verify HEAD 2>/dev/null || echo "")
 
+# 線上實際發布過的版本（由本腳本第 5 步寫入 .deploy-info）。
+# ★ 必須放在 if 鏈**之外**：夾在 if 的 then 體與 elif 之間的那一行，
+#   bash 會當成第一個分支的一部分 —— $CUR 非空時整塊跳過，變量永遠未定義，
+#   守衛靜默失效（set -u 下更會直接報錯退出）。2026-10-11 首版就這麼寫錯了，
+#   由 probe/check-deploy-guard.mjs 抓出來。
+_deployed=$(cut -f1 "$APP_DIR/.deploy-info" 2>/dev/null || echo "")
+
 # ---------- 1 工作区护栏 ----------
 if [ -z "$CUR" ]; then
   take_over
-elif [ "$CUR" = "$TARGET" ] && [ -z "$(dirty_paths)" ] && [ "${SCRAPE:-0}" != "1" ] && [ "${ENRICH:-0}" != "1" ] && [ -z "${ONLY:-}" ]; then
+# ★ 2026-10-11：早退必須同時看「站點真的是這個版本構建的」，不能只看 git HEAD。
+#
+#   背景：本分支原先只比 CUR = TARGET（都是 git HEAD）。但 HEAD 與「站點產物」
+#   是兩回事 —— 部署被 flock 跳過時，代碼已切到 TARGET、rebuild-static.sh 卻沒跑，
+#   站點仍是上一版。此時重跑 sync.sh，HEAD 相等 → 直接早退「已是最新」，
+#   而線上還是舊的：這正是 flock 那段註釋點名的「最壞的一種結果」。
+#
+#   此前靠 ENRICH=1 繞過（那時 sync.sh 每次都傳 ENRICH=1，本分支不成立）。
+#   現在部署預設 ENRICH=0（用戶 2026-10-11 指定，省掉每次 5 分鐘的評分刷新），
+#   少了那個繞道，就必須把判據補成「HEAD 相符 **且** .deploy-info 記的就是它」。
+#   .deploy-info 是本腳本第 5 步寫的，只在一次真正走完重建的部署末尾更新。
+#
+#   回滚/重试路径因此不變：被 flock 跳過後重跑，.deploy-info 仍是舊的 →
+#   不早退，正常重建。
+elif [ "$CUR" = "$TARGET" ] && [ "$_deployed" = "$TARGET" ] && [ -z "$(dirty_paths)" ] && [ "${SCRAPE:-0}" != "1" ] && [ "${ENRICH:-0}" != "1" ] && [ -z "${ONLY:-}" ]; then
   log "服务器已是目标版本，不重建（仍复核站点）"
   verify_site
   exit 0

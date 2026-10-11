@@ -7,6 +7,7 @@
 #   bash deploy/sync.sh --rollback      # 把线上退回它自己的上一个存档点（不存档不推送）
 #   bash deploy/sync.sh --to <sha>      # 线上切到指定存档点
 #   SCRAPE=1 ONLY=mcl bash deploy/sync.sh  # 本次部署只抓 MCL，再构建发布
+#   ENRICH=1 bash deploy/sync.sh           # 本次部署顺带刷新 IMDb / 豆瓣评分（默认 0，见下）
 #
 # 为什么需要它：本项目页面是 SSG，代码不推到服务器并重建，线上就永远是旧的。
 # VPS 的 systemd 定时器只重复构建它自己已有的代码，从不拉新代码。
@@ -41,7 +42,20 @@ done
 # 显式抓取选项要传到服务器重建进程，供一次性定向抓取（例如 ONLY=mcl）。
 DEPLOY_SCRAPE="${SCRAPE:-0}"
 DEPLOY_ONLY="${ONLY:-}"
+# ★ 2026-10-11（用戶指定）：部署**默認不刷評分**，評分交給每小時 :20 的
+#   hk-movie-ratings.timer（它自己跑 rebuild-static.sh，ENRICH=1 FORCE_REFRESH=1）。
+#
+#   為什麼：評分刷新要逐條查 299 部片的 IMDb / 豆瓣，實測固定約 5 分鐘 ——
+#   而它與本次代碼改動無關，只是碰巧被並進了同一次重建。
+#   豆瓣全程限流時那 5 分鐘基本全用來重試失敗（某次部署 299 部 douban new 0），
+#   純屬白等。評分晚一小時上線沒有任何實際損失。
+#
+#   想連評分一起刷：ENRICH=1 bash deploy/sync.sh。
+#   注意部署**不會**因此少構建一次 —— 評分寫進 data/enrich.json 後仍需重建才上線，
+#   所以 ENRICH=1 的部署只是把那一小時的刷新提前，不額外多花構建。
+DEPLOY_ENRICH="${ENRICH:-0}"
 case "$DEPLOY_SCRAPE" in 0|1) ;; *) echo "✖ SCRAPE 只接受 0 或 1"; exit 1 ;; esac
+case "$DEPLOY_ENRICH" in 0|1) ;; *) echo "✖ ENRICH 只接受 0 或 1"; exit 1 ;; esac
 if [ -n "$DEPLOY_ONLY" ]; then
   IFS=, read -r -a _sources <<< "$DEPLOY_ONLY"
   for _source in "${_sources[@]}"; do
@@ -157,6 +171,11 @@ else
   # 这个 bug 本地构建不报错、类型不报错，只在服务器部署后才被死链检查拦下 ——
   # 代价是一整次服务器构建 + 必须回滚才能恢复发布（2026-09-22 实际踩到）。
   "$TSX" probe/check-slug-coverage.mts
+  # 部署早退守衛：它決定「已是最新就跳過重建」還是「重建」，判據寫錯會讓
+  # 一次被 flock 跳過的部署在重跑時被誤判成已發布（代碼切了、站點沒換）。
+  # 守衛的正確性全在 bash 控制流裡（首版就踩了「賦值夾在 if/elif 之間不執行」），
+  # 所以測試是把真實那一段切出來跑，而不是斷言字串。
+  node probe/check-deploy-guard.mjs
 fi
 
 # ---------- 2 存档 ----------
@@ -214,7 +233,8 @@ vps "SITE_DOMAIN='$(echo "$SITE" | sed 's|https\?://||;s|/.*||')' bash /tmp/hkmo
 # 两次实测各约 5.5 分钟，而且第二次构建会把第一次的产物整个覆盖掉 ——
 # 前一次的构建时间纯属白花，这是部署里最耗时的一段。
 #
-# 现在合并成一次：把评分刷新并进这次重建（ENRICH=1 FORCE_REFRESH=1），
+# 现在合并成一次重建（评分是否顺带刷新由 ENRICH 决定，默认不刷 —— 见上方 DEPLOY_ENRICH）。
+# 原先把评分固定并进这次重建（ENRICH=1 FORCE_REFRESH=1），
 # rebuild-static.sh 内部顺序仍是「抓取 → 评分 → 简介 → 海报 → 构建」，
 # 海报本地化不会像合并到定时器那样被跳过（该 unit 里 POSTERS=0）。
 # 定时器只安装、不立即运行。
@@ -222,9 +242,15 @@ vps "SITE_DOMAIN='$(echo "$SITE" | sed 's|https\?://||;s|/.*||')' bash /tmp/hkmo
 # ENRICH_OPTIONAL=1：评分要连 IMDb / 豆瓣，网络抖动或限流不该拖垮一次代码发布
 # —— 刷不到分只是沿用上一版分数，整点定时器会补上。
 # （rebuild-static.sh 里该开关默认 0，评分定时器仍保持「失败即失败」的严格语义。）
-vps "sudo -u hkmovie APP_DIR='$APP_DIR' SCRAPE='$DEPLOY_SCRAPE' ONLY='$DEPLOY_ONLY' ENRICH='1' FORCE_REFRESH='1' ENRICH_OPTIONAL='1' bash /tmp/hkmovie-vps-deploy.sh '$BRANCH'"
+vps "sudo -u hkmovie APP_DIR='$APP_DIR' SCRAPE='$DEPLOY_SCRAPE' ONLY='$DEPLOY_ONLY' ENRICH='$DEPLOY_ENRICH' FORCE_REFRESH='$DEPLOY_ENRICH' ENRICH_OPTIONAL='1' bash /tmp/hkmovie-vps-deploy.sh '$BRANCH'"
 
-# 安装独立的每小时评分定时器；首轮刷新已并入上面的重建，这里不再 --run-now。
+# 安装独立的每小时评分定时器。
+#
+# ★ 2026-10-11 起不再 --run-now：默认部署不刷评分（见 DEPLOY_ENRICH），
+#   而刷一次评分要连 299 部片的 IMDb / 豆瓣（约 5 分钟，豆瓣限流时全用来重试），
+#   让每次代码发布都等它没有意义 —— 站点该显示的还是上一版分数，
+#   下一轮 :20 的定时器会把新分数连同重建一起补上。
+#   需要立即刷新时用 ENRICH=1 bash deploy/sync.sh。
 echo "▶ 安装 IMDb / 豆瓣每小时刷新定时器"
 vps "sudo APP_DIR='$APP_DIR' SERVICE_USER=hkmovie bash '$APP_DIR/deploy/setup-rating-timer.sh'"
 

@@ -133,6 +133,8 @@ probe/*
 !probe/check-og-cards.mjs
 # 戲院場館照：清單與產物必須對得上（頁面引用的圖缺一張就是碎圖，本地構建不報）。
 !probe/check-cinema-photos.mjs
+# 部署早退守衛：只看 git HEAD 會讓「代碼切了、站點沒重建」被誤判成已發布。
+!probe/check-deploy-guard.mjs
 # Go 抓取层移植的对照样本（goscraper/internal/chinachem 的测试要读）
 !probe/chinachem-home.html
 !probe/chinachem-reference.mjs
