@@ -1,0 +1,62 @@
+[
+ {
+  "label": "mcl-002_cm",
+  "out": "tmp-official-all\\mcl-002_cm_800x534.jpg",
+  "w": 800,
+  "h": 534
+ },
+ {
+  "label": "mcl-003_gw",
+  "out": "tmp-official-all\\mcl-003_gw_800x534.jpg",
+  "w": 800,
+  "h": 534
+ },
+ {
+  "label": "mcl-005_tf",
+  "out": "tmp-official-all\\mcl-005_tf_800x533.jpg",
+  "w": 800,
+  "h": 533
+ },
+ {
+  "label": "mcl-009_star",
+  "out": "tmp-official-all\\mcl-009_star_800x534.jpg",
+  "w": 800,
+  "h": 534
+ },
+ {
+  "label": "mcl-012_fg",
+  "out": "tmp-official-all\\mcl-012_fg_320x245.jpg",
+  "w": 320,
+  "h": 245
+ },
+ {
+  "label": "mcl-013_gc",
+  "out": "tmp-official-all\\mcl-013_gc_800x533.jpg",
+  "w": 800,
+  "h": 533
+ },
+ {
+  "label": "mcl-014_mt",
+  "out": "tmp-official-all\\mcl-014_mt_800x534.jpg",
+  "w": 800,
+  "h": 534
+ },
+ {
+  "label": "mcl-015_csw",
+  "out": "tmp-official-all\\mcl-015_csw_800x534.jpg",
+  "w": 800,
+  "h": 534
+ },
+ {
+  "label": "mcl-016_cp",
+  "out": "tmp-official-all\\mcl-016_cp_4500x3002.jpg",
+  "w": 4500,
+  "h": 3002
+ },
+ {
+  "label": "mcl-017_k11",
+  "out": "tmp-official-all\\mcl-017_k11_800x309.jpg",
+  "w": 800,
+  "h": 309
+ }
+]
