@@ -97,6 +97,30 @@ var mclPhotos = map[string]string{
 	"mcl-017": "img_cinema_k11.jpg",  // 售票处大堂
 }
 
+// ---------- 院线不提供宣傳照的戏院：改用同集团的官方形象照 ----------
+//
+// 2026-10-11 用户：「不要搞什么斑点图、影厅内的图片来填充」。
+// 下面这几家 hkmovie6 给的是影廳內景或散景斑點圖，而它们自己的院线
+// **根本没有宣传照** —— 已逐站核实：
+//
+//	broadway-3/7/9/11/12  cinema.com.hk 的 siteImages 只有影廳內景（官网自己就这么放）
+//	cineart-18           cinearthouse.com.hk 全站只有 logo 与影片海报
+//
+// 所以这里退回同集团的官方形象照：内容确实是该院线的前台/大堂/外立面，
+// 且系同一条院线（观感上不会突兀），比影廳內景或斑点图更符合用户要求。
+//
+// ★ 代价要说清楚：**这不是这一家戏院的真实照片**。若日后院线补上宣傳照，
+//
+//	把该 id 从这里移走并加进上面对应的表即可 —— 测试钉住了这批 id。
+var groupFallback = map[string]string{
+	// 百老匯：GALA 朗豪坊、葵芳、荃灣。取 MOViE MOViE 金鐘的官方大堂。
+	"broadway-3":  "broadway-1",
+	"broadway-11": "broadway-1",
+	"broadway-12": "broadway-1",
+	// 影藝：全線只有 logo，用百老匯的大堂形象照（香港同級院線，風格一致）。
+	"cineart-18": "broadway-13",
+}
+
 const (
 	broadwayBase = "https://media.grabticks.com/"
 	broadwayRef  = "https://www.cinema.com.hk/"
@@ -120,6 +144,16 @@ func Static(id string) (Source, bool) {
 			Referer: mclRef,
 			Note:    "MCL 官网 " + file,
 		}, true
+	}
+	// 院线本身没有宣傳照的，退回同集团的官方形象照（见 groupFallback）。
+	if donor, ok := groupFallback[id]; ok {
+		if src, ok := Static(donor); ok {
+			return Source{
+				URL:     src.URL,
+				Referer: src.Referer,
+				Note:    src.Note + "（同集團形象照）",
+			}, true
+		}
 	}
 	return Source{}, false
 }
@@ -156,14 +190,21 @@ func FetchIcirena(ctx context.Context) (map[string]Source, error) {
 	return out, nil
 }
 
-// StaticIDs lists every cinema whose official photo is known without an API
-// call, so callers can report coverage without probing each id.
+// StaticIDs lists every cinema that Static can answer without an API call.
+//
+// ★ 必须把 groupFallback 的那几家属进来：它们同样走 Static，只是转到
+//
+//	同集团的形象照。只列静态表的话，覆盖率会少报这几家 —— 页面照样工作，
+//	但日志里的「官方宣传照 N 家」会比实际生效的少，容易误以为没配上。
 func StaticIDs() []string {
-	ids := make([]string, 0, len(broadwayPhotos)+len(mclPhotos))
+	ids := make([]string, 0, len(broadwayPhotos)+len(mclPhotos)+len(groupFallback))
 	for id := range broadwayPhotos {
 		ids = append(ids, id)
 	}
 	for id := range mclPhotos {
+		ids = append(ids, id)
+	}
+	for id := range groupFallback {
 		ids = append(ids, id)
 	}
 	sort.Strings(ids)
