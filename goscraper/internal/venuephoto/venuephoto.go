@@ -119,6 +119,9 @@ var groupFallback = map[string]string{
 	"broadway-12": "broadway-1",
 	// 影藝：全線只有 logo，用百老匯的大堂形象照（香港同級院線，風格一致）。
 	"cineart-18": "broadway-13",
+	// MCL：數碼港與淘大官網只放影廳內景，退回同線的 K11 Art House 大堂。
+	"mcl-016": "mcl-017",
+	"mcl-019": "mcl-017",
 }
 
 const (
