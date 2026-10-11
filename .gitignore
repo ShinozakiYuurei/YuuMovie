@@ -154,21 +154,7 @@ deploy/nginx-slug-redirects.conf
 # 本机调试与部署日志：deploy/sync.sh 的 `git add -A` 会把它们一起提���，
 # 2026-10-11 就因为 tmp-deploy.err 被当成「改动」单独提交了一次，
 # 导致服务器代码与仓库不一致、部署自检拦下。部署输出请写到别的目录。
-tmp-deploy*.log
-tmp-deploy*.err
-tmp-*.json
-tmp-*.cjs
-tmp-*.mjs
-tmp-c2.tgz
-tmp-cinemas52.tgz
-tmp-mclbig.tgz
-tmp-all52/
-tmp-mclsrc/
-tmp-v3/
-tmp-new/
-tmp-mcl/
-tmp-bwall/
-tmp-bwpng/
-tmp-bjs/
-tmp-icirena/
-tmp-official-all/
+live-*.png
+
+tmp-*
+live-*.png
