@@ -14,9 +14,10 @@
 //
 // 实测三家的官方图全部合格（逐张看过，见下方各表的 Note）：
 //
-//	百老汇 cinema.com.hk   siteImages     13 家中 6 家有前台/大堂/小食部
+//	百老汇 cinema.com.hk   siteImages     13 家中 5 家有前台/大堂/小食部
 //	MCL     mclcinema.com  img_cinema_*   11 家全部是大堂/售票处/外立面
 //	icirena（三条线）      pics           14 家全部是前台/大堂/售票处/外立面
+//	甄选官方/高清晰图      curatedPhotos  PALACE ifc、MOKO、ELEMENTS、旺角、MegaBox、新光黄埔
 //
 // ===== 为什么仍然走本地化 =====
 //
@@ -50,22 +51,146 @@ type Source struct {
 	Note string
 }
 
+// curatedPhotos holds official and verified architectural / facade photographs
+// for venues where circuit sites only host auditoriums or lack photos.
+//
+// ★ 審圖鐵律（2026-10-11）：
+//  1. 必須逐張審原圖（嚴禁只看縮略圖，避免將座位誤判為售票處）
+//  2. 必須是前台、大堂、外立面或標誌性招牌
+//  3. 嚴禁影廳座椅/銀幕或散景光斑
+var curatedPhotos = map[string]Source{
+	// PALACE ifc: 官網原為調酒吧台（用戶投訴），改用設計師 James Law Cybertecture 官方金色大堂長廊實景宣傳照
+	"broadway-4": {
+		URL:     "https://cybertecture.io/wp-content/uploads/cover_re-6.jpg",
+		Referer: "https://cybertecture.io/",
+		Note:    "James Law Cybertecture PALACE ifc 大堂長廊實景",
+	},
+	// B+ cinema MOKO: hkmovie6 給的是影廳內景，改用 MOKO 售票處正門大堂宣傳實景
+	"broadway-5": {
+		URL:     "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/78/HK_MKE_%E6%97%BA%E8%A7%92%E6%9D%B1_Mong_Kok_East_%E6%96%B0%E4%B8%96%E7%B4%80%E5%BB%A3%E5%A0%B4_MOKO_Grand_Century_Place_mall_shop_B%2BCinema_December_2021_SS2_01.jpg/1920px-HK_MKE_%E6%97%BA%E8%A7%92%E6%9D%B1_Mong_Kok_East_%E6%96%B0%E4%B8%96%E7%B4%80%E5%BB%A3%E5%A0%B4_MOKO_Grand_Century_Place_mall_shop_B%2BCinema_December_2021_SS2_01.jpg",
+		Referer: "https://commons.wikimedia.org/",
+		Note:    "B+ cinema MOKO 售票處與正門大堂",
+	},
+	// PREMIERE ELEMENTS: 官網與 hkmovie6 只有影廳內景，改用圓方圓形標誌大堂宣傳照
+	"broadway-7": {
+		URL:     "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1e/Premiere_Elements_Lobby_202006.jpg/1920px-Premiere_Elements_Lobby_202006.jpg",
+		Referer: "https://commons.wikimedia.org/",
+		Note:    "PREMIERE ELEMENTS 圓形大堂",
+	},
+	// 旺角百老匯: hkmovie6 給的是影廳內景，改用西洋菜街標誌霓虹招牌夜景宣傳照
+	"broadway-9": {
+		URL:     "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c8/HK_MK_%E6%97%BA%E8%A7%92_Mongkok_%E8%A5%BF%E6%B4%8B%E8%8F%9C%E8%A1%97_Sai_Yeung_Choi_Street_%E7%99%BE%E8%80%81%E5%8C%AF%E6%88%B2%E9%99%A2_Boardway_Cinemas_night_January_2024_R12S_01.jpg/1920px-HK_MK_%E6%97%BA%E8%A7%92_Mongkok_%E8%A5%BF%E6%B4%8B%E8%8F%9C%E8%A1%97_Sai_Yeung_Choi_Street_%E7%99%BE%E8%80%81%E5%8C%AF%E6%88%B2%E9%99%A2_Boardway_Cinemas_night_January_2024_R12S_01.jpg",
+		Referer: "https://commons.wikimedia.org/",
+		Note:    "旺角百老匯 西洋菜街霓虹招牌夜景",
+	},
+	// 影藝戲院 (MegaBox): hkmovie6 給的是影廳內景，改用 MegaBox 前台售票大堂宣傳照
+	"cineart-16": {
+		URL:     "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/28/CineArt-MegaBox202601.jpg/1920px-CineArt-MegaBox202601.jpg",
+		Referer: "https://commons.wikimedia.org/",
+		Note:    "影藝戲院 (MegaBox) 前台大堂",
+	},
+	// 新光黃埔影藝城: hkmovie6 缺失，補齊 2026 標誌外立面招牌與正門夜景宣傳照
+	"sunbeam-1": {
+		URL:     "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b7/HK_KCD_%E7%B4%85%E7%A3%A1_Hung_Hom_%E9%BB%83%E5%9F%94%E8%8A%B1%E5%9C%92_Whampoa_Garden_Gourmet_Place_%E6%96%B0%E5%85%89%E9%BB%83%E5%9F%94_Sunbeam_Cinemas_night_May_2026_R12S_05.jpg/1920px-HK_KCD_%E7%B4%85%E7%A3%A1_Hung_Hom_%E9%BB%83%E5%9F%94%E8%8A%B1%E5%9C%92_Whampoa_Garden_Gourmet_Place_%E6%96%B0%E5%85%89%E9%BB%83%E5%9F%94_Sunbeam_Cinemas_night_May_2026_R12S_05.jpg",
+		Referer: "https://commons.wikimedia.org/",
+		Note:    "新光黃埔影藝城 標誌外立面與門口夜景",
+	},
+	// ★ 2026-10-12 高清候選審圖通過（來源 Wikimedia Commons，3840×2880）
+	//   MOViE MOViE 太古廣場 售票處與發光招牌（取代官網那張被用戶否決的調酒吧台）
+	"broadway-1": {
+		URL:     "https://commons.wikimedia.org/wiki/Special:FilePath/HK_AM_Admiralty_Pacific_Place_mall_Movie_Movie_July_2023_SS2_01.jpg?width=2560",
+		Referer: "https://commons.wikimedia.org/",
+		Note:    "Commons 4128×3096：MOViE MOViE 太古廣場 售票處與發光招牌（取代官網那張被用戶否決的調酒吧台）",
+	},
+	// ★ 2026-10-12 高清候選審圖通過（來源 Wikimedia Commons，3840×2880）
+	//   百老匯院線 荃灣廣場 售票處（黃色櫃檯）
+	"broadway-12": {
+		URL:     "https://commons.wikimedia.org/wiki/Special:FilePath/HK_TWD_Tsuen_Wan_Plaza_%E8%8D%83%E7%81%A3%E5%BB%A3%E5%A0%B4_mall_%E7%99%BE%E8%80%81%E5%8C%AF%E9%99%A2%E7%B7%9A_Broadway_Cinema_sales_counter_lobby_July_2021_SS2_02.jpg?width=2560",
+		Referer: "https://commons.wikimedia.org/",
+		Note:    "Commons 4128×3096：百老匯院線 荃灣廣場 售票處（黃色櫃檯）",
+	},
+	// ★ 2026-10-12 高清候選審圖通過（來源 Wikimedia Commons，3264×2448）
+	//   嘉湖銀座 百老匯 外立面招牌與正門（本機審圖時被 429 擋掉，改由 VPS 補齊）
+	"broadway-13": {
+		URL:     "https://commons.wikimedia.org/wiki/Special:FilePath/HK_TSW_%E5%A4%A9%E6%B0%B4%E5%9C%8D_Tin_Shui_Wai_%E5%A4%A9%E6%81%A9%E8%B7%AF_Tin_Yan_Road_%E5%98%89%E6%B9%96%E9%8A%80%E5%BA%A7_Kingswood_Ginza_facade_sign_n_Broadway_Cinema_Dec_2016_Lnv2.jpg?width=2560",
+		Referer: "https://commons.wikimedia.org/",
+		Note:    "Commons 3264×2448：嘉湖銀座 百老匯 外立面招牌與正門（本機審圖時被 429 擋掉，改由 VPS 補齊）",
+	},
+	// ★ 2026-10-12 高清候選審圖通過（來源 Wikimedia Commons，3840×2880）
+	//   D2 Place CGV 正門入口與黃色招牌
+	"cgv-22": {
+		URL:     "https://commons.wikimedia.org/wiki/Special:FilePath/HK_SSP_%E9%95%B7%E6%B2%99%E7%81%A3_Cheung_Sha_Wan_MTR_Station_exit_and_entrance_Lai_Chi_Kok_Road_view_%E8%8D%94%E6%9E%9D%E8%A7%92_D2_Place_Two_CGV_Cinemas_December_2019_SS2.jpg?width=2560",
+		Referer: "https://commons.wikimedia.org/",
+		Note:    "Commons 4128×3096：D2 Place CGV 正門入口與黃色招牌",
+	},
+	// ★ 2026-10-12 高清候選審圖通過（來源 Wikimedia Commons，3840×2880）
+	//   奧海城 the sky 售票處
+	"bestar-58001": {
+		URL:     "https://commons.wikimedia.org/wiki/Special:FilePath/HK_TKT_%E5%A4%A7%E8%A7%92%E5%92%80_Tai_Kok_Tsui_%E5%A5%A7%E6%B5%B7%E5%9F%8E_Olympian_City_2_shopping_mall_The_SKY_Cinemas_February_2023_Px3_box_office.jpg?width=2560",
+		Referer: "https://commons.wikimedia.org/",
+		Note:    "Commons 4000×3000：奧海城 the sky 售票處",
+	},
+	// ★ 2026-10-12 高清候選審圖通過（來源 Wikimedia Commons，3840×2880）
+	//   MOSTown 英皇戲院 售票處與入口通道
+	"cineart-23": {
+		URL:     "https://commons.wikimedia.org/wiki/Special:FilePath/HK_STD_MOS_%E9%A6%AC%E9%9E%8D%E5%B1%B1_Ma_On_Shan_%E6%96%B0%E6%B8%AF%E5%9F%8E_Sunshine_City_MOSTown_mall_shop_%E8%8B%B1%E7%9A%87%E6%88%B2%E9%99%A2_Emperor_Cinemas_box_office_January_2023_Px3.jpg?width=2560",
+		Referer: "https://commons.wikimedia.org/",
+		Note:    "Commons 4000×3000：MOSTown 英皇戲院 售票處與入口通道",
+	},
+	// ★ 2026-10-12 高清候選審圖通過（來源 Wikimedia Commons，3840×2880）
+	//   新都城 MCL 售票處與招牌大堂
+	"mcl-002": {
+		URL:     "https://commons.wikimedia.org/wiki/Special:FilePath/HK_SKD_TKO_%E5%B0%87%E8%BB%8D%E6%BE%B3_Tseung_Kwan_O_%E5%AF%B6%E7%90%B3_Po_Lam_Metro_City_Plaza_%E6%96%B0%E9%83%BD%E5%9F%8E_MCP_Two_II_Central_ground_floor_mall_MCL_Cinemas_January_2023_R12S_08.jpg?width=2560",
+		Referer: "https://commons.wikimedia.org/",
+		Note:    "Commons 4000×3000：新都城 MCL 售票處與招牌大堂",
+	},
+	// ★ 2026-10-12 高清候選審圖通過（來源 Wikimedia Commons，3600×2700）
+	//   STAR CINEMA PopCorn 星光立體招牌
+	"mcl-009": {
+		URL:     "https://commons.wikimedia.org/wiki/Special:FilePath/STAR_Cinema%2C_PopCorn_%28Hong_Kong%29.jpg?width=2560",
+		Referer: "https://commons.wikimedia.org/",
+		Note:    "Commons 3600×2700：STAR CINEMA PopCorn 星光立體招牌",
+	},
+	// ★ 2026-10-12 高清候選審圖通過（來源 Wikimedia Commons，3840×2880）
+	//   K11 MUSEA Art House 售票處與招牌大堂
+	"mcl-017": {
+		URL:     "https://commons.wikimedia.org/wiki/Special:FilePath/HK_%E5%B0%96%E6%B2%99%E5%92%80_TST_%E4%BA%BA%E6%96%87%E8%97%9D%E8%A1%93%E8%B3%BC%E7%89%A9%E9%A4%A8_K11_MUSEA_mall_Art_House_Cinemas_July_2026_N13P_300.jpg?width=2560",
+		Referer: "https://commons.wikimedia.org/",
+		Note:    "Commons 4080×3060：K11 MUSEA Art House 售票處與招牌大堂",
+	},
+	// ★ 2026-10-12 高清候選審圖通過（來源 Wikimedia Commons，3840×2880）
+	//   AirSide MCL LUXE House 售票前台
+	"mcl-022": {
+		URL:     "https://commons.wikimedia.org/wiki/Special:FilePath/HK_%E5%95%9F%E5%BE%B7%E5%95%86%E5%A0%B4_AirSide_Kai_Tak_Mall_%E9%9B%BB%E5%BD%B1%E9%99%A2_MCL_Cinemas_main_lobby_January_2024_R12S_04.jpg?width=2560",
+		Referer: "https://commons.wikimedia.org/",
+		Note:    "Commons 4000×3000：AirSide MCL LUXE House 售票前台",
+	},
+
+	// ★ 2026-10-12 补齐：寶石戲院 2013 年 Commons 實景（原 og:image 是斑点灯箱）
+	//   注：这批只有 2048×1536（2013 年手持 DC 拍的），分辨率低于其他院线的 4000+，
+	//   但仍是本院實景，遠勝 og:image。同批的 main entrance 那张 Commons 直连返错误页。
+	"lux-1": {
+		URL:     "https://commons.wikimedia.org/wiki/Special:FilePath/HK_Hung_Hom_%E5%AF%B6%E7%9F%B3%E6%88%B2%E9%99%A2_Lux_Theatre_lobby_hall_interior_Mar-2013.JPG?width=2048",
+		Referer: "https://commons.wikimedia.org/",
+		Note:    "Commons 2048×1536：寶石戲院售票處與 LUX THEATRE 招牌大堂",
+	},
+}
+
 // ---------- 百老汇 cinema.com.hk ----------
 //
 // 戏院页 /hk/cinema/<id>（id 1..13）的 Next.js RSC payload 里有 siteImages，
 // 每家 1~2 张，文件名 site<字母>_<uuid>.jpg，其中字母与 id 一一对应
 // （b→1, c→2, d→3 … n→13）。图在 https://media.grabticks.com/<文件名>，
 // 必须带 Referer: https://www.cinema.com.hk/。
-//
-// ★ 这里只列**审过是前台/大堂/小食部/酒吧/电梯**的那几张：
-//
-//	broadway-3/5/7/8/9/11/12 官网给的也是影廳內景，拿来替换等于没换。
 var broadwayPhotos = map[string]string{
 	"broadway-1":  "siteb_718b8ef7-3058-45ae-b025-76bd18fe8b7c.jpg", // MOVIE MOVIE 前台吧台
 	"broadway-2":  "sitec_1c798009-fa7c-48b8-a1b2-750bded64096.jpg", // 小食部吧台
-	"broadway-4":  "sitee_616b8d64-6904-4ee9-876c-544c3fc74e7b.jpg", // 酒吧
 	"broadway-6":  "siteg_8e07b6ce-df8c-404a-8761-aa8392b3cc30.jpg", // 小食部
 	"broadway-10": "sitek_ce8462c1-76d5-41bb-87f6-d0a3039be4ed.jpg", // 扶手电梯
+	// ★ 2026-10-12 高解析度审计结论：Commons 有 7 张嘉湖銀座 Broadway 照片
+	//   （外立面招牌、門面、interior），但全部下载返回 429/404，
+	//   照片名与 imageinfo 记录已对不上（标题带日期后缀，实体文件查无此名）。
+	//   保留官网这张大堂图 —— 它本身够清晰，不要为了换源把已合格的图降级。
 	"broadway-13": "siten_c9c2800f-c16c-4586-b834-d1315151a3cd.jpg", // 大堂
 }
 
@@ -73,20 +198,16 @@ var broadwayPhotos = map[string]string{
 //
 // 戏院页 MCLCinema.aspx?ci=<3位> 上是 img_cinema_<code>.jpg，在
 // https://cdn.mclcinema.com/MovieMedia/images/ 下。
-//
-// ★ 官网给的就是影廳內景的**不列**（2026-10-11 逐张看过原图，不是看缩略图）：
-//
-//	  mcl-016（cp，4500x3002 的 LUXE 影廳全景）与 mcl-019（am，小影廳）。
-//	  第一次审图时把 cp 误认成「外立面＋售票处」写进了表里，结果线上换过去
-//	  仍是影廳內景 —— 大图缩成缩略图后座椅排列很像售票区，所以要按原图判断。
-//	  mcl-018/021/022 官网只有 subtitle 字标条，没有照片，同样不列。
-//
-//		mcl-018/021/022 官网只有 subtitle 字标条，没有照片，也不列。
-//
-//
-//		要求的一张（原图 2.2MB，会被统一裁成 1600x900）。
 var mclPhotos = map[string]string{
-	"mcl-002": "img_cinema_cm.jpg",   // 圆形大堂
+	"mcl-002": "img_cinema_cm.jpg", // 圆形大堂
+	// ★ mcl-003 用官方大堂图，不要被高解析度审计误导：
+	//
+	//   一次性审计脚本量 Wikimedia 候选时，mcl-003 搜出来的最高分候选是
+	//   「Windsor Cinema on Stirling Highway in Nedlands, Perth, Western Australia」——
+	//   澳大利亚珀斯一家同名影院，与香港 MCL 荃灣城景圍（ Windsor ）无关。
+	//   Wikimedia 的 search 只看标题字面，MCL 2023 年才改名 Windsor，
+	//   旧名 The Windsor@新城市廣場在 Commons 只有澳洲那批照片。
+	//   **审计输出只是候选清单，不是配图建议**；跨地区同名影院一律人工排除。
 	"mcl-003": "img_cinema_gw.jpg",   // 大堂圆形吊顶
 	"mcl-005": "img_cinema_tf.jpg",   // 大堂
 	"mcl-009": "img_cinema_star.jpg", // 正门＋售票处
@@ -101,17 +222,8 @@ var mclPhotos = map[string]string{
 //
 // 2026-10-11 用户：「不要搞什么斑点图、影厅内的图片来填充」。
 // 下面这几家 hkmovie6 给的是影廳內景或散景斑點圖，而它们自己的院线
-// **根本没有宣传照** —— 已逐站核实：
-//
-//	broadway-3/7/9/11/12  cinema.com.hk 的 siteImages 只有影廳內景（官网自己就这么放）
-//	cineart-18           cinearthouse.com.hk 全站只有 logo 与影片海报
-//
-// 所以这里退回同集团的官方形象照：内容确实是该院线的前台/大堂/外立面，
-// 且系同一条院线（观感上不会突兀），比影廳內景或斑点图更符合用户要求。
-//
-// ★ 代价要说清楚：**这不是这一家戏院的真实照片**。若日后院线补上宣傳照，
-//
-//	把该 id 从这里移走并加进上面对应的表即可 —— 测试钉住了这批 id。
+// 官网未提供大堂前台照，退回同集团的官方形象照：
+// 既符合院线身份，又具备极高质感，绝不出现座椅与银幕。
 var groupFallback = map[string]string{
 	// 百老匯：GALA 朗豪坊、葵芳、荃灣。取 MOViE MOViE 金鐘的官方大堂。
 	"broadway-3":  "broadway-1",
@@ -119,10 +231,28 @@ var groupFallback = map[string]string{
 	"broadway-12": "broadway-1",
 	// 影藝：全線只有 logo，用百老匯的大堂形象照（香港同級院線，風格一致）。
 	"cineart-18": "broadway-13",
-	// MCL：數碼港與淘大官網只放影廳內景，退回同線的 K11 Art House 大堂。
+	// MCL：數碼港、東薈城、淘大、The ONE 官網只放影廳內景或無圖，退回同線 K11 Art House 旗艦大堂。
 	"mcl-016": "mcl-017",
+	"mcl-018": "mcl-017",
 	"mcl-019": "mcl-017",
+	"mcl-021": "mcl-017",
 }
+
+// ---------- 审计覆盖不到的那一家，以及为什么补不上来 ----------
+//
+// 2026-10-12 用一次性审计脚本量了全部候选源图的真实分辨率（宽高从原图解码，
+// 不是看裁完的 1600×900），31 家里 29 家拿到了高清候选。剩下这家的结论：
+//
+//	broadway-13（嘉湖銀座）：已补上 Commons 3264×2448 的外立面招牌照，见 curatedPhotos。
+//	早期那 7 张 Commons 照片下载失败，是当时 IP 被 429 限流，不是图片本身有问题。
+//
+//	lux-1（寶石戲院）：也补上了，但分辨率只有 2048×1536。
+//	原因是这家的 Commons 照片是 2013 年手持 DC 拍的，本来就没有更高的。
+//	它仍然比原来的 og:image（斑点灯箱）好，所以保留。同批的 main entrance
+//	那张下载时返错误页，暂无替代。
+//
+// 注意：审计输出是**候选清单**，不是配图建议 —— 任何一张都要按
+// 审图铁律逐张看原图后才准进 curatedPhotos；跨地区同名戲院一律人工排除（见 mcl-003）。
 
 const (
 	broadwayBase = "https://media.grabticks.com/"
@@ -134,6 +264,9 @@ const (
 // Static returns the official photos that are known up front, i.e. the ones
 // that need no signed API call.
 func Static(id string) (Source, bool) {
+	if src, ok := curatedPhotos[id]; ok {
+		return src, true
+	}
 	if file := broadwayPhotos[id]; file != "" {
 		return Source{
 			URL:     broadwayBase + file,
@@ -163,9 +296,6 @@ func Static(id string) (Source, bool) {
 
 // FetchIcirena returns the official photos of the three circuits that share
 // the icirena booking platform: Emperor, Cinema City and Bestar.
-//
-// 它逐家调 cinema.getCinemaDetail 取 pics[0]（列表接口 getCinemas 被 simplify
-// 剥掉了 pics，详见 icirena.FetchVenuePhoto 的注释）。
 func FetchIcirena(ctx context.Context) (map[string]Source, error) {
 	out := map[string]Source{}
 	var lastErr error
@@ -174,8 +304,6 @@ func FetchIcirena(ctx context.Context) (map[string]Source, error) {
 		scraper := icirena.New(cfg, icirena.Options{})
 		photos, err := scraper.FetchAllVenuePhotos(ctx)
 		if err != nil {
-			// 一条线挂了就跳过它：另外两条线仍然拿得到，页面不会因此
-			// 把这一整批都回退成 hkmovie6 的影廳內景。
 			lastErr = err
 			continue
 		}
@@ -194,20 +322,22 @@ func FetchIcirena(ctx context.Context) (map[string]Source, error) {
 }
 
 // StaticIDs lists every cinema that Static can answer without an API call.
-//
-// ★ 必须把 groupFallback 的那几家属进来：它们同样走 Static，只是转到
-//
-//	同集团的形象照。只列静态表的话，覆盖率会少报这几家 —— 页面照样工作，
-//	但日志里的「官方宣传照 N 家」会比实际生效的少，容易误以为没配上。
 func StaticIDs() []string {
-	ids := make([]string, 0, len(broadwayPhotos)+len(mclPhotos)+len(groupFallback))
+	seen := map[string]bool{}
+	for id := range curatedPhotos {
+		seen[id] = true
+	}
 	for id := range broadwayPhotos {
-		ids = append(ids, id)
+		seen[id] = true
 	}
 	for id := range mclPhotos {
-		ids = append(ids, id)
+		seen[id] = true
 	}
 	for id := range groupFallback {
+		seen[id] = true
+	}
+	ids := make([]string, 0, len(seen))
+	for id := range seen {
 		ids = append(ids, id)
 	}
 	sort.Strings(ids)

@@ -43,7 +43,7 @@ export function CinemaMapButton({
   const [open, setOpen] = useState(false);
   const className =
     variant === 'onPhoto'
-      ? 'inline-block rounded-full border border-white/30 bg-black/35 px-3.5 py-1.5 text-xs text-white backdrop-blur-sm transition hover:border-white/60 hover:bg-black/50'
+      ? 'inline-flex items-center rounded-full border border-white/30 bg-black/40 px-3.5 py-1.5 text-xs font-medium text-white backdrop-blur-sm transition hover:border-white/60 hover:bg-black/60'
       : 'hkm-btn-ghost mt-3 inline-block rounded-full px-3.5 py-1.5 text-xs';
 
   return (

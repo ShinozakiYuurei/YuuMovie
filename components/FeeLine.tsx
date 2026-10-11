@@ -32,6 +32,7 @@ export function FeeLine({
   amount,
   note,
   className = '',
+  variant = 'default',
 }: {
   /**
    * 每張戲票手續費（HKD）
@@ -42,21 +43,33 @@ export function FeeLine({
   note: string;
   /** 各頁面自己的外距（如 'mt-1'）；文字樣式由 .hkm-fee 統一給 */
   className?: string;
+  /** 'onPhoto'：壓在場館照上時渲染為與地圖按鈕一致的磨砂玻璃膠囊（2026-10-11） */
+  variant?: 'default' | 'onPhoto';
 }) {
+  const text =
+    amount === FEE_NO_ONLINE
+      ? '不設網上購票'
+      : amount < 0
+        ? '手續費待確認'
+        : `手續費 $${amount}`;
+
+  if (variant === 'onPhoto') {
+    return (
+      <span
+        className={`inline-flex items-center rounded-full border border-white/30 bg-black/40 px-3.5 py-1.5 text-xs font-medium text-white/95 backdrop-blur-sm tabular-nums ${amount < 0 ? 'text-white/75' : ''} ${className}`}
+        title={note}
+      >
+        {text}
+      </span>
+    );
+  }
+
   return (
-    /*
-     * 整行文字共用一個 title，滑過即可看到手續費說明。
-     * tabular-nums 讓金額中的數字寬度一致。
-     */
     <span
       className={`hkm-fee ${amount < 0 ? 'hkm-fee--unknown' : ''} ${className}`}
       title={note}
     >
-      {amount === FEE_NO_ONLINE
-        ? '不設網上購票'
-        : amount < 0
-          ? '手續費待確認'
-          : `手續費 $${amount}`}
+      {text}
     </span>
   );
 }

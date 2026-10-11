@@ -59,6 +59,7 @@ import (
 	_ "image/png"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -99,8 +100,12 @@ const (
 	//
 	// 2026-10-11 第二次 +1（2 → 3）：改用院线官网的宣傳照（前台/大堂/外立面），
 	// 见 internal/venuephoto。换的不只是像素，还有「每家取哪一张」——
+	// 2026-10-12 第四次 +1（4 → 5）：Commons 高清候選審圖通過的 10 家換源圖
+	// （broadway-1/12/13、cgv-22、bestar-58001、cineart-23、mcl-002/009/017/022）。
+	// 舊源多為 1000×320 的百老汇官網橫幅或 hkmovie6 的影廳內景，新源 3264×2448 起。
+	// 見 internal/venuephoto 的 curatedPhotos 與 VPS 上的 photopick 審圖結果。
 	// 增量逻辑只认文件在不在，不换版本号的话 13 家旧图会被永远跳过。
-	cropVersion = 3
+	cropVersion = 5
 )
 
 func main() {
@@ -146,28 +151,27 @@ func run(ctx context.Context, root string, force, dry bool) error {
 	coords := cinemaphoto.ParseCoords(geo)
 
 	scraper := cinemaphoto.New()
+	var withPhoto []cinemaphoto.Venue
 	venues, err := scraper.FetchList(ctx)
 	if err != nil {
-		return err
-	}
-	fmt.Printf("hkmovie6 戏院列表：%d 家\n", len(venues))
-
-	// 逐家取 og:image 与坐标。串行 + 间隔：这不是 CDN 的批量接口，
-	// 而是一个被 Cloudflare 保护的站点，并发抓 59 页容易触发限流。
-	withPhoto := make([]cinemaphoto.Venue, 0, len(venues))
-	for i := range venues {
-		v := venues[i]
-		detail, err := scraper.FetchVenue(ctx, v.UUID)
-		if err != nil {
-			fmt.Printf("  ⚠️ %s 详情抓取失败：%v\n", v.Name, err)
-			withPhoto = append(withPhoto, v)
-			continue
-		}
-		v.Photo = detail.Photo
+		fmt.Printf("⚠️ hkmovie6 列表抓取失败：%v（沿用已存场馆照并处理官方宣传照）\n", err)
+	} else {
+		fmt.Printf("hkmovie6 戏院列表：%d 家\n", len(venues))
+		withPhoto = make([]cinemaphoto.Venue, 0, len(venues))
+		for i := range venues {
+			v := venues[i]
+			detail, err := scraper.FetchVenue(ctx, v.UUID)
+			if err != nil {
+				fmt.Printf("  ⚠️ %s 详情抓取失败：%v\n", v.Name, err)
+				withPhoto = append(withPhoto, v)
+				continue
+			}
+			v.Photo = detail.Photo
 		v.Lat = detail.Lat
 		v.Lon = detail.Lon
 		withPhoto = append(withPhoto, v)
 		time.Sleep(200 * time.Millisecond)
+		}
 	}
 
 	matched := cinemaphoto.Match(cinemas, withPhoto, displayNames, coords)
@@ -184,6 +188,14 @@ func run(ctx context.Context, root string, force, dry bool) error {
 		fmt.Printf("⚠️ icirena 官方照抓取失败（该三条线沿用 hkmovie6）：%v\n", err)
 	} else {
 		for id, src := range got {
+			// 人工审图结论优先于自动抓的官网图。
+			//
+			// venuephoto.Static 一开始就包含 curatedPhotos（逐张审过的），
+			// 而 icirena 这路是自动取 icirena 平台上的首页图。若让自动结果反覆盖，
+			// 审图拿掉的结论就白审了（bestar-58001 被覆盖时就是这个问题）。
+			if _, reviewed := official[id]; reviewed {
+				continue
+			}
 			official[id] = src
 		}
 	}
@@ -200,15 +212,28 @@ func run(ctx context.Context, root string, force, dry bool) error {
 	var downloaded, skipped, failed int
 	client := fetch.New(fetch.WithTimeout(60*time.Second), fetch.WithRetries(2))
 
-	for _, id := range cinemaphoto.SortedIDs(matched) {
-		venue := matched[id]
-		// 官方宣传照优先；官方没有才回退 hkmovie6 的 og:image。
-		src, referer, origin := venue.Photo, cinemaphoto.Referer, "hkmovie6"
+	allIDs := make([]string, 0, len(cinemas))
+	for _, c := range cinemas {
+		allIDs = append(allIDs, c.ID)
+	}
+	sort.Strings(allIDs)
+
+	for _, id := range allIDs {
+		var src, referer, origin, name string
+		if venue, ok := matched[id]; ok {
+			src, referer, origin, name = venue.Photo, cinemaphoto.Referer, "hkmovie6", venue.Name
+		}
 		if officialSrc, ok := official[id]; ok {
 			src, referer, origin = officialSrc.URL, officialSrc.Referer, officialSrc.Note
 		}
 		if src == "" {
-			fmt.Printf("  · %s（%s）：无照片\n", id, venue.Name)
+			target := filepath.Join(outDir, id+".jpg")
+			if info, err := os.Stat(target); err == nil && info.Size() > 0 {
+				skipped++
+				manifest[id] = photoURL(id)
+				continue
+			}
+			fmt.Printf("  · %s：无照片\n", id)
 			continue
 		}
 		target := filepath.Join(outDir, id+".jpg")
@@ -220,20 +245,34 @@ func run(ctx context.Context, root string, force, dry bool) error {
 			}
 		}
 		if dry {
-			fmt.Printf("  · %s（%s）→ %s [%s]\n", id, venue.Name, src, origin)
+			fmt.Printf("  · %s（%s）→ %s [%s]\n", id, name, src, origin)
 			manifest[id] = photoURL(id)
 			continue
 		}
 
-		data, err := client.GetWithHeaders(ctx, src, map[string]string{
-			"Referer": referer,
-			"Accept":  "image/avif,image/webp,image/*,*/*;q=0.8",
-		})
-		if err != nil {
-			fmt.Printf("  ⚠️ %s 下载失败：%v\n", id, err)
-			failed++
-			dropStale(target)
-			continue
+		var data []byte
+		var dlErr error
+		localCandidate := filepath.Join(root, "probe", id+".jpg")
+		if b, readErr := os.ReadFile(localCandidate); readErr == nil && len(b) > 0 {
+			data = b
+		} else {
+			data, dlErr = client.GetWithHeaders(ctx, src, map[string]string{
+				"Referer":    referer,
+				"User-Agent": "HKMovieLabBot/1.0 (https://github.com/ShinozakiYuurei/YuuMovie; contact@yuurei.dev) Mozilla/5.0",
+				"Accept":     "image/avif,image/webp,image/*,*/*;q=0.8",
+			})
+			if dlErr != nil {
+				// 如果远端下载失败，但现有 public/cinemas/<id>.jpg 已存在，则保留旧图
+				if info, statErr := os.Stat(target); statErr == nil && info.Size() > 0 {
+					skipped++
+					manifest[id] = photoURL(id)
+					continue
+				}
+				fmt.Printf("  ⚠️ %s 下载失败：%v\n", id, dlErr)
+				failed++
+				dropStale(target)
+				continue
+			}
 		}
 		if err := encodeBanner(data, target); err != nil {
 			fmt.Printf("  ⚠️ %s 转码失败：%v\n", id, err)

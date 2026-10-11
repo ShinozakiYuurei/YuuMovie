@@ -5,25 +5,27 @@ import (
 	"testing"
 )
 
-// TestStaticCoversKnownCircuits pins which cinemas get an official photo.
+// TestStaticCoversKnownCircuits pins which cinemas get a photo.
 //
-// 意图：改表时要有人看一眼「换掉的是哪几家」。这张表就是「不再显示影廳內景」
-// 的白名单，删一行等于让那家退回 hkmovie6 的 og:image（多半又是座椅＋銀幕）。
+// 2026-10-12 更新：Commons 高清審圖通過的 11 家進了 curatedPhotos，
+// 其中 bestar-58001 / cgv-22 / cineart-23 / mcl-022 是新增覆蓋，
+// broadway-12 從 groupFallback（借 broadway-1 的圖）升級為自有圖，
+// lux-1（寶石戲院）補上 2048×1536 的售票處實景（原 og:image 是斑點圖）。
 func TestStaticCoversKnownCircuits(t *testing.T) {
 	want := []string{
-		// 百老汇：只收审过是前台/大堂/小食部/酒吧/电梯的。
-		// ★ broadway-3/5/7/8/9/11/12 官网给的也是影廳內景，故不在表内。
-		"broadway-1", "broadway-2", "broadway-4", "broadway-6", "broadway-10", "broadway-13",
-		// MCL：全部是大堂/售票处/走廊。
-		// ★ mcl-016（cp）与 mcl-019（am）官网给的就是影廳內景，故不进静态表 —— 改走同線代用照。
+		// 百老匯：前台/大堂/小食部/廚房/扶手櫃，以及審圖通過的 Commons 售票處與外立面
+		"broadway-1", "broadway-2", "broadway-6", "broadway-10", "broadway-12", "broadway-13",
+		// MCL：大堂/售票處/凸肚廚，以及審圖通過的 Commons 售票處與星光招牌
 		"mcl-002", "mcl-003", "mcl-005", "mcl-009", "mcl-012",
-		"mcl-013", "mcl-014", "mcl-015", "mcl-017",
-		// 院线没有宣傳照的：退回同集团形象照，见 groupFallback。
-		"broadway-3", "broadway-11", "broadway-12", "cineart-18",
-		"mcl-016", "mcl-019",
+		"mcl-013", "mcl-014", "mcl-015", "mcl-017", "mcl-022",
+		// 官方/高清晰圖（前台/大堂/外立面）
+		"broadway-4", "broadway-5", "broadway-7", "broadway-9", "cineart-16", "sunbeam-1",
+		// 審圖通過的 Commons 售票處與正門
+		"bestar-58001", "cgv-22", "cineart-23", "lux-1",
+		// 院線沒有官方照的：退回同集團形象照，見 groupFallback。
+		"broadway-3", "broadway-11", "cineart-18",
+		"mcl-016", "mcl-018", "mcl-019", "mcl-021",
 	}
-	// 比集合而不是比顺序：StaticIDs 排的是字符串序，broadway-10 必然排在
-	// broadway-2 前面，把顺序也钉死只会让人为了改表去迁就它。
 	got := map[string]bool{}
 	for _, id := range StaticIDs() {
 		got[id] = true
@@ -41,11 +43,22 @@ func TestStaticCoversKnownCircuits(t *testing.T) {
 
 // TestStaticBuildsAbsoluteURLsWithReferer checks the two fields every media
 // host actually requires.
+//
+// 兩類來源都要覆蓋：院線官網 CDN（要 Referer 才給圖）與 Wikimedia
+// Special:FilePath（審圖通過的 10 家走這條）。
 func TestStaticBuildsAbsoluteURLsWithReferer(t *testing.T) {
 	cases := map[string]string{
-		"broadway-1":  "https://media.grabticks.com/",
-		"broadway-13": "https://media.grabticks.com/",
-		"mcl-002":     "https://cdn.mclcinema.com/MovieMedia/images/",
+		// 院線官網 / 官方網站
+		"broadway-2": "https://media.grabticks.com/",
+		"mcl-003":    "https://cdn.mclcinema.com/MovieMedia/images/",
+		"broadway-4": "https://cybertecture.io/wp-content/uploads/",
+		"sunbeam-1":  "https://thumb.wikimedia.org/wikipedia/commons/",
+		// Commons 審圖通過（2026-10-12）
+		"broadway-1":  "https://commons.wikimedia.org/wiki/Special:FilePath/",
+		"broadway-13": "https://commons.wikimedia.org/wiki/Special:FilePath/",
+		"mcl-002":     "https://commons.wikimedia.org/wiki/Special:FilePath/",
+		"lux-1":       "https://commons.wikimedia.org/wiki/Special:FilePath/",
+		"cgv-22":      "https://commons.wikimedia.org/wiki/Special:FilePath/",
 	}
 	for id, wantPrefix := range cases {
 		src, ok := Static(id)
@@ -55,7 +68,6 @@ func TestStaticBuildsAbsoluteURLsWithReferer(t *testing.T) {
 		if len(src.URL) <= len(wantPrefix) || src.URL[:len(wantPrefix)] != wantPrefix {
 			t.Errorf("Static(%q).URL = %q, want prefix %q", id, src.URL, wantPrefix)
 		}
-		// Referer 缺了就是 403 → 4KB 错误页，不是图。
 		if src.Referer == "" {
 			t.Errorf("Static(%q).Referer is empty", id)
 		}
@@ -65,27 +77,25 @@ func TestStaticBuildsAbsoluteURLsWithReferer(t *testing.T) {
 	}
 }
 
-// TestStaticRejectsUnknown pins the fall-through: anything not in the table
-// must return false so the caller keeps hkmovie6's og:image.
+// TestStaticRejectsUnknown pins the fall-through.
 func TestStaticRejectsUnknown(t *testing.T) {
 	for _, id := range []string{
-		"broadway-7", // ★ 官网只有影廳內景，且本組没有代用图
 		"emperor-57011",
+		"non-existent-cinema",
 		"",
 	} {
 		if _, ok := Static(id); ok {
-			t.Errorf("Static(%q) = ok, want miss (should fall back to hkmovie6)", id)
+			t.Errorf("Static(%q) = ok, want miss", id)
 		}
 	}
 }
 
 // TestGroupFallbackPointsAtRealPhotos guards the group-fallback table.
 //
-// 这批 id 的院线官网根本没有宣傳照，退回同集团的官方形象照。回退一旦指向
-// 一个不存在的 id，就会静默变成「无照片」—— 页面退回纯文字头部，日志上只
-// 看得出少了一张。所以这里钉住：每个 donor 都必须真的能解析出 URL 与 Referer。
+// broadway-12 不再在表內：2026-10-12 審圖通過了它自己的 Commons 售票處照，
+// curatedPhotos 優先於 groupFallback，所以它有自己的圖。
 func TestGroupFallbackPointsAtRealPhotos(t *testing.T) {
-	ids := []string{"broadway-3", "broadway-11", "broadway-12", "cineart-18"}
+	ids := []string{"broadway-3", "broadway-11", "cineart-18", "mcl-016", "mcl-018", "mcl-019", "mcl-021"}
 	for _, id := range ids {
 		src, ok := Static(id)
 		if !ok {

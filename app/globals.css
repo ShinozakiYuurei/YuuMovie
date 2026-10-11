@@ -1702,22 +1702,29 @@ html[data-theme='pink'] .hkm-accent-panel {
  * 那會漏掉自帶顏色的 .hkm-chip / .hkm-fee（它們的色寫在類裡，
  * 優先級高於 Tailwind 的工具類，加了 text-white 也不生效）。
  */
+.hkm-on-photo {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 2px 8px rgba(0, 0, 0, 0.7);
+}
+
 .hkm-on-photo .hkm-chip {
-  border-color: rgb(255 255 255 / 0.28);
+  border-color: rgb(255 255 255 / 0.35);
   background: linear-gradient(
     150deg,
-    rgb(255 255 255 / 0.22) 0%,
-    rgb(255 255 255 / 0.1) 100%
+    rgb(255 255 255 / 0.25) 0%,
+    rgb(255 255 255 / 0.12) 100%
   );
   color: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
 }
 
 .hkm-on-photo .hkm-fee {
-  color: rgb(255 255 255 / 0.92);
+  color: rgb(255 255 255 / 0.95);
 }
 
 .hkm-on-photo .hkm-fee--unknown {
-  color: rgb(255 255 255 / 0.72);
+  color: rgb(255 255 255 / 0.75);
 }
 
 

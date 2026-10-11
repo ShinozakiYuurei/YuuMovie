@@ -97,6 +97,18 @@ export default async function CinemaPage({ params }: { params: Promise<{ id: str
   // 場館照；沒有時為 null，頭部回退成純文字（見上方註釋）
   const photo = cinemaPhotoPath(cinema.id);
   const hasCoord = Boolean(cinemaCoord(cinema.id));
+  /*
+   * 左下角地址行补地区前缀（2026-10-12）：
+   *
+   *   街道名本身看不出区位 —— 「告士打道 77 號」在港島、九龍、新界都有同名的街，
+   *   單靠地址讀者要先自己在腦內對照十八區地圖才能知道去港島還是新界。
+   *   地區由 lib/region.ts 從地址推斷，讀取層已算好（cinema.region），
+   *   澳門戲院沒有地區值，就退回只顯示地址。
+   */
+  const addressLine =
+    cinema.region && cinema.address
+      ? `${cinema.region} · ${cinema.address}`
+      : cinema.address;
 
   return (
     <>
@@ -147,25 +159,34 @@ export default async function CinemaPage({ params }: { params: Promise<{ id: str
             {/* 漸變遮罩：保證底部文字區的對比度（理由見上） */}
             <div
               aria-hidden
-              className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent"
+              className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/75 via-40% to-transparent"
+            />
+            <div
+              aria-hidden
+              className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/35 via-50% to-transparent"
             />
             <div className="hkm-on-photo absolute inset-x-0 bottom-0 p-4 sm:p-6">
-              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <h1 className="text-3xl font-bold tracking-tight text-white">{cinema.nameZh}</h1>
+              <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)]">
+                  {cinema.nameZh}
+                </h1>
                 <span className="hkm-chip">{SOURCE_LABEL[cinema.source]}</span>
               </div>
-              {cinema.address && (
-                <p className="mt-1.5 text-sm text-white/80">{cinema.address}</p>
+              {addressLine && (
+                <p className="mt-2 text-sm font-medium text-white/95 drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
+                  {addressLine}
+                </p>
               )}
               {/*
                * 手續費與地圖按鈕都壓在照片上：兩者的顏色由 .hkm-on-photo
                * 作用域接管（見 globals.css）—— 它們自帶的類優先級高於
                * Tailwind 工具類，逐個加 text-white 是不生效的。
                */}
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+              <div className="mt-3 flex flex-wrap items-center gap-2.5 sm:gap-3">
                 <FeeLine
                   amount={fee.amount}
                   note={fee.note}
+                  variant="onPhoto"
                 />
                 {hasCoord && (
                   <CinemaMapButton
@@ -198,8 +219,8 @@ export default async function CinemaPage({ params }: { params: Promise<{ id: str
              * 地址只剩地圖按鈕的 hover）。現把完整地址放回戲院名旁邊，
              * 手續費仍獨立成行 —— 兩者都是選戲院要看的資訊，不互相頂替。
              */}
-            {cinema.address && (
-              <span className="text-sm text-fg-muted">{cinema.address}</span>
+            {addressLine && (
+              <span className="text-sm text-fg-muted">{addressLine}</span>
             )}
           </div>
           {/* 手續費獨立一行，以一般次要文字顯示，不套用玻璃或標籤樣式。 */}
