@@ -42,6 +42,17 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	// 空导入注册解码器 —— 少一个就是「image: unknown format」：
+	//
+	// ★ WebP 这一行不是可選的（2026-10-11 首次上線實測踩到）：
+	//   請求帶了 Accept: image/webp（見下方 download 處），而 storage.movie6.com
+	//   **照做** —— 同一張圖按 Accept 返回 JPEG 或 WebP（實測 1.15MB → 647KB）。
+	//   只註冊 JPEG/PNG 時，絕大多數戲院都會解碼失敗（首跑 53 家裡 48 家失敗），
+	//   而錯誤訊息只有一句 "image: unknown format"，看不出是格式問題。
+	//
+	// GIF 純屬保險：目前沒有 .gif 源圖，但它是 image.Decode 的標準成員，
+	// 註冊的代價只是幾 KB 二進位。
+	_ "golang.org/x/image/webp"
 	"image"
 	_ "image/gif"
 	"image/jpeg"
