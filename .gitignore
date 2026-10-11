@@ -150,3 +150,25 @@ probe/*
 #   会把它一起提交 —— 既污染仓库，又会在下次部署时与服务器侧的生成物撞车。
 #   （2026-10-10 排查 301 表被拒绝写出时顺手撞到，跑完生成脚本就出现了。）
 deploy/nginx-slug-redirects.conf
+
+# 本机调试与部署日志：deploy/sync.sh 的 `git add -A` 会把它们一起提���，
+# 2026-10-11 就因为 tmp-deploy.err 被当成「改动」单独提交了一次，
+# 导致服务器代码与仓库不一致、部署自检拦下。部署输出请写到别的目录。
+tmp-deploy*.log
+tmp-deploy*.err
+tmp-*.json
+tmp-*.cjs
+tmp-*.mjs
+tmp-c2.tgz
+tmp-cinemas52.tgz
+tmp-mclbig.tgz
+tmp-all52/
+tmp-mclsrc/
+tmp-v3/
+tmp-new/
+tmp-mcl/
+tmp-bwall/
+tmp-bwpng/
+tmp-bjs/
+tmp-icirena/
+tmp-official-all/
