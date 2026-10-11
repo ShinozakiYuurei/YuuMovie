@@ -119,9 +119,9 @@ var curatedPhotos = map[string]Source{
 	// ★ 2026-10-12 高清候選審圖通過（來源 Wikimedia Commons，3840×2880）
 	//   D2 Place CGV 正門入口與黃色招牌
 	"cgv-22": {
-		URL:     "https://commons.wikimedia.org/wiki/Special:FilePath/HK_SSP_%E9%95%B7%E6%B2%99%E7%81%A3_Cheung_Sha_Wan_MTR_Station_exit_and_entrance_Lai_Chi_Kok_Road_view_%E8%8D%94%E6%9E%9D%E8%A7%92_D2_Place_Two_CGV_Cinemas_December_2019_SS2.jpg?width=2560",
+		URL:     "https://commons.wikimedia.org/wiki/Special:FilePath/HK_SSP_%E9%95%B7%E6%B2%99%E7%81%A3_Cheung_Sha_Wan_%E9%95%B7%E7%BE%A9%E8%A1%97_Cheung_Yee_Street_D2_Place_Two_mall_shop_December_2019_SS2_13.jpg?width=2560",
 		Referer: "https://commons.wikimedia.org/",
-		Note:    "Commons 4128×3096：D2 Place CGV 正門入口與黃色招牌",
+		Note:    "Commons 4128×3096：D2 Place CGV 正門黃色招牌（替掉那張招牌被裁在顶部的通道照）",
 	},
 	// ★ 2026-10-12 高清候選審圖通過（來源 Wikimedia Commons，3840×2880）
 	//   奧海城 the sky 售票處
