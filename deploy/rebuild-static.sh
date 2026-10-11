@@ -63,7 +63,13 @@ cd "${APP_DIR}"
 # 保证 Go 二进制存在（优先使用 bin/，未编译时自动构建）
 ensure_go_bins() {
   mkdir -p "${APP_DIR}/bin"
-  if [ ! -x "${APP_DIR}/bin/scrape" ] || [ ! -x "${APP_DIR}/bin/enrich-run" ] || [ ! -x "${APP_DIR}/bin/synopsis-run" ] || [ ! -x "${APP_DIR}/bin/check-links" ] || [ ! -x "${APP_DIR}/bin/cinemaphotos" ]; then
+  # ★ 不能只看「二進位是否存在」（2026-10-11 實際踩到）：部署把代碼切到新 commit，
+  #   而 bin/ 裡的舊二進位仍然存在 —— 守衛判定「有」，於是帶著**上一個版本的
+  #   抓取器**去重建（那次是場館照解碼器還沒註冊的舊 cinemaphotos，53 家裡失敗 48 家，
+  #   而頁面照樣 200，只是照片全缺）。
+  #   現在改為比 mtime：任何一個 Go 源檔比二進位新就重編。
+  _go_newest=$(find "${APP_DIR}/goscraper" -name "*.go" -newer "${APP_DIR}/bin/scrape" -print -quit 2>/dev/null || true)
+  if [ ! -x "${APP_DIR}/bin/scrape" ] || [ -n "${_go_newest}" ]; then
     echo "  编译 Go 抓取工具链..."
     ( cd "${APP_DIR}/goscraper" && \
       go build -o "${APP_DIR}/bin/scrape" ./cmd/scrape && \

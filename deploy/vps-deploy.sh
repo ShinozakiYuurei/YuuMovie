@@ -248,7 +248,8 @@ if command -v go >/dev/null 2>&1 && [ -d goscraper ]; then
     go build -o ../bin/enrich-run ./cmd/enrich-run && \
     go build -o ../bin/synopsis-run ./cmd/synopsis-run && \
     go build -o ../bin/check-links ./cmd/check-links && \
-    go build -o ../bin/ogcardgen ./cmd/ogcardgen )
+    go build -o ../bin/ogcardgen ./cmd/ogcardgen && \
+    go build -o ../bin/cinemaphotos ./cmd/cinemaphotos )
 fi
 # ---------- 4 重建静态站 ----------
 # rebuild-static.sh 默认只抓院线数据；ENRICH=1 时可在构建前增量刷新评分。
